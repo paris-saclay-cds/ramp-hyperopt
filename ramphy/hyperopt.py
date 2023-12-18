@@ -337,7 +337,8 @@ class HyperparameterOptimization(object):
     """
 
     def __init__(
-        self, hyperparameters, engine, ramp_kit_dir, submission_dir, data_label
+        self, hyperparameters, engine, ramp_kit_dir, 
+        hyperopt_submission_dir, submission_dir, data_label, test
     ):
         self.hyperparameters = hyperparameters
         self.engine = engine
@@ -353,7 +354,19 @@ class HyperparameterOptimization(object):
             self.X_train, self.y_train = self.problem.get_train_data(path=ramp_kit_dir)
             self.X_test, self.y_test = self.problem.get_test_data(path=ramp_kit_dir)
         self.cv = list(self.problem.get_cv(self.X_train, self.y_train))
+        self.data_label = data_label
+        self.hyperopt_submission_dir = hyperopt_submission_dir
         self.submission_dir = submission_dir
+        self.test = test
+
+        self.hyperopt_output_path = os.path.join(
+            self.submission_dir, 'hyperopt_output')
+        if self.data_label is not None:
+            self.hyperopt_output_path = os.path.join(
+                self.hyperopt_output_path, self.data_label)
+        if not os.path.exists(self.hyperopt_output_path):
+            os.makedirs(self.hyperopt_output_path)
+
         self.hyperparameter_names = [h.name for h in hyperparameters]
         self.hyperparameters_indices = [h.name + '_i' for h in hyperparameters]
         self.score_names = [s.name for s in self.problem.score_types]
@@ -384,11 +397,17 @@ class HyperparameterOptimization(object):
             + ['float'] * 2
             + ['int'] * 2
         )
+        if self.test:
+            scores_columns += ['test_' + name for name in self.score_names]
+            scores_columns += ['test_time', 'n_test']
+            dtypes = dtypes + (
+                ['float'] * len(self.score_names) + ['float'] + ['int'])
+            
         self.df_scores_ = pd.DataFrame(columns=scores_columns)
         for column, dtype in zip(scores_columns, dtypes):
             self.df_scores_[column] = self.df_scores_[column].astype(dtype)
 
-    def _update_df_scores(self, df_scores, fold_i, test):
+    def update_df_scores(self, df_scores, fold_i):
         row = {'fold_i': fold_i}
         for h in self.hyperparameters:
             row[h.name] = h.default
@@ -396,23 +415,23 @@ class HyperparameterOptimization(object):
         for name in self.score_names:
             row['train_' + name] = df_scores.loc['train'][name]
             row['valid_' + name] = df_scores.loc['valid'][name]
-            if test:
+            if self.test:
                 row['test_' + name] = df_scores.loc['test'][name]
         row['train_time'] = float(df_scores.loc['train']['time'])
         row['valid_time'] = float(df_scores.loc['valid']['time'])
-        row['valid_time'] = float(df_scores.loc['test']['time'])
-
         row['n_train'] = len(self.cv[fold_i][0])
         row['n_valid'] = len(self.cv[fold_i][1])
-        row['n_test'] = len(self.X_test[0])
-        
+        if self.test:
+            row['test_time'] = float(df_scores.loc['test']['time'])
+            row['n_test'] = len(self.X_test[0])
+
         self.df_scores_.loc[len(self.df_scores_)] = pd.Series(row)
         self.df_scores_['fold_i'] = self.df_scores_['fold_i'].astype(int)
         for h in self.hyperparameters:
             col = h.name + '_i'
             self.df_scores_[col] = self.df_scores_[col].astype(int)
 
-    def _run_next_experiment(self, module_path, fold_i):
+    def run_next_experiment(self, module_path, fold_i):
         _, _, df_scores = rw.utils.run_submission_on_cv_fold(
             self.problem,
             module_path=module_path,
@@ -424,15 +443,15 @@ class HyperparameterOptimization(object):
         )
         return df_scores
 
-    def _make_and_save_summary(self, hyperopt_output_path):
-        summary_fname = os.path.join(hyperopt_output_path, 'summary.csv')
+    def make_and_save_summary(self, fname='summary.csv'):
+        summary_fname = os.path.join(self.hyperopt_output_path, fname)
         self.df_scores_.to_csv(summary_fname)
 
-    def _load_summary(self, hyperopt_output_path):
-        summary_fname = os.path.join(hyperopt_output_path, 'summary.csv')
+    def load_summary(self, hyperopt_output_path):
+        summary_fname = os.path.join(self.hyperopt_output_path, 'summary.csv')
         self.df_scores_ = pd.read_csv(summary_fname, index_col=0)
 
-    def _save_best_model(self):
+    def save_best_model(self):
         official_scores = self.df_summary_[
             'valid_' + self.problem.score_types[0].name + '_m'
         ]
@@ -454,17 +473,11 @@ class HyperparameterOptimization(object):
         )
 
 
-def run(hyperparameter_experiment, n_trials, test, resume=False):
-    # Create hyperopt output directory
-    hyperopt_output_path = os.path.join(
-        hyperparameter_experiment.submission_dir, 'hyperopt_output'
-    )
-    if not os.path.exists(hyperopt_output_path):
-        os.makedirs(hyperopt_output_path)
-
+def run(hyperparameter_experiment, n_trials, resume=False):
     start_iter = 0
     if resume:
-        hyperparameter_experiment._load_summary(hyperopt_output_path)
+        hyperparameter_experiment.load_summary(
+            hyperparameter_experiment.hyperopt_output_path)
         start_iter = len(hyperparameter_experiment.df_scores_)
     start = pd.Timestamp.now()
     for i_iter in range(start_iter, n_trials):
@@ -489,21 +502,21 @@ def run(hyperparameter_experiment, n_trials, test, resume=False):
         )
         # Calling the training script.
 
-        df_scores = hyperparameter_experiment._run_next_experiment(
+        df_scores = hyperparameter_experiment.run_next_experiment(
             output_submission_dir, fold_i
         )
         sn = hyperparameter_experiment.problem.score_types[0].name
         hyperparameter_experiment.engine.pass_feedback(
             fold_i, len(hyperparameter_experiment.cv), df_scores, sn
         )
-        hyperparameter_experiment._update_df_scores(df_scores, fold_i, test)
+        hyperparameter_experiment.update_df_scores(df_scores, fold_i)
         shutil.rmtree(output_submission_dir)
         now = pd.Timestamp.now()
         eta = start + (now - start) / (i_iter + 1 - start_iter) * (
             n_trials - start_iter
         )
         print(f'Done {i_iter + 1} / {n_trials} at {now}. ETA = {eta}.')
-        hyperparameter_experiment._make_and_save_summary(hyperopt_output_path)
+        hyperparameter_experiment.make_and_save_summary()
     scores_columns = ['valid_' + name for name in hyperparameter_experiment.score_names]
     for score in scores_columns:
         hyperparameter_experiment.df_scores_[score + '_max'] = (
@@ -528,35 +541,36 @@ def objective(config, run_params=None):
     valid_scores = np.zeros(len(hyperparam_opt.cv))
     df_scores_list = []
     for fold_i in range(len(hyperparam_opt.cv)):
-        df_scores = hyperparam_opt._run_next_experiment(output_submission_dir, fold_i)
+        df_scores = hyperparam_opt.run_next_experiment(output_submission_dir, fold_i)
         sn = hyperparam_opt.score_names[0]
         valid_scores[fold_i] = df_scores.loc['valid', sn]
         df_scores_list.append(df_scores)
+        hyperparam_opt.update_df_scores(
+            df_scores,
+            fold_i,
+        )
+    import time
+    fname = f'tmp_summary_{time.time()}.csv'
+    hyperparam_opt.make_and_save_summary(fname)
     shutil.rmtree(output_submission_dir)
+
     tune.report(
         valid_score=valid_scores.mean(),
         df_scores_list=df_scores_list,
     )
 
 
-def run_tune(hyperparameter_experiment, n_trials, test):
-
+def run_tune(hyperparameter_experiment, n_trials):
     is_lower_the_better = hyperparameter_experiment.problem.score_types[
         0
     ].is_lower_the_better
     engine_mode = 'min' if is_lower_the_better else 'max'
 
-    hyperopt_output_path = os.path.join(
-        hyperparameter_experiment.submission_dir, 'hyperopt_output'
-    )
-    if not os.path.exists(hyperopt_output_path):
-        os.makedirs(hyperopt_output_path)
-
     config = {
         h.name: tune.randint(0, len(h.values))
         for h in hyperparameter_experiment.hyperparameters
     }
-
+    
     run_params = {
         'current_dir': os.getcwd(),
         'hyperparam_opt': hyperparameter_experiment,
@@ -574,16 +588,14 @@ def run_tune(hyperparameter_experiment, n_trials, test):
 
     for _, row in results.results_df.iterrows():
         for h in hyperparameter_experiment.hyperparameters:
-            h.default_index = int(row[f'config.{h.name}'])
+            h.default_index = int(row[f'config/{h.name}'])
         for fold_i, df_scores in enumerate(row['df_scores_list']):
-            hyperparameter_experiment._update_df_scores(
+            hyperparameter_experiment.update_df_scores(
                 df_scores,
                 fold_i,
-                test=test,
             )
 
-    summary_fname = os.path.join(hyperopt_output_path, 'summary.csv')
-    hyperparameter_experiment.df_scores_.to_csv(summary_fname)
+    hyperparameter_experiment.make_and_save_summary()
 
 
 class RayEngine:
@@ -690,6 +702,7 @@ def init_hyperopt(
     data_label,
     label,
     resume,
+    test,
     n_trials=None,
 ):
     # n_trials is only needed by ray_zoopt at init time
@@ -725,7 +738,9 @@ def init_hyperopt(
         engine,
         ramp_kit_dir,
         hyperopt_submission_dir,
+        submission_dir,
         data_label,
+        test,
     )
 
     return hyperparameter_experiment
@@ -752,10 +767,11 @@ def run_hyperopt(
         data_label,
         label,
         resume,
+        test,
     )
     if engine_name.startswith('ray_'):
-        run_tune(hyperparameter_experiment, n_trials, test)
+        run_tune(hyperparameter_experiment, n_trials)
     else:
-        run(hyperparameter_experiment, n_trials, test, resume)
+        run(hyperparameter_experiment, n_trials, resume)
     if not save_best:
-        shutil.rmtree(hyperparameter_experiment.submission_dir)
+        shutil.rmtree(hyperparameter_experiment.hyperopt_submission_dir)
