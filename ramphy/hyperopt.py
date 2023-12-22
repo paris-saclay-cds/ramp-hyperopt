@@ -7,6 +7,8 @@ import pandas as pd
 import rampwf as rw
 from ray import tune
 from tempfile import mkdtemp
+from pathlib import Path
+import warnings
 
 # flake8: noqa: E501
 
@@ -337,7 +339,7 @@ class HyperparameterOptimization(object):
     """
 
     def __init__(
-        self, hyperparameters, engine, ramp_kit_dir, 
+        self, hyperparameters, engine, ramp_kit_dir,
         hyperopt_submission_dir, submission_dir, data_label, test
     ):
         self.hyperparameters = hyperparameters
@@ -402,7 +404,7 @@ class HyperparameterOptimization(object):
             scores_columns += ['test_time', 'n_test']
             dtypes = dtypes + (
                 ['float'] * len(self.score_names) + ['float'] + ['int'])
-            
+
         self.df_scores_ = pd.DataFrame(columns=scores_columns)
         for column, dtype in zip(scores_columns, dtypes):
             self.df_scores_[column] = self.df_scores_[column].astype(dtype)
@@ -505,7 +507,7 @@ def run(hyperparameter_experiment, n_trials, resume=False):
         df_scores = hyperparameter_experiment.run_next_experiment(
             output_submission_dir, fold_i
         )
-        sn = hyperparameter_experiment.problem.score_types[0].name
+        sn = hyperparameter_experiment.score_names[0]
         hyperparameter_experiment.engine.pass_feedback(
             fold_i, len(hyperparameter_experiment.cv), df_scores, sn
         )
@@ -560,30 +562,50 @@ def objective(config, run_params=None):
     )
 
 
-def run_tune(hyperparameter_experiment, n_trials):
+def run_tune(
+    hyperparameter_experiment,
+    n_trials,
+    max_concurrent_runs,
+    n_cpu_per_run,
+    n_gpu_per_run,
+    verbose,
+):
+
     is_lower_the_better = hyperparameter_experiment.problem.score_types[
         0
     ].is_lower_the_better
     engine_mode = 'min' if is_lower_the_better else 'max'
 
-    config = {
-        h.name: tune.randint(0, len(h.values))
-        for h in hyperparameter_experiment.hyperparameters
-    }
-    
+    if hyperparameter_experiment.engine.name == 'ray_grid_search':
+        warnings.warn("A full grid search is being used with RAY's default engine !")
+        config = {
+            h.name: tune.grid_search([i for i in range(len(h.values))])
+            for h in hyperparameter_experiment.hyperparameters
+        }
+        num_samples = int(len(hyperparameter_experiment.cv))
+    else:
+        config = {
+            h.name: tune.randint(0, len(h.values))
+            for h in hyperparameter_experiment.hyperparameters
+        }
+        num_samples = int(n_trials / len(hyperparameter_experiment.cv))
+
     run_params = {
         'current_dir': os.getcwd(),
         'hyperparam_opt': hyperparameter_experiment,
     }
     results = tune.run(
         tune.with_parameters(objective, run_params=run_params),
-        max_concurrent_trials=1,
+        max_concurrent_trials=max_concurrent_runs,
         metric='valid_score',
         mode=engine_mode,
-        num_samples=int(n_trials / len(hyperparameter_experiment.cv)),
+        num_samples=num_samples,
         name=hyperparameter_experiment.engine.name,
         search_alg=hyperparameter_experiment.engine.ray_engine,
         config=config,
+        verbose=verbose,
+        resources_per_trial={"cpu": n_cpu_per_run, "gpu": n_gpu_per_run},
+        local_dir=Path(hyperparameter_experiment.hyperopt_output_path) / "ray_results",
     )
 
     for _, row in results.results_df.iterrows():
@@ -596,13 +618,16 @@ def run_tune(hyperparameter_experiment, n_trials):
             )
 
     hyperparameter_experiment.make_and_save_summary()
+    results.results_df.to_csv(os.path.join(Path(hyperparameter_experiment.hyperopt_output_path), 'ray_summary.csv'))
 
 
 class RayEngine:
     # n_trials is only needed by zoopt at init time
     def __init__(self, engine_name, n_trials=None):
         self.name = engine_name
-        if engine_name[4:] == 'zoopt':
+        if (engine_name[4:] == 'random') or (engine_name[4:] == 'grid_search'):
+            self.ray_engine = None
+        elif engine_name[4:] == 'zoopt':
             try:
                 from ray.tune.search.zoopt import ZOOptSearch
 
@@ -758,6 +783,10 @@ def run_hyperopt(
     test,
     label,
     resume,
+    max_concurrent_runs,
+    n_cpu_per_run,
+    n_gpu_per_run,
+    verbose,
 ):
     hyperparameter_experiment = init_hyperopt(
         ramp_kit_dir,
@@ -770,7 +799,14 @@ def run_hyperopt(
         test,
     )
     if engine_name.startswith('ray_'):
-        run_tune(hyperparameter_experiment, n_trials)
+        run_tune(
+            hyperparameter_experiment,
+            n_trials,
+            max_concurrent_runs,
+            n_cpu_per_run,
+            n_gpu_per_run,
+            verbose,
+        )
     else:
         run(hyperparameter_experiment, n_trials, resume)
     if not save_best:

@@ -94,6 +94,34 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="To resume a broken run. If False, summary.csv will "
     "be created from scratch.",
 )
+@click.option(
+    "--max-concurrent-runs",
+    default=1,
+    show_default=True,
+    help="[ray] Maximum number of trials to run concurrently. Must be non-negative. If "
+         "None or 0, no limit will be applied. default to 1.",
+)
+@click.option(
+    "--n-cpu-per-run",
+    default=1,
+    show_default=True,
+    help="[ray] Machine resources (cpu) to allocate per trial. default to 1",
+)
+@click.option(
+    "--n-gpu-per-run",
+    default=0,
+    show_default=True,
+    help="[ray] Machine resources (gpu) to allocate per trial. default to 0",
+)
+@click.option(
+    "--verbose",
+    default=3,
+    show_default=True,
+    help="[ray] 0, 1, 2, or 3. Verbosity mode. 0 = silent, 1 = only status updates, "
+         "2 = status and brief trial results, 3 = status and detailed trial results. "
+         "Defaults to 3.",
+)
+
 def main(
     submission,
     ramp_kit_dir,
@@ -106,6 +134,10 @@ def main(
     test,
     label,
     resume,
+    max_concurrent_runs,
+    n_cpu_per_run,
+    n_gpu_per_run,
+    verbose
 ):
     """Hyperopt a submission."""
     run_hyperopt(
@@ -120,6 +152,10 @@ def main(
         test=test,
         label=label,
         resume=resume,
+        max_concurrent_runs=max_concurrent_runs,
+        n_cpu_per_run=n_cpu_per_run,
+        n_gpu_per_run=n_gpu_per_run,
+        verbose=verbose,
     )
 
 
