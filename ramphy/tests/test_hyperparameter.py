@@ -1,6 +1,6 @@
 import os
 import pytest
-from rampwf.hyperopt import Hyperparameter, run_hyperopt
+from ramphy.hyperopt import Hyperparameter, run_hyperopt
 
 PATH = os.path.dirname(__file__)
 
@@ -10,7 +10,7 @@ PATH = os.path.dirname(__file__)
 def test_hyperopt():
     submission = "rf"
     data_label = "cover_type_500"
-    engine = "ray_hebo"
+    engine = "ray_random"
 
     ramp_kit_dir = os.path.join(PATH, "test_kit")
     run_hyperopt(
@@ -24,5 +24,9 @@ def test_hyperopt():
         True,
         True,
         True,
-        True
+        True,
+        1,
+        1,
+        0,
+        3,
     )
