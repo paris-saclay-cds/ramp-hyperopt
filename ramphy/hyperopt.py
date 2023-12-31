@@ -423,7 +423,7 @@ class HyperparameterOptimization(object):
         row['n_valid'] = len(self.cv[fold_i][1])
         if self.test:
             row['test_time'] = float(df_scores.loc['test']['time'])
-            row['n_test'] = len(self.X_test[0])
+            row['n_test'] = len(self.X_test)
 
         self.df_scores_.loc[len(self.df_scores_)] = pd.Series(row)
         self.df_scores_['fold_i'] = self.df_scores_['fold_i'].astype(int)
@@ -584,6 +584,7 @@ def run_tune(hyperparameter_experiment, n_trials):
         name=hyperparameter_experiment.engine.name,
         search_alg=hyperparameter_experiment.engine.ray_engine,
         config=config,
+        resources_per_trial={'cpu': 8},
     )
 
     for _, row in results.results_df.iterrows():
