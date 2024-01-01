@@ -605,7 +605,7 @@ def run_tune(
         config=config,
         verbose=verbose,
         resources_per_trial={"cpu": n_cpu_per_run, "gpu": n_gpu_per_run},
-        local_dir=Path(hyperparameter_experiment.hyperopt_output_path) / "ray_results",
+        local_dir=(Path(hyperparameter_experiment.hyperopt_output_path) / "ray_results").as_posix(),
     )
 
     for _, row in results.results_df.iterrows():
