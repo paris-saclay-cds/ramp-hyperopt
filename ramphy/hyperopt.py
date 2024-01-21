@@ -2,6 +2,10 @@
 import re
 import os
 import shutil
+
+import glob
+import json
+
 import numpy as np
 import pandas as pd
 import rampwf as rw
@@ -626,7 +630,7 @@ def run_tune(
 
 class RayEngine:
     # n_trials is only needed by zoopt at init time
-    def __init__(self, engine_name, n_trials=None):
+    def __init__(self, engine_name, n_trials=None, points_to_evaluate=None, evaluated_rewards=None):
         self.name = engine_name
         if (engine_name[4:] == 'random') or (engine_name[4:] == 'grid_search'):
             self.ray_engine = None
@@ -637,6 +641,8 @@ class RayEngine:
                 self.ray_engine = ZOOptSearch(  # gets stuck often
                     algo='Asracos',  # only support ASRacos currently
                     budget=n_trials,
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except('zoopt')
@@ -644,49 +650,70 @@ class RayEngine:
             try:
                 from ray.tune.search.ax import AxSearch
 
-                self.ray_engine = AxSearch()
+                self.ray_engine = AxSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('ax-platform sqlalchemy')
         elif engine_name[4:] == 'blend_search':
             try:
                 from ray.tune.search.flaml import BlendSearch
 
-                self.ray_engine = BlendSearch()
+                self.ray_engine = BlendSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('flaml')
         elif engine_name[4:] == 'cfo':
             try:
                 from ray.tune.search.flaml import CFO
 
-                self.ray_engine = CFO()
+                self.ray_engine = CFO(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('flaml')
         elif engine_name[4:] == 'skopt':
             try:
                 from ray.tune.search.skopt import SkOptSearch
 
-                self.ray_engine = SkOptSearch()
+                self.ray_engine = SkOptSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('scikit-optimize')
         elif engine_name[4:] == 'hyperopt':
             try:
                 from ray.tune.search.hyperopt import HyperOptSearch
 
-                self.ray_engine = HyperOptSearch()
+                self.ray_engine = HyperOptSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('hyperopt')
         elif engine_name[4:] == 'bayesopt':
             try:
                 from ray.tune.search.bayesopt import BayesOptSearch
 
-                self.ray_engine = BayesOptSearch()
+                self.ray_engine = BayesOptSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('bayesian-optimization')
         elif engine_name[4:] == 'bohb':
             try:
                 from ray.tune.search.bohb import TuneBOHB
 
-                self.ray_engine = TuneBOHB()
+                self.ray_engine = TuneBOHB(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('hpbandster')
         elif engine_name[4:] == 'nevergrad':
@@ -695,7 +722,9 @@ class RayEngine:
                 import nevergrad as ng
 
                 self.ray_engine = NevergradSearch(
-                    optimizer=ng.optimizers.OnePlusOne
+                    optimizer=ng.optimizers.OnePlusOne,
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except('nevergrad')
@@ -703,14 +732,20 @@ class RayEngine:
             try:
                 from ray.tune.search.hebo import HEBOSearch
 
-                self.ray_engine = HEBOSearch()
+                self.ray_engine = HEBOSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('hebo')
         elif engine_name[4:] == 'optuna':
             try:
                 from ray.tune.search.optuna import OptunaSearch
 
-                self.ray_engine = OptunaSearch()
+                self.ray_engine = OptunaSearch(
+                    points_to_evaluate=points_to_evaluate,
+                    evaluated_rewards=evaluated_rewards,
+                )
             except ModuleNotFoundError:
                 self.raise_except('optuna')
         else:
@@ -758,7 +793,31 @@ def init_hyperopt(
     if engine_name == 'random':
         engine = RandomEngine(hyperparameters)
     elif engine_name.startswith('ray_'):
-        engine = RayEngine(engine_name, n_trials)
+        points_to_evaluate = None
+        evaluated_rewards = None
+        if resume:
+            if data_label is None:
+                ray_results_path = Path(submission_dir) / 'hyperopt_output'
+            else:
+                ray_results_path = Path(submission_dir) / 'hyperopt_output' / data_label
+            print("\n-------------- Resuming previous trials --------------")
+            previous_runs = glob.glob(f"{ray_results_path}/tmp_summary_*.csv")
+            points_to_evaluate = []
+            evaluated_rewards = []
+            for prev_run in previous_runs:
+                try:
+                    result_df = pd.read_csv(prev_run)
+                    run_hypers = {
+                        str(k): int(result_df[f'{k}_i'].values) for k in [h.name for h in hyperparameters]
+                    }
+                    # TODO: how to automatically know ray's metric here (store a 'valid-score' column in tmp_summary)
+                    run_eval = float(result_df['valid_r2'].values)
+                    points_to_evaluate.append(run_hypers)
+                    evaluated_rewards.append(run_eval)
+                except json.decoder.JSONDecodeError:
+                    print(f"error loading: {prev_run}")
+            print("-------------- Done --------------\n")
+        engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:
         raise ValueError(f'{engine_name} is not a valid engine name')
     hyperparameter_experiment = HyperparameterOptimization(
