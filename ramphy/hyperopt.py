@@ -5,7 +5,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import rampwf as rw
-from ray import tune
+from ray import tune, train
 from tempfile import mkdtemp
 from pathlib import Path
 import warnings
@@ -556,10 +556,10 @@ def objective(config, run_params=None):
     hyperparam_opt.make_and_save_summary(fname)
     shutil.rmtree(output_submission_dir)
 
-    tune.report(
-        valid_score=valid_scores.mean(),
-        df_scores_list=df_scores_list,
-    )
+    train.report({
+        'valid_score': valid_scores.mean(),
+        'df_scores_list': df_scores_list,
+    })
 
 
 def run_tune(
@@ -594,13 +594,16 @@ def run_tune(
         'current_dir': os.getcwd(),
         'hyperparam_opt': hyperparameter_experiment,
     }
+    tune_name = f'{hyperparameter_experiment.engine.name}__' +\
+                f'{hyperparameter_experiment.submission_dir.split("/")[-1]}__' +\
+                f'{hyperparameter_experiment.data_label}'
     results = tune.run(
         tune.with_parameters(objective, run_params=run_params),
         max_concurrent_trials=max_concurrent_runs,
         metric='valid_score',
         mode=engine_mode,
         num_samples=num_samples,
-        name=hyperparameter_experiment.engine.name,
+        name=tune_name,
         search_alg=hyperparameter_experiment.engine.ray_engine,
         config=config,
         verbose=verbose,
