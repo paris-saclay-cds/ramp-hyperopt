@@ -807,11 +807,13 @@ def init_hyperopt(
             for prev_run in previous_runs:
                 try:
                     result_df = pd.read_csv(prev_run)
+                    h_names = [h.name for h in hyperparameters]
+                    h_indices = [h.name + '_i' for h in hyperparameters]
                     run_hypers = {
-                        str(k): int(result_df[f'{k}_i'].values) for k in [h.name for h in hyperparameters]
+                        h_name: int(result_df[h_i].values[0]) 
+                        for h_name, h_i in zip(h_names, h_indices)
                     }
-                    # TODO: how to automatically know ray's metric here (store a 'valid-score' column in tmp_summary)
-                    run_eval = float(result_df['valid_r2'].values)
+                    run_eval = float(result_df[f'valid_{problem.score_types[0].name}'].mean())
                     points_to_evaluate.append(run_hypers)
                     evaluated_rewards.append(run_eval)
                 except json.decoder.JSONDecodeError:
