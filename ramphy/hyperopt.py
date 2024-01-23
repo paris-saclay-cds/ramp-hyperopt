@@ -818,6 +818,7 @@ def init_hyperopt(
                     evaluated_rewards.append(run_eval)
                 except json.decoder.JSONDecodeError:
                     print(f"error loading: {prev_run}")
+            n_trials -= len(previous_runs)
             print("-------------- Done --------------\n")
         engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:
