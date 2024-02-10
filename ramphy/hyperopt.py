@@ -190,7 +190,11 @@ class Hyperparameter(object):
             value : any dtype
                 The value to look for.
         """
-        return list(self.values).index(value)
+        if self.dtype == 'float':
+            float_list = list([abs(v - value) < 1e-15 for v in self.values])
+            return float_list.index(True)
+        else:
+            return list(self.values).index(value)
 
     def set_default(self, default):
         """Set the default value.
@@ -818,7 +822,6 @@ def init_hyperopt(
                     evaluated_rewards.append(run_eval)
                 except json.decoder.JSONDecodeError:
                     print(f"error loading: {prev_run}")
-            n_trials -= len(previous_runs)
             print("-------------- Done --------------\n")
         engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:
