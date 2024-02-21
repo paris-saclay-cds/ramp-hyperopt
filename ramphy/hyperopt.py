@@ -1,7 +1,8 @@
-"""Hyperparameter optiomization for ramp-kits."""
+"""Hyperparameter optimization for ramp-kits."""
 import re
 import os
 import shutil
+import time
 
 import glob
 import json
@@ -330,7 +331,8 @@ def write_hyperparameters(
         with open(f_name) as f:
             content = f.read()
             content = HYPERPARAMS_REPL_REGEX.sub(hyper_section, content)
-        output_f_name = os.path.join(output_submission_dir, wen + '.py')
+        Path(output_submission_dir).mkdir(parents=True, exist_ok=True)
+        output_f_name = Path(output_submission_dir) / f'{wen}.py'
         with open(output_f_name, 'w') as f:
             f.write(content)
 
@@ -441,7 +443,15 @@ class HyperparameterOptimization(object):
             col = h.name + '_i'
             self.df_scores_[col] = self.df_scores_[col].astype(int)
 
-    def run_next_experiment(self, module_path, fold_i):
+    def run_next_experiment(self, module_path, fold_i, save_output=False):
+        if save_output:
+            training_output_path = Path(module_path) / 'training_output'
+            training_output_path.mkdir(parents=True, exist_ok=True)
+            print('Training output path: {}'.format(training_output_path))
+            fold_output_path = training_output_path / f'fold_{fold_i}'
+            fold_output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            fold_output_path='.'
         _, _, df_scores = rw.utils.run_submission_on_cv_fold(
             self.problem,
             module_path=module_path,
@@ -450,15 +460,21 @@ class HyperparameterOptimization(object):
             y_train=self.y_train,
             X_test=self.X_test,
             y_test=self.y_test,
+            save_output=save_output,
+            fold_output_path=fold_output_path,
         )
         return df_scores
 
-    def make_and_save_summary(self, fname='summary.csv'):
-        summary_fname = os.path.join(self.hyperopt_output_path, fname)
+    def make_and_save_summary(self, path=None, fname='summary.csv'):
+        if path is None:
+            path = self.hyperopt_output_path
+        summary_fname = Path(path) / fname
         self.df_scores_.to_csv(summary_fname)
 
-    def load_summary(self, hyperopt_output_path):
-        summary_fname = os.path.join(self.hyperopt_output_path, 'summary.csv')
+    def load_summary(self, path=None, fname='summary.csv'):
+        if path is None:
+            path = self.hyperopt_output_path
+        summary_fname = Path(path) / fname
         self.df_scores_ = pd.read_csv(summary_fname, index_col=0)
 
     def save_best_model(self):
@@ -540,7 +556,9 @@ def objective(config, run_params=None):
     hyperparam_opt = run_params['hyperparam_opt']
     for h in hyperparam_opt.hyperparameters:
         h.default_index = config[h.name]
-    output_submission_dir = mkdtemp()
+#    output_submission_dir = mkdtemp()
+    output_submission_dir =\
+        f'{hyperparam_opt.submission_dir}_hyperopt_{time.time()}'
     os.chdir(run_params['current_dir'])
     write_hyperparameters(
         hyperparam_opt.submission_dir,
@@ -551,7 +569,8 @@ def objective(config, run_params=None):
     valid_scores = np.zeros(len(hyperparam_opt.cv))
     df_scores_list = []
     for fold_i in range(len(hyperparam_opt.cv)):
-        df_scores = hyperparam_opt.run_next_experiment(output_submission_dir, fold_i)
+        df_scores = hyperparam_opt.run_next_experiment(
+            output_submission_dir, fold_i, run_params['save_output'])
         sn = hyperparam_opt.score_names[0]
         valid_scores[fold_i] = df_scores.loc['valid', sn]
         df_scores_list.append(df_scores)
@@ -559,10 +578,10 @@ def objective(config, run_params=None):
             df_scores,
             fold_i,
         )
-    import time
-    fname = f'tmp_summary_{time.time()}.csv'
-    hyperparam_opt.make_and_save_summary(fname)
-    shutil.rmtree(output_submission_dir)
+#    fname = f'tmp_summary_{time.time()}.csv'
+#    fname = Path(output_submission_dir) / 'summary.csv'
+    hyperparam_opt.make_and_save_summary(path=output_submission_dir)
+#    shutil.rmtree(output_submission_dir)
 
     train.report({
         'valid_score': valid_scores.mean(),
@@ -576,6 +595,7 @@ def run_tune(
     max_concurrent_runs,
     n_cpu_per_run,
     n_gpu_per_run,
+    save_output,
     verbose,
 ):
 
@@ -601,6 +621,7 @@ def run_tune(
     run_params = {
         'current_dir': os.getcwd(),
         'hyperparam_opt': hyperparameter_experiment,
+        'save_output': save_output,
     }
     tune_name = f'{hyperparameter_experiment.engine.name}__' +\
                 f'{hyperparameter_experiment.submission_dir.split("/")[-1]}__' +\
@@ -847,7 +868,7 @@ def run_hyperopt(
     submission,
     engine_name,
     n_trials,
-    save_best,
+    save_output,
     test,
     label,
     resume,
@@ -873,9 +894,10 @@ def run_hyperopt(
             max_concurrent_runs,
             n_cpu_per_run,
             n_gpu_per_run,
+            save_output,
             verbose,
         )
     else:
         run(hyperparameter_experiment, n_trials, resume)
-    if not save_best:
+    if not save_output:
         shutil.rmtree(hyperparameter_experiment.hyperopt_submission_dir)

@@ -68,14 +68,14 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     "--n-trials 56",
 )
 @click.option(
-    "--save-best",
+    "--save-output",
     is_flag=True,
     default=False,
     show_default=True,
     help="Specify this flag to create a "
-    "<submission>_<data_label>_hyperopt "
-    "(or <submission>_hyperopt if <data_label> is None)"
-    'in the "submissions" dir with the best submission.',
+    "<submission>_<data_label>_hyperopt_<timestamp> "
+    "(or <submission>_hyperopt_<timestamp> if <data_label> is None)"
+    'in the "submissions" dir with all the submissions.',
 )
 @click.option(
     "--test",
@@ -130,7 +130,7 @@ def main(
     ramp_submission_dir,
     engine,
     n_trials,
-    save_best,
+    save_output,
     test,
     label,
     resume,
@@ -148,7 +148,7 @@ def main(
         submission=submission,
         engine_name=engine,
         n_trials=n_trials,
-        save_best=save_best,
+        save_output=save_output,
         test=test,
         label=label,
         resume=resume,

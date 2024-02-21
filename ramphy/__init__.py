@@ -6,6 +6,11 @@ from .hyperopt import (
     run_hyperopt,
     write_hyperparameters,
 )
+from .actions import (
+    submit_hybrid,
+    blend,
+    train,
+)
 
 __all__ = [
     "Hyperparameter",
@@ -14,4 +19,7 @@ __all__ = [
     "parse_hyperparameters",
     "run_hyperopt",
     "write_hyperparameters",
+    "submit_hybrid",
+    "blend",
+    "train",
 ]
