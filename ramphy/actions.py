@@ -1,4 +1,4 @@
-"""Hyperparameter optiomization for ramp-kits."""
+"""Actions for RAMP agent."""
 import os
 import shutil
 import time
@@ -11,6 +11,14 @@ import pandas as pd
 import rampwf as rw
 from pathlib import Path
 
+def _bagged_reward(score_type, bagged_f_name):
+    bagged_scores_df = pd.read_csv(bagged_f_name)
+    valid_scores_df = bagged_scores_df[bagged_scores_df['step'] == 'valid']
+    r = valid_scores_df.iloc[-1][score_type.name]
+    if score_type.is_lower_the_better:
+        return -r
+    else:
+        return r
 
 def train(submission, fold_idxs=None, ramp_kit_dir = '.', 
           ramp_data_dir = '.'):
@@ -42,15 +50,9 @@ def train(submission, fold_idxs=None, ramp_kit_dir = '.',
         save_output=True,
         fold_idxs=fold_idxs,
     )
-    # reward is the valid bagged score 
     submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
-    bagged_scores_df = pd.read_csv(
-        submission_dir / 'training_output' / 'bagged_scores.csv', index_col=0)
-    r = bagged_scores_df.loc['valid'].iloc[-1][problem.score_types[0].name]
-    if problem.score_types[0].is_lower_the_better:
-        return -r
-    else:
-        return r
+    bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
+    return _bagged_reward(problem.score_types[0], bagged_f_name)
 
 def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
         score_f_name_prefix=''):
@@ -109,16 +111,8 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
         save_output=True, fold_idxs=fold_idxs,
         score_f_name_prefix=score_f_name_prefix)
 
-    # reward is the valid bagged score 
-    submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
-    bagged_scores_df = pd.read_csv(
-        submission_dir / 'training_output' / f'bagged_scores.csv',
-        index_col=0)
-    r = bagged_scores_df.loc['valid'].iloc[-1][problem.score_types[0].name]
-    if problem.score_types[0].is_lower_the_better:
-        return -r
-    else:
-        return r
+    bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
+    return _bagged_reward(problem.score_types[0], bagged_f_name)
 
 def blend(submissions, fold_idxs=None, ramp_kit_dir = '.', 
           ramp_data_dir = '.'):
@@ -147,15 +141,9 @@ def blend(submissions, fold_idxs=None, ramp_kit_dir = '.',
     rw.utils.testing.blend_submissions(
         submissions, ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir,
         ramp_submission_dir='submissions', save_output=True, output_path=output_path)
-    # reward is the valid bagged score 
-    bagged_scores_df = pd.read_csv(
-        output_path / 'bagged_scores_combined.csv', index_col=0)
-    r = bagged_scores_df.loc['valid'].iloc[-1][problem.score_types[0].name]
-    if problem.score_types[0].is_lower_the_better:
-        return -r
-    else:
-        return r
 
+    bagged_f_name = output_path / 'bagged_scores_combined.csv'
+    return _bagged_reward(problem.score_types[0], bagged_f_name)
 
 def submit_hybrid(new_submission, parent_submissions,
                   ramp_kit_dir = '.', ramp_data_dir = '.'):
