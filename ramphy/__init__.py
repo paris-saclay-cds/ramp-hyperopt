@@ -8,6 +8,7 @@ from .hyperopt import (
 )
 from .actions import (
     submit_hybrid,
+    bag,
     blend,
     train,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "run_hyperopt",
     "write_hyperparameters",
     "submit_hybrid",
+    "bag",
     "blend",
     "train",
 ]

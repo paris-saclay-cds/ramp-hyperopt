@@ -52,6 +52,73 @@ def train(submission, fold_idxs=None, ramp_kit_dir = '.',
     else:
         return r
 
+def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
+        score_f_name_prefix=''):
+    """Bagging action. 
+
+    Bags a submission on a set of folds
+
+    Parameters
+    ----------
+    submission : str
+        The name of the submission to be tested.
+    fold_idxs : list of int, default=None
+        The list of CV folds we want to run the submission on.
+        If None, we will run on all folds.
+    ramp_kit_dir : str, default='.'
+        The directory of the ramp-kit to be tested for submission.
+    ramp_data_dir : str, default='.'
+        The directory of the data.
+    score_f_name_prefix : str, default=''
+        The suffix we add to mark the submission file:
+        submission_{score_f_name_prefix}bagged_test.csv
+    Returns
+    -------
+    r : float
+        The reward: the bagged valid score.
+    """
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
+    print(f'Bagging {submission} on {problem.problem_title}')
+    X_train, y_train, X_test, y_test = rw.utils.assert_data(
+        ramp_kit_dir, ramp_data_dir)
+    cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir)
+    if fold_idxs is None:
+        fold_idxs = range(len(cv))
+    training_output_path = submission_dir / 'training_output'
+    print(f'Training output path: {training_output_path}')
+
+    # saving predictions for CV bagging after the CV loop
+    predictions_valid_list = []
+    predictions_test_list = []
+
+    print(f'Reading prediction files ...')
+    for fold_i in fold_idxs:
+        _, valid_is = cv[fold_i]
+        fold_output_path = training_output_path / f'fold_{fold_i}'
+        predictions_valid, predictions_test = rw.utils.load_predictions(
+            problem, valid_is, data_path=ramp_data_dir,
+            input_path=fold_output_path)
+        predictions_valid_list.append(predictions_valid)
+        predictions_test_list.append(predictions_test)
+
+    rw.utils.bag_submissions(
+        problem, cv, y_train, y_test, predictions_valid_list,
+        predictions_test_list, training_output_path,
+        ramp_data_dir=ramp_data_dir, score_type_index=None,
+        save_output=True, fold_idxs=fold_idxs,
+        score_f_name_prefix=score_f_name_prefix)
+
+    # reward is the valid bagged score 
+    submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
+    bagged_scores_df = pd.read_csv(
+        submission_dir / 'training_output' / f'bagged_scores.csv',
+        index_col=0)
+    r = bagged_scores_df.loc['valid'].iloc[-1][problem.score_types[0].name]
+    if problem.score_types[0].is_lower_the_better:
+        return -r
+    else:
+        return r
 
 def blend(submissions, fold_idxs=None, ramp_kit_dir = '.', 
           ramp_data_dir = '.'):
