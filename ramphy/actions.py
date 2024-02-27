@@ -1,7 +1,8 @@
 """Actions for RAMP agent."""
 import os
-import shutil
 import time
+import shutil
+import itertools
 
 import glob
 import json
@@ -20,8 +21,8 @@ def _bagged_reward(score_type, bagged_f_name):
     else:
         return r
 
-def train(submission, fold_idxs=None, ramp_kit_dir = '.', 
-          ramp_data_dir = '.'):
+def train(submission, fold_idxs=None, 
+          ramp_kit_dir = '.', ramp_data_dir = '.'):
     """Training action. 
 
     Trains and bags a submission on a set of folds
@@ -31,8 +32,8 @@ def train(submission, fold_idxs=None, ramp_kit_dir = '.',
     submission : str
         The name of the submission to be tested.
     fold_idxs : list of int, default=None
-        The list of CV folds we want to run the submission on.
-        If None, we will run on all folds.
+        Fold indices to train on.
+        If None, we will train on all folds.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit to be tested for submission.
     ramp_data_dir : str, default='.'
@@ -54,7 +55,8 @@ def train(submission, fold_idxs=None, ramp_kit_dir = '.',
     bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
     return _bagged_reward(problem.score_types[0], bagged_f_name)
 
-def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
+def bag(submission, fold_idxs=None,
+        ramp_kit_dir = '.', ramp_data_dir = '.',
         score_f_name_prefix=''):
     """Bagging action. 
 
@@ -65,8 +67,8 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
     submission : str
         The name of the submission to be tested.
     fold_idxs : list of int, default=None
-        The list of CV folds we want to run the submission on.
-        If None, we will run on all folds.
+        Fold indices to bag.
+        If None, we will bag all folds.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit to be tested for submission.
     ramp_data_dir : str, default='.'
@@ -85,8 +87,6 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
     X_train, y_train, X_test, y_test = rw.utils.assert_data(
         ramp_kit_dir, ramp_data_dir)
     cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir)
-    if fold_idxs is None:
-        fold_idxs = range(len(cv))
     training_output_path = submission_dir / 'training_output'
     print(f'Training output path: {training_output_path}')
 
@@ -95,8 +95,18 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
     predictions_test_list = []
 
     print(f'Reading prediction files ...')
-    for fold_i in fold_idxs:
-        _, valid_is = cv[fold_i]
+    if fold_idxs is None:
+        fold_start = 0
+        fold_stop = None
+    else:
+        fold_start = min(fold_idxs)
+        fold_stop = max(fold_idxs) + 1
+    fold_i = fold_start - 1
+    for fold in itertools.islice(cv, fold_start, fold_stop):
+        fold_i += 1
+        if not fold_idxs is None and not fold_i in fold_idxs:
+            continue
+        valid_is = fold[1]
         fold_output_path = training_output_path / f'fold_{fold_i}'
         predictions_valid, predictions_test = rw.utils.load_predictions(
             problem, valid_is, data_path=ramp_data_dir,
@@ -105,7 +115,7 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
         predictions_test_list.append(predictions_test)
 
     rw.utils.bag_submissions(
-        problem, cv, y_train, y_test, predictions_valid_list,
+        problem, X_train, y_train, y_test, predictions_valid_list,
         predictions_test_list, training_output_path,
         ramp_data_dir=ramp_data_dir, score_type_index=None,
         save_output=True, fold_idxs=fold_idxs,
@@ -114,8 +124,8 @@ def bag(submission, fold_idxs=None, ramp_kit_dir = '.', ramp_data_dir = '.',
     bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
     return _bagged_reward(problem.score_types[0], bagged_f_name)
 
-def blend(submissions, fold_idxs=None, ramp_kit_dir = '.', 
-          ramp_data_dir = '.'):
+def blend(submissions, fold_idxs=None,
+          ramp_kit_dir = '.', ramp_data_dir = '.'):
     """Blending action. 
 
     Blends a list of submissions
@@ -125,8 +135,8 @@ def blend(submissions, fold_idxs=None, ramp_kit_dir = '.',
     submissions : list of str
         The name of the submissions to be blended.
     fold_idxs : list of int, default=None
-        The list of CV folds we want to run the submission on.
-        If None, we will run on all folds.
+        Fold indices to blend.
+        If None, we will blend all folds.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit to be tested for submission.
     ramp_data_dir : str, default='.'
@@ -140,7 +150,8 @@ def blend(submissions, fold_idxs=None, ramp_kit_dir = '.',
     output_path = Path(ramp_kit_dir) / 'submissions' / 'training_output'
     rw.utils.testing.blend_submissions(
         submissions, ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir,
-        ramp_submission_dir='submissions', save_output=True, output_path=output_path)
+        ramp_submission_dir='submissions', save_output=True,
+        output_path=output_path, fold_idxs=fold_idxs)
 
     bagged_f_name = output_path / 'bagged_scores_combined.csv'
     return _bagged_reward(problem.score_types[0], bagged_f_name)
