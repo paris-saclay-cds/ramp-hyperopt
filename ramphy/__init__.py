@@ -10,6 +10,8 @@ from .actions import (
     submit_hybrid,
     bag,
     blend,
+    hyperopt,
+    retrain,
     train,
 )
 
@@ -23,5 +25,7 @@ __all__ = [
     "submit_hybrid",
     "bag",
     "blend",
+    "hyperopt",
+    "retrain",
     "train",
 ]

@@ -1,11 +1,11 @@
 """Hyperparameter optimization for ramp-kits."""
 import re
 import os
-import shutil
 import time
-
 import glob
 import json
+import shutil
+import itertools
 
 import numpy as np
 import pandas as pd
@@ -349,8 +349,8 @@ class HyperparameterOptimization(object):
     """
 
     def __init__(
-        self, hyperparameters, engine, ramp_kit_dir,
-        hyperopt_submission_dir, submission_dir, data_label, test
+        self, hyperparameters, engine, ramp_kit_dir, ramp_data_dir,
+        submission_dir, fold_idxs, data_label, test
     ):
         self.hyperparameters = hyperparameters
         self.engine = engine
@@ -363,11 +363,27 @@ class HyperparameterOptimization(object):
                 path=ramp_kit_dir, data_label=data_label
             )
         else:
-            self.X_train, self.y_train = self.problem.get_train_data(path=ramp_kit_dir)
-            self.X_test, self.y_test = self.problem.get_test_data(path=ramp_kit_dir)
-        self.cv = list(self.problem.get_cv(self.X_train, self.y_train))
+            self.X_train, self.y_train = self.problem.get_train_data(path=ramp_data_dir)
+            self.X_test, self.y_test = self.problem.get_test_data(path=ramp_data_dir)
+        cv_gen = self.problem.get_cv(self.X_train, self.y_train)
+        self.cv = []
+        if fold_idxs is None:
+            fold_start = 0
+            fold_stop = None
+        else:
+            fold_start = min(fold_idxs)
+            fold_stop = max(fold_idxs) + 1
+        fold_i = fold_start - 1
+        for fold in itertools.islice(cv_gen, fold_start, fold_stop):
+            fold_i += 1
+            if fold_idxs is None or fold_i in fold_idxs:
+                self.cv.append(fold)
+        if fold_idxs is None:
+            self.fold_idxs = list(range(0, fold_i + 1))
+        else:
+            self.fold_idxs = fold_idxs
+
         self.data_label = data_label
-        self.hyperopt_submission_dir = hyperopt_submission_dir
         self.submission_dir = submission_dir
         self.test = test
 
@@ -448,7 +464,7 @@ class HyperparameterOptimization(object):
             training_output_path = Path(module_path) / 'training_output'
             training_output_path.mkdir(parents=True, exist_ok=True)
             print('Training output path: {}'.format(training_output_path))
-            fold_output_path = training_output_path / f'fold_{fold_i}'
+            fold_output_path = training_output_path / f'fold_{self.fold_idxs[fold_i]}'
             fold_output_path.mkdir(parents=True, exist_ok=True)
         else:
             fold_output_path='.'
@@ -784,9 +800,11 @@ class RayEngine:
 
 def init_hyperopt(
     ramp_kit_dir,
+    ramp_data_dir,
     ramp_submission_dir,
     submission,
     engine_name,
+    fold_idxs,
     data_label,
     label,
     resume,
@@ -795,25 +813,9 @@ def init_hyperopt(
 ):
     # n_trials is only needed by ray_zoopt at init time
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    if data_label is None:
-        hyperopt_submission = submission + '_hyperopt'
-    else:
-        hyperopt_submission = (
-            submission + '_' + data_label + '_hyperopt'
-            if not label
-            else submission + '_' + data_label + '_' + engine_name + '_hyperopt'
-        )
-    hyperopt_submission_dir = os.path.join(
-        ramp_submission_dir,
-        hyperopt_submission,
-    )
     submission_dir = os.path.join(ramp_submission_dir, submission)
-    if not resume:
-        if os.path.exists(hyperopt_submission_dir):
-            shutil.rmtree(hyperopt_submission_dir)
-        shutil.copytree(submission_dir, hyperopt_submission_dir)
     hyperparameters = parse_all_hyperparameters(
-        hyperopt_submission_dir, problem.workflow
+        submission_dir, problem.workflow
     )
     if engine_name == 'random':
         engine = RandomEngine(hyperparameters)
@@ -821,28 +823,37 @@ def init_hyperopt(
         points_to_evaluate = None
         evaluated_rewards = None
         if resume:
-            if data_label is None:
-                ray_results_path = Path(submission_dir) / 'hyperopt_output'
-            else:
-                ray_results_path = Path(submission_dir) / 'hyperopt_output' / data_label
+            previous_trial_paths = glob.glob(f'{ramp_submission_dir}/{submission}_hyperopt_*')
             print("\n-------------- Resuming previous trials --------------")
-            previous_runs = glob.glob(f"{ray_results_path}/tmp_summary_*.csv")
             points_to_evaluate = []
             evaluated_rewards = []
-            for prev_run in previous_runs:
-                try:
-                    result_df = pd.read_csv(prev_run)
-                    h_names = [h.name for h in hyperparameters]
-                    h_indices = [h.name + '_i' for h in hyperparameters]
-                    run_hypers = {
-                        h_name: int(result_df[h_i].values[0]) 
-                        for h_name, h_i in zip(h_names, h_indices)
-                    }
-                    run_eval = float(result_df[f'valid_{problem.score_types[0].name}'].mean())
-                    points_to_evaluate.append(run_hypers)
-                    evaluated_rewards.append(run_eval)
-                except json.decoder.JSONDecodeError:
-                    print(f"error loading: {prev_run}")
+            for prev_trial_path in previous_trial_paths:
+                scores = []
+                for fold_idx in fold_idxs: 
+                    try:
+                        score = rw.utils.load_submission_fold_score(
+                            Path(prev_trial_path), fold_idx, problem.score_types[0].name,
+                            'valid', data_label)
+                        scores.append(score)
+                    except FileNotFoundError:
+                        print(f"{prev_trial_path}/{fold_idx}' doesn't exist.")
+                        break
+                if len(scores) != len(fold_idxs):
+                    print(f"Skipping {prev_trial_path}")
+                    # We may later figure out how to combine previous results with
+                    # heterogeneous uneven folds.
+                    continue
+                trial_mean_score = np.array(scores).mean()
+                hyperparameters_trial = parse_all_hyperparameters(
+                    prev_trial_path, problem.workflow
+                )
+                h_names = [h.name for h in hyperparameters_trial]
+                trial_hypers = {
+                    h.name: h.default_index
+                    for h in hyperparameters_trial
+                }
+                points_to_evaluate.append(trial_hypers)
+                evaluated_rewards.append(trial_mean_score)
             print("-------------- Done --------------\n")
         engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:
@@ -851,8 +862,9 @@ def init_hyperopt(
         hyperparameters,
         engine,
         ramp_kit_dir,
-        hyperopt_submission_dir,
+        ramp_data_dir,
         submission_dir,
+        fold_idxs,
         data_label,
         test,
     )
@@ -868,6 +880,7 @@ def run_hyperopt(
     submission,
     engine_name,
     n_trials,
+    fold_idxs,
     save_output,
     test,
     label,
@@ -879,9 +892,11 @@ def run_hyperopt(
 ):
     hyperparameter_experiment = init_hyperopt(
         ramp_kit_dir,
+        ramp_data_dir,
         ramp_submission_dir,
         submission,
         engine_name,
+        fold_idxs,
         data_label,
         label,
         resume,
@@ -899,5 +914,3 @@ def run_hyperopt(
         )
     else:
         run(hyperparameter_experiment, n_trials, resume)
-    if not save_output:
-        shutil.rmtree(hyperparameter_experiment.hyperopt_submission_dir)

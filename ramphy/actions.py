@@ -10,6 +10,7 @@ import json
 import numpy as np
 import pandas as pd
 import rampwf as rw
+from .hyperopt import run_hyperopt
 from pathlib import Path
 
 def _bagged_reward(score_type, bagged_f_name):
@@ -20,6 +21,29 @@ def _bagged_reward(score_type, bagged_f_name):
         return -r
     else:
         return r
+
+def hyperopt(submission, n_trials, fold_idxs=None, 
+             ramp_kit_dir = '.', ramp_data_dir = '.',
+             resume=True):
+    run_hyperopt(
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+        ramp_submission_dir='submissions',
+        data_label=None,
+        submission=submission,
+        engine_name='ray_hebo',
+        n_trials=n_trials,
+        fold_idxs=fold_idxs,
+        save_output=True,
+        test=False,
+        label=False,
+        resume=resume,
+        max_concurrent_runs=1,
+        n_cpu_per_run=8,
+        n_gpu_per_run=0,
+        verbose=3,
+    )
+    # reward TBD
 
 def train(submission, fold_idxs=None, 
           ramp_kit_dir = '.', ramp_data_dir = '.'):
@@ -49,11 +73,37 @@ def train(submission, fold_idxs=None,
         ramp_data_dir=ramp_data_dir,
         submission=submission,
         save_output=True,
+        retrain=False,
         fold_idxs=fold_idxs,
     )
     submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
     bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
     return _bagged_reward(problem.score_types[0], bagged_f_name)
+
+def retrain(submission, ramp_kit_dir = '.', ramp_data_dir = '.'):
+    """Retraining action. 
+
+    Trains the submissin on full training data. No reward since no
+    validation set.
+
+    Parameters
+    ----------
+    submission : str
+        The name of the submission to be tested.
+    ramp_kit_dir : str, default='.'
+        The directory of the ramp-kit to be tested for submission.
+    ramp_data_dir : str, default='.'
+        The directory of the data.
+    """
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    rw.utils.testing.assert_submission(
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+        submission=submission,
+        save_output=True,
+        retrain=True,
+        fold_idxs=[],
+    )
 
 def bag(submission, fold_idxs=None,
         ramp_kit_dir = '.', ramp_data_dir = '.',

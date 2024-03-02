@@ -148,6 +148,7 @@ def main(
         submission=submission,
         engine_name=engine,
         n_trials=n_trials,
+        fold_idxs=None,
         save_output=save_output,
         test=test,
         label=label,
