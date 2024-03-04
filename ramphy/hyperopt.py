@@ -836,7 +836,7 @@ def init_hyperopt(
                             'valid', data_label)
                         scores.append(score)
                     except FileNotFoundError:
-                        print(f"{prev_trial_path}/{fold_idx}' doesn't exist.")
+                        print(f"{prev_trial_path}/fold_{fold_idx}' doesn't exist.")
                         break
                 if len(scores) != len(fold_idxs):
                     print(f"Skipping {prev_trial_path}")
@@ -854,6 +854,7 @@ def init_hyperopt(
                 }
                 points_to_evaluate.append(trial_hypers)
                 evaluated_rewards.append(trial_mean_score)
+            print(f"Found {len(points_to_evaluate)} existing subissions, resuming.") 
             print("-------------- Done --------------\n")
         engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:

@@ -12,6 +12,7 @@ from .actions import (
     blend,
     hyperopt,
     retrain,
+    select_and_train,
     train,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     "blend",
     "hyperopt",
     "retrain",
+    "select_and_train",
     "train",
 ]
