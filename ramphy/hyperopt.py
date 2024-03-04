@@ -5,6 +5,7 @@ import time
 import glob
 import json
 import shutil
+import hashlib
 import itertools
 
 import numpy as np
@@ -572,9 +573,10 @@ def objective(config, run_params=None):
     hyperparam_opt = run_params['hyperparam_opt']
     for h in hyperparam_opt.hyperparameters:
         h.default_index = config[h.name]
-#    output_submission_dir = mkdtemp()
+    hyper_indices = [h.default_index for h in hyperparam_opt.hyperparameters]
+    hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
     output_submission_dir =\
-        f'{hyperparam_opt.submission_dir}_hyperopt_{time.time()}'
+        f'{hyperparam_opt.submission_dir}_hyperopt_{hyper_hash}'
     os.chdir(run_params['current_dir'])
     write_hyperparameters(
         hyperparam_opt.submission_dir,
