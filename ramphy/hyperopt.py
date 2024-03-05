@@ -5,6 +5,7 @@ import time
 import glob
 import json
 import shutil
+import hashlib
 import itertools
 
 import numpy as np
@@ -572,9 +573,10 @@ def objective(config, run_params=None):
     hyperparam_opt = run_params['hyperparam_opt']
     for h in hyperparam_opt.hyperparameters:
         h.default_index = config[h.name]
-#    output_submission_dir = mkdtemp()
+    hyper_indices = [h.default_index for h in hyperparam_opt.hyperparameters]
+    hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
     output_submission_dir =\
-        f'{hyperparam_opt.submission_dir}_hyperopt_{time.time()}'
+        f'{hyperparam_opt.submission_dir}_hyperopt_{hyper_hash}'
     os.chdir(run_params['current_dir'])
     write_hyperparameters(
         hyperparam_opt.submission_dir,
@@ -836,7 +838,7 @@ def init_hyperopt(
                             'valid', data_label)
                         scores.append(score)
                     except FileNotFoundError:
-                        print(f"{prev_trial_path}/{fold_idx}' doesn't exist.")
+                        print(f"{prev_trial_path}/fold_{fold_idx}' doesn't exist.")
                         break
                 if len(scores) != len(fold_idxs):
                     print(f"Skipping {prev_trial_path}")
@@ -854,6 +856,7 @@ def init_hyperopt(
                 }
                 points_to_evaluate.append(trial_hypers)
                 evaluated_rewards.append(trial_mean_score)
+            print(f"Found {len(points_to_evaluate)} existing subissions, resuming.") 
             print("-------------- Done --------------\n")
         engine = RayEngine(engine_name, n_trials, points_to_evaluate, evaluated_rewards)
     else:
