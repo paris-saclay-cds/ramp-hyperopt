@@ -60,6 +60,10 @@ def train(
     fold_idxs : list of int, default=None
         Fold indices to train on.
         If None, we will train on all folds.
+    bag : bool, default=True
+        Whether to bag the folds after training.
+    force_retrain : bool, default=False
+        Whether to retrain on folds with existing scores.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
@@ -179,9 +183,8 @@ def bag(submission, fold_idxs=None,
     bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
     return _bagged_reward(problem.score_types[0], bagged_f_name)
 
-def blend(
-        submissions, fold_idxs=None,
-        ramp_kit_dir = '.', ramp_data_dir = '.'):
+def blend(submissions, fold_idxs=None,
+          ramp_kit_dir = '.', ramp_data_dir = '.'):
     """Blending action. 
 
     Blends a list of submissions
