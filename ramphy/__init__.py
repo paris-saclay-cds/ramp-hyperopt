@@ -12,7 +12,8 @@ from .actions import (
     blend,
     hyperopt,
     retrain,
-    select_and_train,
+    select_top_hyperopt_and_train,
+    select_top_hyperopt_and_submit_hybrid,
     train,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "blend",
     "hyperopt",
     "retrain",
-    "select_and_train",
+    "select_top_hyperopt_and_train",
+    "select_top_hyperopt_and_submit_hybrid",
     "train",
 ]
