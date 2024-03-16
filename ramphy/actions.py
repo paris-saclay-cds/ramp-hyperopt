@@ -11,7 +11,7 @@ import json
 import numpy as np
 import pandas as pd
 import rampwf as rw
-from .hyperopt import run_hyperopt, parse_all_hyperparameters
+from .hyperopt import run_hyperopt, parse_hyperparameters, parse_all_hyperparameters, write_hyperparameters
 from pathlib import Path
 
 def _bagged_reward(score_type, bagged_f_name):
@@ -420,7 +420,7 @@ def select_top_hyperopt_and_train(
 
 def select_top_hyperopt_and_submit_hybrid(
         new_submission, parent_submissions, select_idx,
-        fold_idxs, score_cutoff=None, top_n=None, 
+        fold_idxs, score_cutoff=None, top_n=None, keep_hypers=False,
         ramp_kit_dir='.', ramp_data_dir='.'):
     """Selects top {submission}_hyperopt*'s and combines them with a new we.
 
@@ -467,13 +467,20 @@ def select_top_hyperopt_and_submit_hybrid(
         Number of the best {submission}_hyperopt*'s to be
         trained.
         Either score_cutoff or top_n must be non None.
+    keep_hypers : bool, default=False
+        If True, hypers of the top
+        {parent_submissions[select_idx]}_hyperopt* will be kept
+        even for the workflow elements that do not come
+        from the {parent_submissions[select_idx]}_hyperopt*.
+        Only works if all the parent submissions share the same
+        hypers.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
         The directory of the data.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    new_submissions = _select(
+    new_submissions = _select_top_hyperopt(
         parent_submissions[select_idx], fold_idxs, score_cutoff, top_n, 
         ramp_kit_dir, ramp_data_dir)
     for submission in new_submissions:
@@ -482,6 +489,14 @@ def select_top_hyperopt_and_submit_hybrid(
             '__new_submission__', parent_submissions,
             ramp_kit_dir, ramp_data_dir)
         module_path = Path(ramp_kit_dir) / 'submissions' / '__new_submission__'
+        if keep_hypers:
+            orig_module_path = Path(ramp_kit_dir) / 'submissions' / submission
+            hypers_per_workflow_element = {}
+            for wen in problem.workflow.element_names:
+                hypers_per_workflow_element[wen] = parse_hyperparameters(
+                    orig_module_path, wen)
+            write_hyperparameters(
+                module_path, module_path, hypers_per_workflow_element)
         hypers = parse_all_hyperparameters(module_path, problem.workflow)
         hyper_indices = [h.default_index for h in hypers]
         hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]

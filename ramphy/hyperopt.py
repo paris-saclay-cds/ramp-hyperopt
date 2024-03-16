@@ -287,8 +287,8 @@ def parse_all_hyperparameters(module_path, workflow):
     Parameters:
         module_path : str
             The path to the submission directory.
-        workflow_element_name : string
-            The name of the workflow element.
+        workflow : workflow from rw.workflows 
+            The ramp workflow.
     Return:
         hyperparameters : list of instances of Hyperparameter
     """
