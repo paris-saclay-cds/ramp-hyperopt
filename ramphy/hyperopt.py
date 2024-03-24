@@ -366,21 +366,9 @@ class HyperparameterOptimization(object):
         else:
             self.X_train, self.y_train = self.problem.get_train_data(path=ramp_data_dir)
             self.X_test, self.y_test = self.problem.get_test_data(path=ramp_data_dir)
-        cv_gen = self.problem.get_cv(self.X_train, self.y_train)
-        self.cv = []
+        self.cv = self.problem.get_cv(self.X_train, self.y_train, fold_idxs)
         if fold_idxs is None:
-            fold_start = 0
-            fold_stop = None
-        else:
-            fold_start = min(fold_idxs)
-            fold_stop = max(fold_idxs) + 1
-        fold_i = fold_start - 1
-        for fold in itertools.islice(cv_gen, fold_start, fold_stop):
-            fold_i += 1
-            if fold_idxs is None or fold_i in fold_idxs:
-                self.cv.append(fold)
-        if fold_idxs is None:
-            self.fold_idxs = list(range(0, fold_i + 1))
+            self.fold_idxs = list(range(len(self.cv)))
         else:
             self.fold_idxs = fold_idxs
 

@@ -114,74 +114,6 @@ def retrain(submission, ramp_kit_dir = '.', ramp_data_dir = '.'):
         fold_idxs=[],
     )
 
-def bag(submission, fold_idxs=None,
-        ramp_kit_dir = '.', ramp_data_dir = '.',
-        score_f_name_prefix=''):
-    """Bagging action. 
-
-    Bags a submission on a set of folds
-
-    Parameters
-    ----------
-    submission : str
-        The name of the submission to be tested.
-    fold_idxs : list of int, default=None
-        Fold indices to bag.
-        If None, we will bag all folds.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
-    score_f_name_prefix : str, default=''
-        The suffix we add to mark the submission file:
-        submission_{score_f_name_prefix}bagged_test.csv
-    Returns
-    -------
-    r : float
-        The reward: the bagged valid score.
-    """
-    problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    submission_dir = Path(ramp_kit_dir) / 'submissions' / submission
-    print(f'Bagging {submission} on {problem.problem_title}')
-    X_train, y_train, X_test, y_test = rw.utils.assert_data(
-        ramp_kit_dir, ramp_data_dir)
-    cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir)
-    training_output_path = submission_dir / 'training_output'
-    print(f'Training output path: {training_output_path}')
-
-    # saving predictions for CV bagging after the CV loop
-    predictions_valid_list = []
-    predictions_test_list = []
-
-    print(f'Reading prediction files ...')
-    if fold_idxs is None:
-        fold_start = 0
-        fold_stop = None
-    else:
-        fold_start = min(fold_idxs)
-        fold_stop = max(fold_idxs) + 1
-    fold_i = fold_start - 1
-    for fold in itertools.islice(cv, fold_start, fold_stop):
-        fold_i += 1
-        if not fold_idxs is None and not fold_i in fold_idxs:
-            continue
-        valid_is = fold[1]
-        fold_output_path = training_output_path / f'fold_{fold_i}'
-        predictions_valid, predictions_test = rw.utils.load_predictions(
-            problem, valid_is, data_path=ramp_data_dir,
-            input_path=fold_output_path)
-        predictions_valid_list.append(predictions_valid)
-        predictions_test_list.append(predictions_test)
-
-    rw.utils.bag_submissions(
-        problem, X_train, y_train, y_test, predictions_valid_list,
-        predictions_test_list, training_output_path,
-        ramp_data_dir=ramp_data_dir, score_type_index=None,
-        save_output=True, fold_idxs=fold_idxs,
-        score_f_name_prefix=score_f_name_prefix)
-
-    bagged_f_name = submission_dir / 'training_output' / 'bagged_scores.csv'
-    return _bagged_reward(problem.score_types[0], bagged_f_name)
 
 def blend(submissions, fold_idxs=None,
           ramp_kit_dir = '.', ramp_data_dir = '.'):
@@ -256,7 +188,8 @@ def submit_hybrid(
         shutil.copy(from_file, to_file)
         print(f'Copying {from_file} to {to_file}')
 
-def _select_all_hyperopt(submission, ramp_kit_dir = '.'):
+def _select_all_hyperopt(
+    submission, ramp_kit_dir = '.'):
     """Returns all submissions {submission}_hyperopt*.
     
     Parameters
@@ -272,17 +205,18 @@ def _select_all_hyperopt(submission, ramp_kit_dir = '.'):
     """
     submissions_f_names = glob.glob(
         f'{ramp_kit_dir}/submissions/{submission}_hyperopt*')
-    return [fn.split('/')[-1] for fn in submissions_f_names]
 
 def _select_top_hyperopt(
         submission, fold_idxs, score_cutoff=None, top_n=None, 
+        select_best=True,
         ramp_kit_dir = '.', ramp_data_dir = '.'):
     """Returns submissions {submission}_hyperopt* with top score.
 
     Selects all {submission}_hyperopt* submissions which have been
     trained on fold_idxs. Then selects either the top_n
     according to mean score, or those with mean score better than
-    score_cutoff.
+    score_cutoff. If both are None, return all hyperopts that were trained
+    on fold-idxs.
     Parameters
     ----------
     submission : str
@@ -297,7 +231,6 @@ def _select_top_hyperopt(
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s
         to be returned.
-        Either score_cutoff or top_n must be non None.
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
@@ -342,12 +275,21 @@ def _select_top_hyperopt(
         row_dicts.append(row_dict)
     summary_df = pd.DataFrame.from_records(row_dicts)
     summary_df = summary_df[summary_df['fold_idx'].isin(fold_idxs)]
+    # Select submissions that have _all_ the folds of fold_idxs trained
+    if select_best:
+        agg = {col:'first' if col in hyper_names else 'count'
+               for col in summary_df.set_index('hyperopt_submission').columns}
+        count_df = summary_df.groupby('hyperopt_submission').agg(agg)
+        count_df = count_df.reset_index()
+        selected_hyperopt_submissions = count_df[count_df[valid_score_name] == len(fold_idxs)]['hyperopt_submission'].to_numpy()
+        summary_df = summary_df[summary_df['hyperopt_submission'].isin(selected_hyperopt_submissions)]
+
     agg = {col:'first' if col in hyper_names else 'mean'
            for col in summary_df.set_index('hyperopt_submission').columns}
     means_df = summary_df.groupby('hyperopt_submission').agg(agg)
     means_df[hyper_index_names] = means_df[hyper_index_names].astype(int)
     if score_cutoff is not None:
-        if is_lower_the_better:
+        if (is_lower_the_better and select_best) or (not is_lower_the_better and not select_best):
             new_submissions = means_df[means_df[valid_score_name] < score_cutoff].index
         else:
             new_submissions = means_df[means_df[valid_score_name] > score_cutoff].index
@@ -355,7 +297,7 @@ def _select_top_hyperopt(
         new_submissions = means_df.sort_values(
             valid_score_name, ascending=is_lower_the_better).iloc[:top_n].index
     else:
-        raise ValueError('Either score_cutoff or top_n must be non None.')
+        new_submissions = means_df.index
     return new_submissions
 
 def select_top_hyperopt_and_train(
@@ -418,6 +360,39 @@ def select_top_hyperopt_and_train(
             submission, fold_idxs=fold_idxs, bag=False, 
             ramp_kit_dir = '.', ramp_data_dir = '.')
 
+def select_top_hyperopt_and_blend(
+        submission, fold_idxs,
+        score_cutoff=None, top_n=None, 
+        ramp_kit_dir='.', ramp_data_dir='.'):
+    """Selects and blends submissions {submission}_hyperopt*.
+
+    Selects {submission}_hyperopt* submissions, then those
+    which have been trained on fold_idxs, and blends them.
+    Parameters
+    ----------
+    submission : str
+        The name of the original hyperopted submission.
+    fold_idxs : list or generator of int
+        Fold indices that the {submission}_hyperopt*'s 
+        have been trained on.
+    score_cutoff : float, default=None
+        Worst mean score of the {submission}_hyperopt*'s to be
+        trained.
+    top_n : int, default=None
+        Number of the best {submission}_hyperopt*'s to be
+        trained.
+    ramp_kit_dir : str, default='.'
+        The directory of the ramp-kit.
+    ramp_data_dir : str, default='.'
+        The directory of the data.
+    """
+    submissions = _select_top_hyperopt(
+        submission, fold_idxs, score_cutoff, top_n, 
+        ramp_kit_dir, ramp_data_dir)
+    blend(
+        submissions, fold_idxs, 
+        ramp_kit_dir, ramp_data_dir)
+
 def select_top_hyperopt_and_submit_hybrid(
         new_submission, parent_submissions, select_idx,
         fold_idxs, score_cutoff=None, top_n=None, keep_hypers=False,
@@ -466,7 +441,6 @@ def select_top_hyperopt_and_submit_hybrid(
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s to be
         trained.
-        Either score_cutoff or top_n must be non None.
     keep_hypers : bool, default=False
         If True, hypers of the top
         {parent_submissions[select_idx]}_hyperopt* will be kept
@@ -502,6 +476,60 @@ def select_top_hyperopt_and_submit_hybrid(
         hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
         output_submission_dir =\
             Path(ramp_kit_dir) / 'submissions' / f'{new_submission}_hyperopt_{hyper_hash}'
-        shutil.move(module_path, output_submission_dir)
-                
+        if not output_submission_dir.exists():  # force resubmit perhaps?
+            shutil.move(module_path, output_submission_dir)
+
+def clean_up_predictions(submission, fold_idxs, score_cutoff=None, ramp_kit_dir='.'):
+    """
+    
+    Parameters
+    ----------
+    new_submission : str
+        The name of the new submission to be submitted.
+    parent_submissions : list of str
+        The names of the submissions from which the workflow elements
+        will come.
+    select_idx : int
+        The index of the parent submission whose (typically)
+        hyperopted children will be used in the hybrid. 
+    fold_idxs : list or generator of int
+        Fold indices to train selected submissions on.
+    score_cutoff : float, default=None
+        Worst mean score of the {submission}_hyperopt*'s to be
+        trained.
+        Either score_cutoff or top_n must be non None.
+    top_n : int, default=None
+        Number of the best {submission}_hyperopt*'s to be
+        trained.
+        Either score_cutoff or top_n must be non None.
+    keep_hypers : bool, default=False
+        If True, hypers of the top
+        {parent_submissions[select_idx]}_hyperopt* will be kept
+        even for the workflow elements that do not come
+        from the {parent_submissions[select_idx]}_hyperopt*.
+        Only works if all the parent submissions share the same
+        hypers.
+    ramp_kit_dir : str, default='.'
+        The directory of the ramp-kit.
+    ramp_data_dir : str, default='.'
+        The directory of the data.
+    """
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    if score_cutoff is None:
+        submissions_f_names = glob.glob(
+            f'{ramp_kit_dir}/submissions/{submission}*')
+    else:
+        submissions = _select_top_hyperopt(
+            submission, fold_idxs, score_cutoff=score_cutoff,
+            select_best=False, ramp_kit_dir=ramp_kit_dir)
+        submissions_f_names = [f'submissions/{submission}' for submission in submissions]
+    for module_path in submissions_f_names:
+        for fold_idx in fold_idxs:
+            fold_path = Path(module_path) / 'training_output' / f'fold_{fold_idx}'
+            for f_name in [fold_path / 'y_pred_test.npz', fold_path / 'y_pred_train.npz']:
+                if f_name.is_file():
+                    print(f'Deleting {f_name}')
+                    os.remove(f_name)
+
+
         
