@@ -76,6 +76,7 @@ def train(
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     rw.utils.testing.assert_submission(
         ramp_kit_dir=ramp_kit_dir,
+        ramp_submission_dir=os.path.join(ramp_kit_dir, 'submissions'),
         ramp_data_dir=ramp_data_dir,
         submission=submission,
         save_output=True,
