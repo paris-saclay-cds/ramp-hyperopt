@@ -366,7 +366,7 @@ class HyperparameterOptimization(object):
         else:
             self.X_train, self.y_train = self.problem.get_train_data(path=ramp_data_dir)
             self.X_test, self.y_test = self.problem.get_test_data(path=ramp_data_dir)
-        self.cv = self.problem.get_cv(self.X_train, self.y_train, fold_idxs)
+        self.cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir, data_label, fold_idxs)
         if fold_idxs is None:
             self.fold_idxs = list(range(len(self.cv)))
         else:
