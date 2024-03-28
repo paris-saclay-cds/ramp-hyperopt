@@ -269,6 +269,88 @@ def get_hyperopt_score_summary(
     summary_df = pd.DataFrame.from_records(row_dicts)
     return summary_df
 
+def filter_full_folds(summary_df, fold_idxs):
+    """Returns a summary DataFrame.
+
+    Filters submissions that were trained on all the given folds.
+    Parameters
+    ----------
+    summary_df : pd.DataFrame
+        All submissions, folds, and scores.
+    fold_idxs : list or generator of int
+        Fold indices that we want to filter.
+    Returns
+    -------
+    new_summary_df : pd.DataFrame
+        The filtered summary.
+    """
+#    agg = {col:'first' if col in hyper_names else 'count'
+#           for col in summary_df.set_index(groupby_columns).columns}
+    groupby_columns = ['hyperopt_submission']
+    counts_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).count()
+    full_hyperopt_submissions = counts_df[counts_df['fold_idx'] == len(fold_idxs)].index.to_numpy()
+    return summary_df.loc[summary_df['hyperopt_submission'].isin(full_hyperopt_submissions)]
+
+def get_hyperopt_score_means(summary_df, fold_idxs=None):
+    """Returns a mean DataFrame.
+
+    Computes the mean of each submission over folds. If
+    fold_idxs is not None, it first filters submissions
+    that were trained on all the given folds.
+    Parameters
+    ----------
+    summary_df : pd.DataFrame
+        All submissions, folds, and scores.
+    fold_idxs : list or generator of int, default=None
+        Fold indices that we want to take the mean over.
+        If None, mean over all existing folds will be returned.
+    Returns
+    -------
+    means_df : pd.DataFrame
+        The mean of submissions over folds.
+    """
+    groupby_columns = ['hyperopt_submission']
+    non_hyper_columns = [col for col in summary_df.set_index(
+        groupby_columns).columns if col[:6] != 'hyper_']
+
+    if fold_idxs is not None:
+        summary_df = filter_full_folds(summary_df, fold_idxs)
+
+    agg = {col:'mean' if col in non_hyper_columns else 'first'
+           for col in summary_df.set_index(groupby_columns).columns}
+    means_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
+    return means_df
+
+def get_hyperopt_score_stds(summary_df, fold_idxs=None):
+    """Returns an std DataFrame.
+
+    Computes the std of each submission over folds. If
+    fold_idxs is not None, it first filters submissions
+    that were trained on all the given folds.
+    Parameters
+    ----------
+    summary_df : pd.DataFrame
+        All submissions, folds, and scores.
+    fold_idxs : list or generator of int, default=None
+        Fold indices that we want to take the std over.
+        If None, std over all existing folds will be returned.
+    Returns
+    -------
+    stds_df : pd.DataFrame
+        The std of submissions over folds.
+    """
+    groupby_columns = ['hyperopt_submission']
+    non_hyper_columns = [col for col in summary_df.set_index(
+        groupby_columns).columns if col[:6] != 'hyper_']
+
+    if fold_idxs is not None:
+        summary_df = filter_full_folds(summary_df, fold_idxs)
+
+    agg = {col:'std' if col in non_hyper_columns else 'first'
+           for col in summary_df.set_index(groupby_columns).columns}
+    stds_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
+    return stds_df
+
 def save_hyperopt_score_summary(
         submission, fold_idxs=None,
         ramp_kit_dir = '.', ramp_data_dir = '.'):
@@ -338,20 +420,8 @@ def rename_best_hyperopt_submissions(
     summary_df = get_hyperopt_score_summary(
         submission=submission, fold_idxs=fold_idxs,
         ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir)
-    # Select those which have scores for all folds
-    if fold_idxs is not None:
-        groupby_columns = ['hyperopt_submission']
-        non_hyper_columns = [col for col in summary_df.set_index(groupby_columns).columns if col[:6] != 'hyper_']
-        agg = {col:'first' if col in hyper_names else 'count' for col in summary_df.set_index(groupby_columns).columns}
-        counts_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
-        full_hyperopt_submissions = counts_df[counts_df['fold_idx'] == len(fold_idxs)].index.to_numpy()
-        summary_df = summary_df.loc[summary_df['hyperopt_submission'].isin(full_hyperopt_submissions)]
 
-    groupby_columns = ['hyperopt_submission']
-    non_hyper_columns = [col for col in summary_df.set_index(groupby_columns).columns if col[:6] != 'hyper_']
-    agg = {col:'first' if col in hyper_names else 'mean' for col in summary_df.set_index(groupby_columns).columns}
-    means_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
-    means_df[hyper_index_names] = means_df[hyper_index_names].astype(int)
+    means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
     select_top_hyperopt_and_blend(
         submission=submission, fold_idxs=fold_idxs,
@@ -376,10 +446,46 @@ def rename_best_hyperopt_submissions(
             print(f'{from_f_name} -> {to_f_name}')
             shutil.move(from_f_name, to_f_name)
 
-def _select_top_hyperopt(
-        submission, fold_idxs, score_cutoff=None, top_n=None, 
-        select_best=True,
+def delete_duplicates_hyperopt(
+        submission, fold_idxs,
         ramp_kit_dir = '.', ramp_data_dir = '.'):
+    """Deletes duplicates of {submission}_hyperopt*.
+
+    Two submission are considered duplicates if their valid score
+    is exactly the same.
+    Parameters
+    ----------
+    submission : str
+        The name of the original hyperopted submission.
+    fold_idxs : list or generator of int
+        Fold indices that the {submission}_hyperopt*'s 
+        have been trained on.
+    ramp_kit_dir : str, default='.'
+        The directory of the ramp-kit.
+    ramp_data_dir : str, default='.'
+        The directory of the data.
+    """
+
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    score_names = [st.name for st in problem.score_types] 
+    valid_score_name = f'valid_{score_names[0]}'
+
+    summary_df = get_hyperopt_score_summary(
+        submission, fold_idxs,
+        ramp_kit_dir, ramp_data_dir)
+    
+    means_df = get_hyperopt_score_means(summary_df, fold_idxs)
+
+    unique_submissions = means_df.reset_index().groupby(valid_score_name).first()['hyperopt_submission'].to_numpy()
+    for submission in means_df.reset_index()['hyperopt_submission']:
+        if submission not in unique_submissions:
+            print(f'Removing {submission}')
+            shutil.rmtree(Path('submissions') / submission)
+
+def select_top_hyperopt(
+        submission, fold_idxs,
+        score_cutoff=None, top_n=None, n_sigma=None,
+    ramp_kit_dir = '.', ramp_data_dir = '.'):
     """Returns submissions {submission}_hyperopt* with top score.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -401,8 +507,8 @@ def _select_top_hyperopt(
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s
         to be returned.
-    select_best : bool, default=True
-        If True, select the best submissions, otherwise select tht worst.
+    n_sigma : float, default=None
+        Top 20 submissions: score_cutoff = mean - sigma * n
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
@@ -414,54 +520,40 @@ def _select_top_hyperopt(
     """
 
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    X_train, y_train = problem.get_train_data(ramp_data_dir)
     score_names = [st.name for st in problem.score_types] 
     valid_score_name = f'valid_{score_names[0]}'
     is_lower_the_better = problem.score_types[0].is_lower_the_better
-    module_path = Path(ramp_kit_dir) / 'submissions' / submission
-    hypers = parse_all_hyperparameters(module_path, problem.workflow)
-    hyper_names = [f'hyper_{h.name}' for h in hypers]
-    hyper_index_names = [f'{hn}_i' for hn in hyper_names]
-    hyper_grid_sizes = [len(h.values) for h in hypers]
 
-    score_f_names = glob.glob(
-        f'{ramp_kit_dir}/submissions/{submission}_hyperopt*/training_output/fold*/scores.csv')
-    row_dicts = []
-    for score_f_name in score_f_names:
-        row_dict = {}
-        row_dict['hyperopt_submission'] = score_f_name.split('/')[-4]
-        row_dict['fold_idx'] = int(score_f_name.split('/')[-2].split('_')[1])
-        hyper_module_path = Path(
-            ramp_kit_dir) / 'submissions'  / row_dict['hyperopt_submission']
-        hyper_hypers = parse_all_hyperparameters(
-            hyper_module_path, problem.workflow)
-        for h in hyper_hypers:
-            row_dict[f'hyper_{h.name}_i'] = h.default_index
-            row_dict[f'hyper_{h.name}'] = h.default
-        score_df = pd.read_csv(
-            hyper_module_path / 'training_output' / f'fold_{row_dict["fold_idx"]}' / 'scores.csv')
-        score_df = score_df.set_index('step')
-        for step in ['train', 'valid', 'test']:
-            for sn in score_names + ['time']:
-                row_dict[f'{step}_{sn}'] = score_df.loc[step, sn]
-        row_dicts.append(row_dict)
-    summary_df = pd.DataFrame.from_records(row_dicts)
-    summary_df = summary_df[summary_df['fold_idx'].isin(fold_idxs)]
-    # Select submissions that have _all_ the folds of fold_idxs trained
-    if select_best:
-        agg = {col:'first' if col in hyper_names else 'count'
-               for col in summary_df.set_index('hyperopt_submission').columns}
-        count_df = summary_df.groupby('hyperopt_submission').agg(agg)
-        count_df = count_df.reset_index()
-        selected_hyperopt_submissions = count_df[count_df[valid_score_name] == len(fold_idxs)]['hyperopt_submission'].to_numpy()
-        summary_df = summary_df[summary_df['hyperopt_submission'].isin(selected_hyperopt_submissions)]
+    summary_df = get_hyperopt_score_summary(
+        submission, fold_idxs,
+        ramp_kit_dir, ramp_data_dir)
+    
+    means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
-    agg = {col:'first' if col in hyper_names else 'mean'
-           for col in summary_df.set_index('hyperopt_submission').columns}
-    means_df = summary_df.groupby('hyperopt_submission').agg(agg)
-    means_df[hyper_index_names] = means_df[hyper_index_names].astype(int)
+    if n_sigma is not None:
+        summary_df = filter_full_folds(summary_df, fold_idxs)
+        groupby_columns = ['fold_idx']
+        non_hyper_columns = [col for col in summary_df.set_index(
+            groupby_columns).columns if col[:6] != 'hyper_']
+        agg = {col:'mean' if col in non_hyper_columns else 'first'
+               for col in summary_df.set_index(groupby_columns + ['hyperopt_submission']).columns}
+        foldwise_means_df = summary_df.groupby(groupby_columns).agg(agg)
+        foldwise_means_df[f'{valid_score_name}_bias'] = foldwise_means_df[f'{valid_score_name}']\
+            - foldwise_means_df[f'{valid_score_name}'].mean()
+        summary_df = summary_df.set_index('fold_idx').join(
+            foldwise_means_df[[f'{valid_score_name}_bias']]).reset_index()
+        summary_df[f'{valid_score_name}_unbiased'] = summary_df[f'{valid_score_name}']\
+            - summary_df[f'{valid_score_name}_bias']
+        stds_df = get_hyperopt_score_stds(summary_df, fold_idxs)
+        means_df = means_df.join(stds_df[[f'{valid_score_name}_unbiased']])
+        means_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
+        top_mean = means_df.iloc[:top_n][valid_score_name].mean()
+        top_std = means_df.iloc[:top_n][f'{valid_score_name}_unbiased'].mean()
+        score_cutoff = top_mean - n_sigma * top_std
+        print(f'score_cutoff = {score_cutoff}')       
+
     if score_cutoff is not None:
-        if (is_lower_the_better and select_best) or (not is_lower_the_better and not select_best):
+        if is_lower_the_better:
             new_submissions = means_df[means_df[valid_score_name] < score_cutoff].index
         else:
             new_submissions = means_df[means_df[valid_score_name] > score_cutoff].index
@@ -470,11 +562,12 @@ def _select_top_hyperopt(
             valid_score_name, ascending=is_lower_the_better).iloc[:top_n].index
     else:
         new_submissions = means_df.index
+    print(f'Selected {len(new_submissions)} subissions')
     return new_submissions
 
 def select_top_hyperopt_and_train(
         submission, fold_idxs, trained_fold_idxs=None,
-        score_cutoff=None, top_n=None, 
+        score_cutoff=None, top_n=None, n_sigma=None,
         ramp_kit_dir='.', ramp_data_dir='.'):
     """Selects and trains submissions {submission}_hyperopt*.
 
@@ -512,6 +605,8 @@ def select_top_hyperopt_and_train(
         trained.
         If train_fold_idxs is not None, either score_cutoff or
         top_n must be non None.
+    n_sigma : float, default=None
+        Top 20 submissions: score_cutoff = mean - sigma * n
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
@@ -524,8 +619,8 @@ def select_top_hyperopt_and_train(
     if trained_fold_idxs is None:
         new_submissions = _select_all_hyperopt(submission, ramp_kit_dir)
     else:
-        new_submissions = _select_top_hyperopt(
-            submission, trained_fold_idxs, score_cutoff, top_n, 
+        new_submissions = select_top_hyperopt(
+            submission, trained_fold_idxs, score_cutoff, top_n, n_sigma,
             ramp_kit_dir, ramp_data_dir)
     for submission in new_submissions:
         train(
@@ -558,7 +653,7 @@ def select_top_hyperopt_and_blend(
     ramp_data_dir : str, default='.'
         The directory of the data.
     """
-    submissions = _select_top_hyperopt(
+    submissions = select_top_hyperopt(
         submission, fold_idxs, score_cutoff, top_n, 
         ramp_kit_dir, ramp_data_dir)
     blend(
@@ -626,7 +721,7 @@ def select_top_hyperopt_and_submit_hybrid(
         The directory of the data.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    new_submissions = _select_top_hyperopt(
+    new_submissions = select_top_hyperopt(
         parent_submissions[select_idx], fold_idxs, score_cutoff, top_n, 
         ramp_kit_dir, ramp_data_dir)
     for submission in new_submissions:
@@ -691,6 +786,7 @@ def clean_up_predictions(submission, fold_idxs, score_cutoff=None, ramp_kit_dir=
         submissions_f_names = glob.glob(
             f'{ramp_kit_dir}/submissions/{submission}*')
     else:
+        #,,,
         submissions = _select_top_hyperopt(
             submission, fold_idxs, score_cutoff=score_cutoff,
             select_best=False, ramp_kit_dir=ramp_kit_dir)
