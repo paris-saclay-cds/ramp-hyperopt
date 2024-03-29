@@ -622,7 +622,8 @@ def select_top_hyperopt_and_train(
         new_submissions = select_top_hyperopt(
             submission, trained_fold_idxs, score_cutoff, top_n, n_sigma,
             ramp_kit_dir, ramp_data_dir)
-    for submission in new_submissions:
+    for i, submission in enumerate(new_submissions):
+        print(f'Training submission {i}/{len(new_submissions)}')
         train(
             submission, fold_idxs=fold_idxs, bag=False, 
             ramp_kit_dir = '.', ramp_data_dir = '.')
