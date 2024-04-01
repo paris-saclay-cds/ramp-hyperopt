@@ -630,7 +630,7 @@ def select_top_hyperopt_and_train(
 
 def select_top_hyperopt_and_blend(
         submission, fold_idxs,
-        score_cutoff=None, top_n=None, 
+        score_cutoff=None, top_n=None, n_sigma=None,
         ramp_kit_dir='.', ramp_data_dir='.'):
     """Selects and blends submissions {submission}_hyperopt*.
 
@@ -649,13 +649,15 @@ def select_top_hyperopt_and_blend(
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s to be
         trained.
+    n_sigma : float, default=None
+        Top 20 submissions: score_cutoff = mean - sigma * n
     ramp_kit_dir : str, default='.'
         The directory of the ramp-kit.
     ramp_data_dir : str, default='.'
         The directory of the data.
     """
     submissions = select_top_hyperopt(
-        submission, fold_idxs, score_cutoff, top_n, 
+        submission, fold_idxs, score_cutoff, top_n, n_sigma,
         ramp_kit_dir, ramp_data_dir)
     blend(
         submissions, fold_idxs, 
