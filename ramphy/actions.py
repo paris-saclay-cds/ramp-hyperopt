@@ -351,6 +351,36 @@ def get_hyperopt_score_stds(summary_df, fold_idxs=None):
     stds_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
     return stds_df
 
+def get_hyperopt_score_counts(summary_df, fold_idxs=None):
+    """Returns a count DataFrame.
+
+    Computes the std of each submission over folds. If
+    fold_idxs is not None, it first filters submissions
+    that were trained on all the given folds.
+    Parameters
+    ----------
+    summary_df : pd.DataFrame
+        All submissions, folds, and scores.
+    fold_idxs : list or generator of int, default=None
+        Fold indices that we want to take the std over.
+        If None, std over all existing folds will be returned.
+    Returns
+    -------
+    counts_df : pd.DataFrame
+        The count of submissions over folds.
+    """
+    groupby_columns = ['hyperopt_submission']
+    non_hyper_columns = [col for col in summary_df.set_index(
+        groupby_columns).columns if col[:6] != 'hyper_']
+
+    if fold_idxs is not None:
+        summary_df = filter_full_folds(summary_df, fold_idxs)
+
+    agg = {col:'count' if col in non_hyper_columns else 'first'
+           for col in summary_df.set_index(groupby_columns).columns}
+    counts_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).agg(agg)
+    return counts_df
+
 def save_hyperopt_score_summary(
         submission, fold_idxs=None,
         ramp_kit_dir = '.', ramp_data_dir = '.'):
@@ -531,6 +561,7 @@ def select_top_hyperopt(
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
     if n_sigma is not None:
+        # foldwise means for unbiasing
         summary_df = filter_full_folds(summary_df, fold_idxs)
         groupby_columns = ['fold_idx']
         non_hyper_columns = [col for col in summary_df.set_index(
@@ -540,15 +571,22 @@ def select_top_hyperopt(
         foldwise_means_df = summary_df.groupby(groupby_columns).agg(agg)
         foldwise_means_df[f'{valid_score_name}_bias'] = foldwise_means_df[f'{valid_score_name}']\
             - foldwise_means_df[f'{valid_score_name}'].mean()
+        # unbiasing summary
         summary_df = summary_df.set_index('fold_idx').join(
             foldwise_means_df[[f'{valid_score_name}_bias']]).reset_index()
         summary_df[f'{valid_score_name}_unbiased'] = summary_df[f'{valid_score_name}']\
             - summary_df[f'{valid_score_name}_bias']
+        # computing standard errors
         stds_df = get_hyperopt_score_stds(summary_df, fold_idxs)
+        counts_df = get_hyperopt_score_counts(summary_df, fold_idxs)
+        counts_df['fold_count'] = counts_df['fold_idx']
         means_df = means_df.join(stds_df[[f'{valid_score_name}_unbiased']])
+        means_df = means_df.join(counts_df[['fold_count']])
+        means_df['mean_std'] = means_df[f'{valid_score_name}_unbiased'] / np.sqrt(means_df['fold_count'])
+        
         means_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
         top_mean = means_df.iloc[:top_n][valid_score_name].mean()
-        top_std = means_df.iloc[:top_n][f'{valid_score_name}_unbiased'].mean()
+        top_std = means_df.iloc[:top_n]['mean_std'].mean()
         score_cutoff = top_mean - n_sigma * top_std
         print(f'score_cutoff = {score_cutoff}')       
 
