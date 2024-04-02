@@ -792,8 +792,8 @@ def select_top_hyperopt_and_train(
             submission,
             fold_idxs=fold_idxs,
             bag=False,
-            ramp_kit_dir=".",
-            ramp_data_dir=".",
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
         )
 
 
