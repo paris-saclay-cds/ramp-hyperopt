@@ -286,10 +286,11 @@ def filter_full_folds(summary_df, fold_idxs):
     """
 #    agg = {col:'first' if col in hyper_names else 'count'
 #           for col in summary_df.set_index(groupby_columns).columns}
+    summary_filtered_df = summary_df[summary_df['fold_idx'].isin(fold_idxs)]
     groupby_columns = ['hyperopt_submission']
-    counts_df = summary_df.set_index(groupby_columns).groupby(groupby_columns).count()
+    counts_df = summary_filtered_df.set_index(groupby_columns).groupby(groupby_columns).count()
     full_hyperopt_submissions = counts_df[counts_df['fold_idx'] == len(fold_idxs)].index.to_numpy()
-    return summary_df.loc[summary_df['hyperopt_submission'].isin(full_hyperopt_submissions)]
+    return summary_filtered_df.loc[summary_filtered_df['hyperopt_submission'].isin(full_hyperopt_submissions)]
 
 def get_hyperopt_score_means(summary_df, fold_idxs=None):
     """Returns a mean DataFrame.

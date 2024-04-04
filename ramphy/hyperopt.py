@@ -355,17 +355,21 @@ class HyperparameterOptimization(object):
     ):
         self.hyperparameters = hyperparameters
         self.engine = engine
+        self.ramp_kit_dir = ramp_kit_dir
+        self.ramp_data_dir = ramp_data_dir
         self.problem = rw.utils.assert_read_problem(ramp_kit_dir)
-        if data_label is not None:
-            self.X_train, self.y_train = self.problem.get_train_data(
-                path=ramp_kit_dir, data_label=data_label
-            )
-            self.X_test, self.y_test = self.problem.get_test_data(
-                path=ramp_kit_dir, data_label=data_label
-            )
-        else:
-            self.X_train, self.y_train = self.problem.get_train_data(path=ramp_data_dir)
-            self.X_test, self.y_test = self.problem.get_test_data(path=ramp_data_dir)
+#        if data_label is not None:
+#            self.X_train, self.y_train = self.problem.get_train_data(
+#                path=ramp_kit_dir, data_label=data_label
+#            )
+#            self.X_test, self.y_test = self.problem.get_test_data(
+#                path=ramp_kit_dir, data_label=data_label
+#            )
+#        else:
+#            self.X_train, self.y_train = self.problem.get_train_data(path=ramp_data_dir)
+#            self.X_test, self.y_test = self.problem.get_test_data(path=ramp_data_dir)
+        self.X_train, self.y_train, self.X_test, self.y_test = rw.utils.assert_data(
+            ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, data_label=data_label)
         self.cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir, data_label, fold_idxs)
         if fold_idxs is None:
             self.fold_idxs = list(range(len(self.cv)))
@@ -457,14 +461,21 @@ class HyperparameterOptimization(object):
             fold_output_path.mkdir(parents=True, exist_ok=True)
         else:
             fold_output_path='.'
+        X_train, y_train, X_test, y_test = rw.utils.assert_data(
+            ramp_kit_dir=self.ramp_kit_dir, ramp_data_dir=self.ramp_data_dir,
+            data_label=self.data_label, submission_path=module_path)
+        cv = rw.utils.assert_cv(
+            ramp_kit_dir=self.ramp_kit_dir, ramp_data_dir=self.ramp_data_dir,
+            data_label=self.data_label, fold_idxs=self.fold_idxs,
+            submission_path=module_path)
         _, _, df_scores = rw.utils.run_submission_on_cv_fold(
             self.problem,
             module_path=module_path,
-            fold=self.cv[fold_i],
-            X_train=self.X_train,
-            y_train=self.y_train,
-            X_test=self.X_test,
-            y_test=self.y_test,
+            fold=cv[fold_i],
+            X_train=X_train,
+            y_train=y_train,
+            X_test=X_test,
+            y_test=y_test,
             save_output=save_output,
             fold_output_path=fold_output_path,
         )
