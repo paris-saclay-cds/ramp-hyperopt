@@ -474,6 +474,8 @@ def save_hyperopt_score_summary(
         f"{ramp_kit_dir}/submissions/{submission}/training_output/hyperopt_summary.csv"
     )
     print(f"Saving hyperopt scores into {f_name}.")
+    if not os.path.exists(f"{ramp_kit_dir}/submissions/{submission}/training_output/"):
+        os.makedirs(f"{ramp_kit_dir}/submissions/{submission}/training_output/")
     summary_df.to_csv(f_name)
 
 
