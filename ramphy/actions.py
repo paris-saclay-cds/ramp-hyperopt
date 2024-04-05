@@ -703,7 +703,10 @@ def select_top_hyperopt(
         means_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
         top_mean = means_df.iloc[:top_n][valid_score_name].mean()
         top_std = means_df.iloc[:top_n]["mean_std"].mean()
-        score_cutoff = top_mean - n_sigma * top_std
+        if is_lower_the_better:
+            score_cutoff = top_mean + n_sigma * top_std
+        else:
+            score_cutoff = top_mean - n_sigma * top_std            
         print(f"score_cutoff = {score_cutoff}")
 
     if score_cutoff is not None:
