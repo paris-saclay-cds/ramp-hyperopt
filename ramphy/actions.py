@@ -208,8 +208,8 @@ def submit_hybrid(
             "shuold be the same."
         )
 
-    parents_and_wf_elements = zip(parent_submissions, problem.workflow.element_names)
-    for parent_submission, wf_element in parents_and_wf_elements:
+    for wf_element in parent_submissions:
+        parent_submission = parent_submissions[wf_element]
         from_file = (
             Path(ramp_kit_dir) / "submissions" / parent_submission / f"{wf_element}.py"
         )
@@ -324,15 +324,18 @@ def filter_full_folds(summary_df, fold_idxs):
     new_summary_df : pd.DataFrame
         The filtered summary.
     """
-    summary_filtered_df = summary_df[summary_df['fold_idx'].isin(fold_idxs)]
-    groupby_columns = ['hyperopt_submission']
-    counts_df = summary_filtered_df.set_index(groupby_columns).groupby(groupby_columns).count()
+    summary_filtered_df = summary_df[summary_df["fold_idx"].isin(fold_idxs)]
+    groupby_columns = ["hyperopt_submission"]
+    counts_df = (
+        summary_filtered_df.set_index(groupby_columns).groupby(groupby_columns).count()
+    )
     full_hyperopt_submissions = counts_df[
-        counts_df['fold_idx'] == len(fold_idxs)
+        counts_df["fold_idx"] == len(fold_idxs)
     ].index.to_numpy()
     return summary_filtered_df.loc[
-        summary_filtered_df['hyperopt_submission'].isin(full_hyperopt_submissions)
+        summary_filtered_df["hyperopt_submission"].isin(full_hyperopt_submissions)
     ]
+
 
 def get_hyperopt_score_means(summary_df, fold_idxs=None):
     """Returns a mean DataFrame.
