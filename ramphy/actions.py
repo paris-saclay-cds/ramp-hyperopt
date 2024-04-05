@@ -52,7 +52,7 @@ def hyperopt(
         test=False,
         label=False,
         resume=resume,
-        max_concurrent_runs=1,
+        max_concurrent_runs=2,
         n_cpu_per_run=8,
         n_gpu_per_run=0,
         verbose=3,
@@ -136,7 +136,9 @@ def retrain(submission, ramp_kit_dir=".", ramp_data_dir="."):
     )
 
 
-def blend(submissions, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir="."):
+def blend(
+    submissions, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir=".", output_path=None
+):
     """Blending action.
 
     Blends a list of submissions
@@ -158,12 +160,13 @@ def blend(submissions, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir="."):
         The reward: the blended valid score.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
+    if output_path is None:
+        output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
     rw.utils.testing.blend_submissions(
         submissions,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
-        ramp_submission_dir="submissions",
+        ramp_submission_dir=str(Path(ramp_kit_dir) / "submissions"),
         save_output=True,
         output_path=output_path,
         fold_idxs=fold_idxs,
