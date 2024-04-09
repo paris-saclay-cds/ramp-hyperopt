@@ -510,7 +510,7 @@ def save_hyperopt_score_summary(
 
 def rename_best_hyperopt_submissions(
     submission: str,
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Iterable[int],
     top_n: Optional[int] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
@@ -525,10 +525,9 @@ def rename_best_hyperopt_submissions(
     ----------
     submission : str
         The name of the original hyperopted submission.
-    fold_idxs : list or generator of int, default=None
+    fold_idxs : list or generator of int
         Fold indices that the {submission}_hyperopt*'s
-        have been trained on. If None, return summary of all
-        folds.
+        have been trained on.
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s
         to be renamed.
