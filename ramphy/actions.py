@@ -53,7 +53,7 @@ def hyperopt(
         label=False,
         resume=resume,
         max_concurrent_runs=2,
-        n_cpu_per_run=8,
+        n_cpu_per_run=None,
         n_gpu_per_run=0,
         verbose=3,
     )
@@ -706,7 +706,7 @@ def select_top_hyperopt(
         if is_lower_the_better:
             score_cutoff = top_mean + n_sigma * top_std
         else:
-            score_cutoff = top_mean - n_sigma * top_std            
+            score_cutoff = top_mean - n_sigma * top_std
         print(f"score_cutoff = {score_cutoff}")
 
     if score_cutoff is not None:

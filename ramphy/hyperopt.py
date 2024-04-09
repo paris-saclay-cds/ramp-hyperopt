@@ -12,6 +12,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import rampwf as rw
+import ray
 from ray import tune, train
 from tempfile import mkdtemp
 from pathlib import Path
@@ -926,6 +927,12 @@ def run_hyperopt(
     n_gpu_per_run,
     verbose,
 ):
+    if n_cpu_per_run is None:
+        n_cpu_per_run = os.cpu_count() - 1
+
+    if n_gpu_per_run is None:
+        n_gpu_per_run = len(ray.get_gpu_ids())  # Get the number of GPUs available
+
     hyperparameter_experiment = init_hyperopt(
         ramp_kit_dir,
         ramp_data_dir,
