@@ -53,7 +53,7 @@ def hyperopt(
         test=False,
         label=False,
         resume=resume,
-        max_concurrent_runs=2,
+        max_concurrent_runs=1,
         n_cpu_per_run=None,
         n_gpu_per_run=0,
         verbose=3,
@@ -68,6 +68,7 @@ def train(
     force_retrain: bool = False,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
+    ignore_errors: Optional[bool] = False,
 ) -> Optional[pd.Series]:
     """Training action.
 
@@ -94,17 +95,22 @@ def train(
         The reward: the bagged valid score.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    rw.utils.testing.assert_submission(
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-        ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
-        submission=submission,
-        save_output=True,
-        retrain=False,
-        bag=bag,
-        force_retrain=force_retrain,
-        fold_idxs=fold_idxs,
-    )
+    try:
+        rw.utils.testing.assert_submission(
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
+            submission=submission,
+            save_output=True,
+            retrain=False,
+            bag=bag,
+            force_retrain=force_retrain,
+            fold_idxs=fold_idxs,
+        )
+    except Exception as e:
+        print("called")
+        if not ignore_errors:
+            raise e
     if bag:
         submission_dir = Path(ramp_kit_dir) / "submissions" / submission
         bagged_f_name = submission_dir / "training_output" / "bagged_scores.csv"
@@ -766,6 +772,7 @@ def select_top_hyperopt_and_train(
     n_sigma: Optional[float] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
+    ignore_errors: Optional[bool] = False,
 ):
     """Selects and trains submissions {submission}_hyperopt*.
 
@@ -828,13 +835,14 @@ def select_top_hyperopt_and_train(
         )
     for i, submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
-        train(
-            submission,
-            fold_idxs=fold_idxs,
-            bag=False,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
-        )
+            train(
+                submission,
+                fold_idxs=fold_idxs,
+                bag=False,
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+                ignore_errors=ignore_errors,
+            )
 
 
 def select_top_hyperopt_and_blend(
