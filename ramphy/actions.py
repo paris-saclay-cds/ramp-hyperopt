@@ -8,7 +8,7 @@ import itertools
 
 import glob
 import json
-from typing import Iterable, Optional, List
+from typing import Sequence, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,7 @@ def _bagged_reward(score_type, bagged_f_name):
 def hyperopt(
     submission: str,
     n_trials: int,
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
     resume: bool = True,
@@ -63,7 +63,7 @@ def hyperopt(
 
 def train(
     submission: str,
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Optional[Sequence[int]] = None,
     bag: bool = True,
     force_retrain: bool = False,
     ramp_kit_dir: str = ".",
@@ -139,7 +139,7 @@ def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") 
 
 def blend(
     submissions: List[str],
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
     output_path: Optional[str] = None,
@@ -255,7 +255,7 @@ def _select_all_hyperopt(submission: str, ramp_kit_dir: str = ".") -> List[str]:
 
 def get_hyperopt_score_summary(
     submission: str,
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
@@ -327,7 +327,7 @@ def get_hyperopt_score_summary(
 
 
 def filter_full_folds(
-    summary_df: pd.DataFrame, fold_idxs: Iterable[int]
+    summary_df: pd.DataFrame, fold_idxs: Sequence[int]
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -357,7 +357,7 @@ def filter_full_folds(
 
 
 def get_hyperopt_score_means(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
 ) -> pd.DataFrame:
     """Returns a mean DataFrame.
 
@@ -395,7 +395,7 @@ def get_hyperopt_score_means(
 
 
 def get_hyperopt_score_stds(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
 ) -> pd.DataFrame:
     """Returns an std DataFrame.
 
@@ -433,7 +433,7 @@ def get_hyperopt_score_stds(
 
 
 def get_hyperopt_score_counts(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
 ) -> pd.DataFrame:
     """Returns a count DataFrame.
 
@@ -472,7 +472,7 @@ def get_hyperopt_score_counts(
 
 def save_hyperopt_score_summary(
     submission: str,
-    fold_idxs: Optional[Iterable[int]] = None,
+    fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
 ) -> None:
@@ -510,7 +510,7 @@ def save_hyperopt_score_summary(
 
 def rename_best_hyperopt_submissions(
     submission: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     top_n: Optional[int] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
@@ -596,7 +596,7 @@ def rename_best_hyperopt_submissions(
 
 def delete_duplicates_hyperopt(
     submission: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
 ) -> None:
@@ -641,7 +641,7 @@ def delete_duplicates_hyperopt(
 
 def select_top_hyperopt(
     submission: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
@@ -759,8 +759,8 @@ def select_top_hyperopt(
 
 def select_top_hyperopt_and_train(
     submission: str,
-    fold_idxs: Iterable[int],
-    trained_fold_idxs: Iterable[int] = None,
+    fold_idxs: Sequence[int],
+    trained_fold_idxs: Sequence[int] = None,
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
@@ -839,7 +839,7 @@ def select_top_hyperopt_and_train(
 
 def select_top_hyperopt_and_blend(
     submission: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
@@ -880,7 +880,7 @@ def select_top_hyperopt_and_submit_hybrid(
     new_submission: str,
     parent_submissions: dict,
     select_element: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     keep_hypers: bool = False,
@@ -982,7 +982,7 @@ def select_top_hyperopt_and_submit_hybrid(
 
 def clean_up_predictions(
     submission: str,
-    fold_idxs: Iterable[int],
+    fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
     ramp_kit_dir: str = ".",
 ) -> None:
