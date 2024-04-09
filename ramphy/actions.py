@@ -8,6 +8,7 @@ import itertools
 
 import glob
 import json
+from typing import Iterable, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -32,13 +33,13 @@ def _bagged_reward(score_type, bagged_f_name):
 
 
 def hyperopt(
-    submission,
-    n_trials,
-    fold_idxs=None,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
-    resume=True,
-):
+    submission: str,
+    n_trials: int,
+    fold_idxs: Optional[Iterable[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+    resume: bool = True,
+) -> None:
     run_hyperopt(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
@@ -61,13 +62,13 @@ def hyperopt(
 
 
 def train(
-    submission,
-    fold_idxs=None,
-    bag=True,
-    force_retrain=False,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
-):
+    submission: str,
+    fold_idxs: Optional[Iterable[int]] = None,
+    bag: bool = True,
+    force_retrain: bool = False,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> Optional[pd.Series]:
     """Training action.
 
     Trains and bags a submission on a set of folds
@@ -110,7 +111,7 @@ def train(
         return _bagged_reward(problem.score_types[0], bagged_f_name)
 
 
-def retrain(submission, ramp_kit_dir=".", ramp_data_dir="."):
+def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") -> None:
     """Retraining action.
 
     Trains the submissin on full training data. No reward since no
@@ -137,8 +138,12 @@ def retrain(submission, ramp_kit_dir=".", ramp_data_dir="."):
 
 
 def blend(
-    submissions, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir=".", output_path=None
-):
+    submissions: List[str],
+    fold_idxs: Optional[Iterable[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+    output_path: Optional[str] = None,
+) -> pd.Series:
     """Blending action.
 
     Blends a list of submissions
@@ -162,13 +167,15 @@ def blend(
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     if output_path is None:
         output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
+    else:
+        output_path = Path(output_path)
     rw.utils.testing.blend_submissions(
         submissions,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
         ramp_submission_dir=str(Path(ramp_kit_dir) / "submissions"),
         save_output=True,
-        output_path=output_path,
+        output_path=str(output_path),
         fold_idxs=fold_idxs,
     )
 
@@ -177,8 +184,11 @@ def blend(
 
 
 def submit_hybrid(
-    new_submission, parent_submissions, ramp_kit_dir=".", ramp_data_dir="."
-):
+    new_submission: str,
+    parent_submissions: dict,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Combines workflow elements coming from different submissions.
 
     Borrowing workflow elements from parent submissions.
@@ -223,7 +233,7 @@ def submit_hybrid(
         print(f"Copying {from_file} to {to_file}")
 
 
-def _select_all_hyperopt(submission, ramp_kit_dir="."):
+def _select_all_hyperopt(submission: str, ramp_kit_dir: str = ".") -> List[str]:
     """Returns all submissions {submission}_hyperopt*.
 
     Parameters
@@ -240,11 +250,15 @@ def _select_all_hyperopt(submission, ramp_kit_dir="."):
     submissions_f_names = glob.glob(
         f"{ramp_kit_dir}/submissions/{submission}_hyperopt*"
     )
+    return submissions_f_names
 
 
 def get_hyperopt_score_summary(
-    submission, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir="."
-):
+    submission: str,
+    fold_idxs: Optional[Iterable[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -312,7 +326,9 @@ def get_hyperopt_score_summary(
     return summary_df
 
 
-def filter_full_folds(summary_df, fold_idxs):
+def filter_full_folds(
+    summary_df: pd.DataFrame, fold_idxs: Iterable[int]
+) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
     Filters submissions that were trained on all the given folds.
@@ -340,7 +356,9 @@ def filter_full_folds(summary_df, fold_idxs):
     ]
 
 
-def get_hyperopt_score_means(summary_df, fold_idxs=None):
+def get_hyperopt_score_means(
+    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+) -> pd.DataFrame:
     """Returns a mean DataFrame.
 
     Computes the mean of each submission over folds. If
@@ -376,7 +394,9 @@ def get_hyperopt_score_means(summary_df, fold_idxs=None):
     return means_df
 
 
-def get_hyperopt_score_stds(summary_df, fold_idxs=None):
+def get_hyperopt_score_stds(
+    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+) -> pd.DataFrame:
     """Returns an std DataFrame.
 
     Computes the std of each submission over folds. If
@@ -412,7 +432,9 @@ def get_hyperopt_score_stds(summary_df, fold_idxs=None):
     return stds_df
 
 
-def get_hyperopt_score_counts(summary_df, fold_idxs=None):
+def get_hyperopt_score_counts(
+    summary_df: pd.DataFrame, fold_idxs: Optional[Iterable[int]] = None
+) -> pd.DataFrame:
     """Returns a count DataFrame.
 
     Computes the std of each submission over folds. If
@@ -449,8 +471,11 @@ def get_hyperopt_score_counts(summary_df, fold_idxs=None):
 
 
 def save_hyperopt_score_summary(
-    submission, fold_idxs=None, ramp_kit_dir=".", ramp_data_dir="."
-):
+    submission: str,
+    fold_idxs: Optional[Iterable[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Saves a summary csv.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -484,8 +509,12 @@ def save_hyperopt_score_summary(
 
 
 def rename_best_hyperopt_submissions(
-    submission, fold_idxs=None, top_n=None, ramp_kit_dir=".", ramp_data_dir="."
-):
+    submission: str,
+    fold_idxs: Optional[Iterable[int]] = None,
+    top_n: Optional[int] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Renames best submissions for archiving.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -567,8 +596,11 @@ def rename_best_hyperopt_submissions(
 
 
 def delete_duplicates_hyperopt(
-    submission, fold_idxs, ramp_kit_dir=".", ramp_data_dir="."
-):
+    submission: str,
+    fold_idxs: Iterable[int],
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Deletes duplicates of {submission}_hyperopt*.
 
     Two submission are considered duplicates if their valid score
@@ -609,14 +641,14 @@ def delete_duplicates_hyperopt(
 
 
 def select_top_hyperopt(
-    submission,
-    fold_idxs,
-    score_cutoff=None,
-    top_n=None,
-    n_sigma=None,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
-):
+    submission: str,
+    fold_idxs: Iterable[int],
+    score_cutoff: Optional[float] = None,
+    top_n: Optional[int] = None,
+    n_sigma: Optional[float] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> List[str]:
     """Returns submissions {submission}_hyperopt* with top score.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -723,18 +755,18 @@ def select_top_hyperopt(
     else:
         new_submissions = means_df.index
     print(f"Selected {len(new_submissions)} subissions")
-    return new_submissions
+    return new_submissions.to_list()
 
 
 def select_top_hyperopt_and_train(
-    submission,
-    fold_idxs,
-    trained_fold_idxs=None,
-    score_cutoff=None,
-    top_n=None,
-    n_sigma=None,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
+    submission: str,
+    fold_idxs: Iterable[int],
+    trained_fold_idxs: Iterable[int] = None,
+    score_cutoff: Optional[float] = None,
+    top_n: Optional[int] = None,
+    n_sigma: Optional[float] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
 ):
     """Selects and trains submissions {submission}_hyperopt*.
 
@@ -807,14 +839,14 @@ def select_top_hyperopt_and_train(
 
 
 def select_top_hyperopt_and_blend(
-    submission,
-    fold_idxs,
-    score_cutoff=None,
-    top_n=None,
-    n_sigma=None,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
-):
+    submission: str,
+    fold_idxs: Iterable[int],
+    score_cutoff: Optional[float] = None,
+    top_n: Optional[int] = None,
+    n_sigma: Optional[float] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Selects and blends submissions {submission}_hyperopt*.
 
     Selects {submission}_hyperopt* submissions, then those
@@ -846,19 +878,19 @@ def select_top_hyperopt_and_blend(
 
 
 def select_top_hyperopt_and_submit_hybrid(
-    new_submission,
-    parent_submissions,
-    select_idx,
-    fold_idxs,
-    score_cutoff=None,
-    top_n=None,
-    keep_hypers=False,
-    ramp_kit_dir=".",
-    ramp_data_dir=".",
-):
+    new_submission: str,
+    parent_submissions: dict,
+    select_element: str,
+    fold_idxs: Iterable[int],
+    score_cutoff: Optional[float] = None,
+    top_n: Optional[int] = None,
+    keep_hypers: bool = False,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
+) -> None:
     """Selects top {submission}_hyperopt*'s and combines them with a new we.
 
-    Selects all {parent_submissions[select_idx]}_hyperopt* submissions
+    Selects all {parent_submissions[select_element]}_hyperopt* submissions
     which have been trained on fold_idxs, then selects either the
     top_n according to mean score, or those with mean score better than
     score_cutoff. Then hybridizes these hyperopted submissions with the
@@ -874,12 +906,12 @@ def select_top_hyperopt_and_submit_hybrid(
     50 submissions; the hash in xgboost_fe_<hash> will be computed on the
     new submission files since the new feature extractor might have changed
     hyper values, on which the hash is computed); parent_submissions =
-    ['xgboost_fe', 'xgboost'], indicating that the feature extractor (the
+    {'feature_extractor':'xgboost_fe', 'classifier':'xgboost'}, indicating that the feature extractor (the
     first workflow element) will come from xgboost_fe, and the second
-    (the classifier) will come from 'xgboost_hyperopt*, and select_idx=1,
-    telling that it is the second parent who's hyperopted children will
+    (the classifier) will come from 'xgboost_hyperopt*, and select_element='classifier',
+    telling that it is the hyperopted children of the parent providing the classifier that will
     be hybridized. In case the LLMs submit the classifier, we'd have
-    parent_submissions = ['xgboost', 'new_classifier'], and select_idx=0.
+    parent_submissions = {'feature_extractor':'xgboost', 'classifier':'new_classifier'}, and select_element="feature_extractor.
 
     Parameters
     ----------
@@ -888,8 +920,8 @@ def select_top_hyperopt_and_submit_hybrid(
     parent_submissions : list of str
         The names of the submissions from which the workflow elements
         will come.
-    select_idx : int
-        The index of the parent submission whose (typically)
+    select_element: str,
+        The element of the parent submission whose (typically)
         hyperopted children will be used in the hybrid.
     fold_idxs : list or generator of int
         Fold indices to train selected submissions on.
@@ -914,15 +946,15 @@ def select_top_hyperopt_and_submit_hybrid(
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     new_submissions = select_top_hyperopt(
-        parent_submissions[select_idx],
-        fold_idxs,
-        score_cutoff,
-        top_n,
-        ramp_kit_dir,
-        ramp_data_dir,
+        submission=parent_submissions[select_element],
+        fold_idxs=fold_idxs,
+        score_cutoff=score_cutoff,
+        top_n=top_n,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
     )
     for submission in new_submissions:
-        parent_submissions[select_idx] = submission
+        parent_submissions[select_element] = submission
         submit_hybrid(
             "__new_submission__", parent_submissions, ramp_kit_dir, ramp_data_dir
         )
@@ -949,7 +981,12 @@ def select_top_hyperopt_and_submit_hybrid(
             shutil.move(module_path, output_submission_dir)
 
 
-def clean_up_predictions(submission, fold_idxs, score_cutoff=None, ramp_kit_dir="."):
+def clean_up_predictions(
+    submission: str,
+    fold_idxs: Iterable[int],
+    score_cutoff: Optional[float] = None,
+    ramp_kit_dir: str = ".",
+) -> None:
     """
 
     Parameters
@@ -989,11 +1026,10 @@ def clean_up_predictions(submission, fold_idxs, score_cutoff=None, ramp_kit_dir=
         submissions_f_names = glob.glob(f"{ramp_kit_dir}/submissions/{submission}*")
     else:
         # ,,,
-        submissions = _select_top_hyperopt(
-            submission,
-            fold_idxs,
+        submissions = select_top_hyperopt(
+            submission=submission,
+            fold_idxs=fold_idxs,
             score_cutoff=score_cutoff,
-            select_best=False,
             ramp_kit_dir=ramp_kit_dir,
         )
         submissions_f_names = [
