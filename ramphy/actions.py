@@ -835,14 +835,14 @@ def select_top_hyperopt_and_train(
         )
     for i, submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
-            train(
-                submission,
-                fold_idxs=fold_idxs,
-                bag=False,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-                ignore_errors=ignore_errors,
-            )
+        train(
+            submission,
+            fold_idxs=fold_idxs,
+            bag=False,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ignore_errors=ignore_errors,
+        )
 
 
 def select_top_hyperopt_and_blend(
