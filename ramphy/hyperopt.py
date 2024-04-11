@@ -850,7 +850,7 @@ def init_hyperopt(
                         )
                         scores.append(score)
                     except FileNotFoundError:
-                        print(f"{prev_trial_path}/fold_{fold_idx}' doesn't exist.")
+                        print(f"{prev_trial_path}/training_output/fold_{fold_idx}' doesn't exist.")
                         break
                 if len(scores) != len(fold_idxs):
                     print(f"Skipping {prev_trial_path}")
