@@ -1,0 +1,114 @@
+{
+    "target_col": "target",
+    "col_types" : {
+      "id": "num",
+      "cat0": "cat",
+      "cat1": "cat",
+      "cat2": "cat",
+      "cat3": "cat",
+      "cat4": "cat",
+      "cat5": "cat",
+      "cat6": "cat",
+      "cat7": "cat",
+      "cat8": "cat",
+      "cat9": "cat",
+      "cont0": "num",
+      "cont1": "num",
+      "cont2": "num",
+      "cont3": "num",
+      "cont4": "num",
+      "cont5": "num",
+      "cont6": "num",
+      "cont7": "num",
+      "cont8": "num",
+      "cont9": "num",
+      "cont10": "num",
+      "cont11": "num",
+      "cont12": "num",
+      "cont13": "num"
+    },
+    "col_values": {
+      "cat0": [
+        "A",
+        "B"
+      ],
+      "cat1": [
+        "A",
+        "B"
+      ],
+      "cat2": [
+        "A",
+        "B"
+      ],
+      "cat3": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "cat4": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "cat5": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "cat6": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "G",
+        "H",
+        "I"
+      ],
+      "cat7": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "I"
+      ],
+      "cat8": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G"
+      ],
+      "cat9": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O"
+      ]
+    },
+    "id_col": "id",
+    "prediction_type": "regression",
+    "input_types": ["tabular"],
+    "score_type": "rmse",
+    "title": "Kaggle insurance claim",
+    "kaggle_name": "tabular-playground-series-feb-2021"
+}
