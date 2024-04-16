@@ -594,8 +594,8 @@ def rename_best_hyperopt_submissions(
             contributivites_df.loc[hyperopt_submission]["contributivity"]
         )
         if top_n is None or hyperopt_submission_i < top_n or contributivity > 0:
-            from_f_name = f"submissions/{hyperopt_submission}"
-            to_f_name = f"submissions/{submission}_best_{hyperopt_submission_i}_{contributivity}"
+            from_f_name = f"{ramp_kit_dir}/submissions/{hyperopt_submission}"
+            to_f_name = f"{ramp_kit_dir}/submissions/{submission}_best_{hyperopt_submission_i}_{contributivity}"
             print(f"{from_f_name} -> {to_f_name}")
             shutil.move(from_f_name, to_f_name)
 
@@ -641,8 +641,8 @@ def delete_duplicates_hyperopt(
     )
     for submission in means_df.reset_index()["hyperopt_submission"]:
         if submission not in unique_submissions:
-            print(f"Removing {submission}")
-            shutil.rmtree(Path("submissions") / submission)
+            print(f"Removing {ramp_kit_dir}/submissions/{submission}")
+            shutil.rmtree(Path(ramp_kit_dir) / "submissions" / submission)
 
 
 def select_top_hyperopt(
@@ -833,10 +833,14 @@ def select_top_hyperopt_and_train(
             ramp_kit_dir,
             ramp_data_dir,
         )
-    for i, submission in enumerate(new_submissions):
+    for i, new_submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
+        shutil.copy(
+            f'{ramp_kit_dir}/submissions/{submission}/data_preprocessor.py',
+            f'{ramp_kit_dir}/submissions/{new_submission}/data_preprocessor.py',
+        )
         train(
-            submission,
+            new_submission,
             fold_idxs=fold_idxs,
             bag=False,
             ramp_kit_dir=ramp_kit_dir,

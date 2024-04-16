@@ -250,7 +250,7 @@ class Hyperparameter(object):
         return bool(self.default)
 
 
-def parse_hyperparameters(module_path, workflow_element_name):
+def parse_hyperparameters(submission_path, workflow_element_name):
     """Parse hyperparameters in a workflow element.
 
     Load the module, take all Hyperparameter objects, and set the name of each
@@ -258,7 +258,7 @@ def parse_hyperparameters(module_path, workflow_element_name):
     name of each to workflow_element_name.
 
     Parameters:
-        module_path : str
+        submission_path : str
             The path to the submission directory.
         workflow_element_name : string
             The name of the workflow element.
@@ -267,7 +267,7 @@ def parse_hyperparameters(module_path, workflow_element_name):
     """
     hyperparameters = []
     workflow_element = rw.utils.import_module_from_source(
-        os.path.join(module_path, workflow_element_name + ".py"), workflow_element_name
+        os.path.join(submission_path, workflow_element_name + ".py"), workflow_element_name
     )
     for object_name in dir(workflow_element):
         o = getattr(workflow_element, object_name)
@@ -277,7 +277,7 @@ def parse_hyperparameters(module_path, workflow_element_name):
     return hyperparameters
 
 
-def parse_all_hyperparameters(module_path, workflow):
+def parse_all_hyperparameters(submission_path, workflow):
     """Parse hyperparameters in a submission.
 
     Load all the the modules, take all Hyperparameter objects, and set the name
@@ -285,7 +285,7 @@ def parse_all_hyperparameters(module_path, workflow):
     element name of each to the corresponding workflow_element_name.
 
     Parameters:
-        module_path : str
+        submission_path : str
             The path to the submission directory.
         workflow : workflow from rw.workflows
             The ramp workflow.
@@ -293,29 +293,30 @@ def parse_all_hyperparameters(module_path, workflow):
         hyperparameters : list of instances of Hyperparameter
     """
     hyperparameters = []
+    workflow.set_element_names(submission_path)
     for wen in workflow.element_names:
-        hyperparameters += parse_hyperparameters(module_path, wen)
+        hyperparameters += parse_hyperparameters(submission_path, wen)
     return hyperparameters
 
 
 def write_hyperparameters(
-    submission_dir, output_submission_dir, hypers_per_workflow_element
+    submission_path, output_submission_path, hypers_per_workflow_element
 ):
     """Write hyperparameters in a submission.
 
-    Read workflow elements from submission_dir, replace the hyperparameter
+    Read workflow elements from submission_path, replace the hyperparameter
     section with the hyperparameters in the hypers_per_workflow_element
     dictionary (with new hyperparamter values set by, e.g, a hyperopt engine),
-    then write the new workflow elements into output_submission_dir (which
-    can be a temporary directory or submission_dir itself when the function
+    then write the new workflow elements into output_submission_path (which
+    can be a temporary directory or submission_path itself when the function
     is called to replace the hyperparameters in the input submission with the
     best hyperparameters.)
 
     Parameters:
-        submission_dir : str
+        submission_path : str
             The path to the submission directory from which the submission is
             read.
-        output_submission_dir : str
+        output_submission_path : str
             The path to the output submission directory into which the
             submission with the new hyperparameter values is written.
         hypers_per_workflow_element : dictionary
@@ -328,12 +329,12 @@ def write_hyperparameters(
         for h in hs:
             hyper_section += h.python_repr
         hyper_section += HYPERPARAMS_SECTION_END
-        f_name = os.path.join(submission_dir, wen + ".py")
+        f_name = os.path.join(submission_path, wen + ".py")
         with open(f_name) as f:
             content = f.read()
             content = HYPERPARAMS_REPL_REGEX.sub(hyper_section, content)
-        Path(output_submission_dir).mkdir(parents=True, exist_ok=True)
-        output_f_name = Path(output_submission_dir) / f"{wen}.py"
+        Path(output_submission_path).mkdir(parents=True, exist_ok=True)
+        output_f_name = Path(output_submission_path) / f"{wen}.py"
         with open(output_f_name, "w") as f:
             f.write(content)
 
@@ -345,7 +346,7 @@ class HyperparameterOptimization(object):
         hyperparameters: a list of Hyperparameters
         engine: a hyperopt engine
         ramp_kit_dir: the directory where the ramp kit is found
-        submission_dir: the directory where the submission to be optimized
+        submission_path: the directory where the submission to be optimized
             is found
     """
 
@@ -355,7 +356,7 @@ class HyperparameterOptimization(object):
         engine,
         ramp_kit_dir,
         ramp_data_dir,
-        submission_dir,
+        submission_path,
         fold_idxs,
         data_label,
         test,
@@ -376,11 +377,18 @@ class HyperparameterOptimization(object):
         else:
             self.fold_idxs = fold_idxs
 
+        self.workflow = self.problem.workflow
+        try:
+            self.workflow.metadata = self.problem.get_metadata(ramp_data_dir, data_label)
+        except AttributeError:
+            print("No metadata")    
+        self.workflow.set_element_names(submission_path)    
+
         self.data_label = data_label
-        self.submission_dir = submission_dir
+        self.submission_path = submission_path
         self.test = test
 
-        self.hyperopt_output_path = os.path.join(self.submission_dir, "hyperopt_output")
+        self.hyperopt_output_path = os.path.join(self.submission_path, "hyperopt_output")
         if self.data_label is not None:
             self.hyperopt_output_path = os.path.join(
                 self.hyperopt_output_path, self.data_label
@@ -451,25 +459,28 @@ class HyperparameterOptimization(object):
             col = h.name + "_i"
             self.df_scores_[col] = self.df_scores_[col].astype(int)
 
-    def run_next_experiment(self, module_path, fold_i, save_output=False):
+    def preprocess_data(self, submission_path):
+        self.X_train_preprocessed, self.y_train_preprocessed, self.X_test_preprocessed = \
+            self.workflow.preprocess_data(
+                submission_path, self.X_train, self.y_train, self.X_test
+            )
+
+    def run_next_experiment(self, submission_path, fold_i, save_output=False):
         if save_output:
-            training_output_path = Path(module_path) / "training_output"
+            training_output_path = Path(submission_path) / "training_output"
             training_output_path.mkdir(parents=True, exist_ok=True)
             print("Training output path: {}".format(training_output_path))
             fold_output_path = training_output_path / f"fold_{self.fold_idxs[fold_i]}"
             fold_output_path.mkdir(parents=True, exist_ok=True)
         else:
             fold_output_path = "."
-        X_train, y_train, X_test = rw.utils.preprocess_data(
-            module_path, self.X_train, self.y_train, self.X_test, self.ramp_kit_dir
-        )
         _, _, df_scores = rw.utils.run_submission_on_cv_fold(
             self.problem,
-            module_path=module_path,
+            submission_path=submission_path,
             fold=self.cv[fold_i],
-            X_train=X_train,
-            y_train=y_train,
-            X_test=X_test,
+            X_train=self.X_train_preprocessed,
+            y_train=self.y_train_preprocessed,
+            X_test=self.X_test_preprocessed,
             y_test=self.y_test,
             save_output=save_output,
             fold_output_path=fold_output_path,
@@ -506,7 +517,7 @@ class HyperparameterOptimization(object):
             self.hyperparameters[0].set_default(best_defaults)
         # Overwrite the submission with the best hyperparameter values
         write_hyperparameters(
-            self.submission_dir, self.submission_dir, self.hypers_per_workflow_element
+            self.submission_path, self.submission_path, self.hypers_per_workflow_element
         )
 
 
@@ -532,23 +543,24 @@ def run(hyperparameter_experiment, n_trials, resume=False):
         for h, i in zip(hyperparameter_experiment.hyperparameters, next_value_indices):
             h.default_index = i
         # Writing submission files with new hyperparameter values
-        output_submission_dir = mkdtemp()
+        output_submission_path = mkdtemp()
         write_hyperparameters(
-            hyperparameter_experiment.submission_dir,
-            output_submission_dir,
+            hyperparameter_experiment.submission_path,
+            output_submission_path,
             hyperparameter_experiment.hypers_per_workflow_element,
         )
         # Calling the training script.
 
+        hyperparameter_experiment.preprocess_data(output_submission_path)
         df_scores = hyperparameter_experiment.run_next_experiment(
-            output_submission_dir, fold_i
+            output_submission_path, fold_i
         )
         sn = hyperparameter_experiment.score_names[0]
         hyperparameter_experiment.engine.pass_feedback(
             fold_i, len(hyperparameter_experiment.cv), df_scores, sn
         )
         hyperparameter_experiment.update_df_scores(df_scores, fold_i)
-        shutil.rmtree(output_submission_dir)
+        shutil.rmtree(output_submission_path)
         now = pd.Timestamp.now()
         eta = start + (now - start) / (i_iter + 1 - start_iter) * (
             n_trials - start_iter
@@ -570,19 +582,20 @@ def objective(config, run_params=None):
         h.default_index = config[h.name]
     hyper_indices = [h.default_index for h in hyperparam_opt.hyperparameters]
     hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
-    output_submission_dir = f"{hyperparam_opt.submission_dir}_hyperopt_{hyper_hash}"
+    output_submission_path = f"{hyperparam_opt.submission_path}_hyperopt_{hyper_hash}"
     os.chdir(run_params["current_dir"])
     write_hyperparameters(
-        hyperparam_opt.submission_dir,
-        output_submission_dir,
+        hyperparam_opt.submission_path,
+        output_submission_path,
         hyperparam_opt.hypers_per_workflow_element,
     )
     # Calling the training script.
+    hyperparam_opt.preprocess_data(output_submission_path)
     valid_scores = np.zeros(len(hyperparam_opt.cv))
     df_scores_list = []
     for fold_i in range(len(hyperparam_opt.cv)):
         df_scores = hyperparam_opt.run_next_experiment(
-            output_submission_dir, fold_i, run_params["save_output"]
+            output_submission_path, fold_i, run_params["save_output"]
         )
         sn = hyperparam_opt.score_names[0]
         valid_scores[fold_i] = df_scores.loc["valid", sn]
@@ -592,9 +605,9 @@ def objective(config, run_params=None):
             fold_i,
         )
     #    fname = f'tmp_summary_{time.time()}.csv'
-    #    fname = Path(output_submission_dir) / 'summary.csv'
-    hyperparam_opt.make_and_save_summary(path=output_submission_dir)
-    #    shutil.rmtree(output_submission_dir)
+    #    fname = Path(output_submission_path) / 'summary.csv'
+    hyperparam_opt.make_and_save_summary(path=output_submission_path)
+    #    shutil.rmtree(output_submission_path)
 
     train.report(
         {
@@ -639,7 +652,7 @@ def run_tune(
     }
     tune_name = (
         f"{hyperparameter_experiment.engine.name}__"
-        + f'{hyperparameter_experiment.submission_dir.split("/")[-1]}__'
+        + f'{hyperparameter_experiment.submission_path.split("/")[-1]}__'
         + f"{hyperparameter_experiment.data_label}"
     )
     results = tune.run(
@@ -823,8 +836,8 @@ def init_hyperopt(
 ):
     # n_trials is only needed by ray_zoopt at init time
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    submission_dir = os.path.join(ramp_submission_dir, submission)
-    hyperparameters = parse_all_hyperparameters(submission_dir, problem.workflow)
+    submission_path = os.path.join(ramp_submission_dir, submission)
+    hyperparameters = parse_all_hyperparameters(submission_path, problem.workflow)
     if engine_name == "random":
         engine = RandomEngine(hyperparameters)
     elif engine_name.startswith("ray_"):
@@ -875,7 +888,7 @@ def init_hyperopt(
         engine,
         ramp_kit_dir,
         ramp_data_dir,
-        submission_dir,
+        submission_path,
         fold_idxs,
         data_label,
         test,
