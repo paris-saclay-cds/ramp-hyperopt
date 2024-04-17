@@ -7,7 +7,7 @@ from ramphy import Hyperparameter
 # RAMP START HYPERPARAMETERS
 encoding_strategy = Hyperparameter(
     dtype='str',
-    default='OneHot',
+    default='Binary',
     values=['OneHot', 'Count', 'Target', 'Binary', 'Hashing']
 )
 r_features_for_hashing = Hyperparameter(
@@ -34,7 +34,8 @@ class DataPreprocessor(object):
         return X_transformed_df
     
     def preprocess(self, X_train, y_train, X_test, metadata):
-        cat_cols = [col for col, col_type in metadata['col_types'].items() if col_type == 'cat']
+        cat_cols = [col for col, col_type in 
+                    metadata['data_description']['feature_types'].items() if col_type == 'cat']
         if ENCODING_STRATEGY == 'OneHot':
             transformers = [('cat', OneHotEncoder(handle_unknown='infrequent_if_exist'), cat_cols)]
         elif ENCODING_STRATEGY == 'Count':
@@ -61,8 +62,8 @@ class DataPreprocessor(object):
         for col in new_columns:
             new_col_types[col] = 'cat'
         for col in non_cat_columns:
-            new_col_types[col] = metadata['col_types'][col]
-        metadata['col_types'] = new_col_types
+            new_col_types[col] = metadata['data_description']['feature_types'][col]
+        metadata['data_description']['feature_types'] = new_col_types
 
         return X_train, y_train, X_test, metadata
 
