@@ -28,6 +28,7 @@ from .ramp_setup.setup_scripts.tabular_regression import (
     tabular_regression_submit,
 )
 from .ramp_setup.setup_scripts.tabular_classification import tabular_classification_setup
+from .ramp_setup.setup_scripts.kit_setup import kit_setup
 
 __all__ = [
     "Hyperparameter",
@@ -54,4 +55,5 @@ __all__ = [
     "tabular_regression_setup",
     "tabular_regression_submit",
     "tabular_classification_setup",
+    "kit_setup",
 ]
