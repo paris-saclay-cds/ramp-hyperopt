@@ -7,6 +7,8 @@ import pandas as pd
 import ramphy as rh
 import rampwf as rw
 
+from ramphy.ramp_setup.setup_scripts import utils as ramp_setup_utils
+
 
 def tabular_regression_setup(
     download_dir: str | Path,
@@ -32,7 +34,8 @@ def tabular_regression_setup(
 
     problem_code = open(problem_template_f_name).read()
     metadata = json.load(open(metadata_f_name))
-    problem_code = problem_code.format(**metadata)
+    metadata = ramp_setup_utils.prepare_metadata(metadata)
+    problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
     ramp_data_dir.mkdir(parents=True, exist_ok=True)
@@ -97,12 +100,12 @@ def tabular_regression_submit(
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata_f_name = ramp_data_dir / "data" / "metadata.json"
     metadata = json.load(open(metadata_f_name))
-
+    metadata = ramp_setup_utils.prepare_metadata(metadata)
     regressor_f_name = (
         ramp_templates_dir / "workflow_elements" / "tabular_regressors" / f'{workflow_element_dict["regressor"]}.py'
     )
     regressor_code = open(regressor_f_name).read()
-    regressor_code = regressor_code.format(**metadata)
+    regressor_code = regressor_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "regressor.py", "w") as f_out:
         f_out.write(regressor_code)
 

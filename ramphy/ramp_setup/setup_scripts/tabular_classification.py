@@ -8,6 +8,9 @@ import ramphy as rh
 import rampwf as rw
 
 
+
+
+
 def tabular_classification_setup(
     download_dir: str | Path,
     ramp_kit_dir: str | Path = ".",
@@ -32,7 +35,8 @@ def tabular_classification_setup(
 
     problem_code = open(problem_template_f_name).read()
     metadata = json.load(open(metadata_f_name))
-    problem_code = problem_code.format(**metadata)
+    metadata = prepare_metadata(metadata)
+    problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
     ramp_data_dir.mkdir(parents=True, exist_ok=True)

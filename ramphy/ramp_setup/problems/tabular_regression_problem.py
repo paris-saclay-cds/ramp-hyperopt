@@ -6,7 +6,7 @@ from sklearn.model_selection import ShuffleSplit
 import rampwf as rw
 
 problem_title = "{title} tabular regression"
-Predictions = rw.prediction_types.make_regression(label_names=["{target_name}"])
+Predictions = rw.prediction_types.make_regression(label_names=["{data_description[target_name]}"])
 workflow = rw.workflows.TabularRegressor()
 score_types = [
     rw.score_types.RMSE(name="{score_name}", precision=4),
@@ -35,10 +35,10 @@ def _read_data(path, f_name, data_label, is_train):
     else:
         data_path = Path(path) / "data" / data_label
     data = pd.read_csv(data_path / f_name)
-    y_array = data["{target_name}"].to_numpy()
+    y_array = data[["{data_description[target_name]}"]].to_numpy()
     if len(y_array.shape) == 1:
         y_array = y_array.reshape((len(y_array), 1))
-    X_df = data.drop("{target_name}", axis=1)
+    X_df = data.drop(["{data_description[target_name]}"], axis=1)
     return X_df, y_array
 
 
@@ -68,7 +68,7 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     sample_df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
     df = pd.DataFrame()
     df["{id_name}"] = sample_df["{id_name}"]
-    df["{target_name}"] = y_pred
+    df[["{data_description[target_name]}"]] = y_pred
     output_f_name = Path(output_path) / f"submission_{{suffix}}.csv"
     print(f"Writing submissions into {{output_f_name}}")
     df.to_csv(output_f_name, index=False)
