@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from ramphy import tabular_classification_setup
 from ramphy import tabular_regression_setup
 
 
@@ -40,13 +39,6 @@ def kit_setup(
 
     if challenge_type == "regression":
         return tabular_regression_setup(
-            ramp_data_dir=ramp_data_dir,
-            ramp_kit_dir=ramp_kit_dir,
-            download_dir=download_dir,
-            ramp_templates_dir=ramp_templates_dir,
-        )
-    elif "classification" in challenge_type:
-        return tabular_classification_setup(
             ramp_data_dir=ramp_data_dir,
             ramp_kit_dir=ramp_kit_dir,
             download_dir=download_dir,
