@@ -35,6 +35,8 @@ def tabular_regression_setup(
     problem_code = open(problem_template_f_name).read()
     metadata = json.load(open(metadata_f_name))
     metadata = ramp_setup_utils.prepare_metadata(metadata)
+    feature_types = metadata["data_description"]["feature_types"]
+    target_name = metadata["data_description"]["target_name"]
     problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
@@ -45,23 +47,24 @@ def tabular_regression_setup(
     test_data = pd.read_csv(download_dir / "test.csv")
     sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
 
-    metadata["data_description"]["feature_values"] = {}
-    for col, col_type in metadata["data_description"]["feature_types"].items():
+    feature_values = {}
+    for col, col_type in feature_types.items():
         if col_type == "cat" or col_type == "bin":
             # Ensure the column is treated as string to safely use .str accessor
             train_data[col] = train_data[col].astype(str)
             train_data[col] = train_data[col].str.strip()
             test_data[col] = test_data[col].astype(str)
             test_data[col] = test_data[col].str.strip()
-            metadata["data_description"]["feature_values"][col] = sorted(
+            feature_values[col] = sorted(
                 pd.concat([train_data[col], test_data[col]]).dropna().unique().tolist()
             )
-
+    metadata["data_description"]["feature_values"] = feature_values
+    
     # mock test labels
     # matching mean and sigma from training set
     np.random.seed(43)
-    test_data[metadata["target_name"]] = np.random.normal(
-        train_data[metadata["target_name"]].mean(), train_data[metadata["target_name"]].std()
+    test_data[target_name] = np.random.normal(
+        train_data[target_name].mean(), train_data[target_name].std()
     )
     test_data.to_csv(ramp_data_dir / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "train.csv", index=False)
