@@ -39,9 +39,9 @@ def kit_setup(
 
     if challenge_type == "regression":
         return tabular_regression_setup(
-            ramp_data_dir=ramp_data_dir,
-            ramp_kit_dir=ramp_kit_dir,
             download_dir=download_dir,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
             ramp_templates_dir=ramp_templates_dir,
         )
     else:
