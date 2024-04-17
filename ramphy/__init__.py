@@ -23,6 +23,10 @@ from .actions import (
     select_top_hyperopt_and_submit_hybrid,
     train,
 )
+from .ramp_setup.setup_scripts.tabular_regression import (
+    tabular_regression_setup,
+    tabular_regression_submit,
+)
 
 __all__ = [
     "Hyperparameter",
@@ -46,4 +50,6 @@ __all__ = [
     "select_top_hyperopt_and_train",
     "select_top_hyperopt_and_submit_hybrid",
     "train",
+    "tabular_regression_setup",
+    "tabular_regression_submit",
 ]
