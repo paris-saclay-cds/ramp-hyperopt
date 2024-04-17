@@ -1,5 +1,6 @@
 from pathlib import Path
 from tabular_regression import tabular_regression_setup
+from tabular_classification import tabular_classification_setup
 from typing import Optional
 
 
@@ -12,6 +13,13 @@ def kit_setup(
 ) -> None:
     if challenge_type == "regression":
         return tabular_regression_setup(
+            ramp_data_dir=ramp_data_dir,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_setup_kit_dir=ramp_setup_kit_dir,
+            ramp_templates_dir=ramp_templates_dir,
+        )
+    elif "classification" in challenge_type:
+        return tabular_classification_setup(
             ramp_data_dir=ramp_data_dir,
             ramp_kit_dir=ramp_kit_dir,
             ramp_setup_kit_dir=ramp_setup_kit_dir,
