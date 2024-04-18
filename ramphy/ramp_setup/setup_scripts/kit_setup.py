@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Optional
 
-from ramp_setup.metadata import load_metadata_from_json
 from ramphy import tabular_regression_setup
 from ramphy import tabular_regression_submit
+from ramphy.ramp_setup.metadata import load_metadata_from_json
 
 
 def kit_setup(

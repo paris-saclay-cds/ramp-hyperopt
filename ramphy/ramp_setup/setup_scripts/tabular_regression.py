@@ -4,8 +4,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from ramp_setup.metadata import load_metadata_from_json
-from ramp_setup.metadata import make_metadata_injectable
+from ramphy.ramp_setup.metadata import load_metadata_from_json
+from ramphy.ramp_setup.metadata import make_metadata_injectable
 
 
 def tabular_regression_setup(
