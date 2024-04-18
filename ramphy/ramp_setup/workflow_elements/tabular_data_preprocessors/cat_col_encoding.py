@@ -2,12 +2,13 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from base_data_preprocessor import BaseDataPreprocessor
 from category_encoders import BinaryEncoder
 from category_encoders import CountEncoder
 from category_encoders import HashingEncoder
 from category_encoders import TargetEncoder
-from ramp_setup.metadata import MetaData
 from ramphy import Hyperparameter
+from ramphy.ramp_setup.metadata import MetaData
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
@@ -22,8 +23,9 @@ R_FEATURES_FOR_HASHING = float(r_features_for_hashing)
 ENCODING_STRATEGY = str(encoding_strategy)
 
 
-class DataPreprocessor(object):
+class DataPreprocessor(BaseDataPreprocessor):
     def __init__(self):
+        super().__init__()
         self.to_cache = ENCODING_STRATEGY in ["Hashing", "Count", "Target", "Binary"]
 
     def transform(self, X, transformer, new_columns):

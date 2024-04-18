@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 from base_data_preprocessor import BaseDataPreprocessor
-from ramp_setup.metadata import MetaData
+from ramphy.ramp_setup.metadata import MetaData
 
 
 class DataPreprocessor(BaseDataPreprocessor):
