@@ -23,7 +23,7 @@ class DataDescription:
     description: str
     feature_types: Dict[str, str]
     target_types: Dict[str, str]
-    feature_values: Optional[Dict]
+    feature_values: Optional[Dict] = None
 
 
 @dataclass
