@@ -80,6 +80,16 @@ class MetaData:
             ),
         )
 
+    def asdict(self) -> dict:
+        """Returns the metadata as a dictionary
+
+        Returns:
+            dict: _description_
+        """
+        metadata_dict = asdict(self)
+        metadata_dict["data_description"] = asdict(metadata_dict["data_description"])
+        return metadata_dict
+
 
 def load_metadata_from_json(load_path: str | Path) -> MetaData:
     """Loads metadata from json
