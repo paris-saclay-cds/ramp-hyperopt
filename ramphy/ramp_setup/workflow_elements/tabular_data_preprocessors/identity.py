@@ -7,13 +7,9 @@ from ramphy.ramp_setup.metadata import MetaData
 
 
 class DataPreprocessor(BaseDataPreprocessor):
-    """Drop ID column"""
+    """Does nothing"""
 
     def transform(
         self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: MetaData
     ) -> Tuple[pd.DataFrame, Optional[np.ndarray], MetaData]:
-        """Removes the id column"""
-        X = X.drop(columns=[metadata.id_name])
-        if metadata is not None:
-            self.drop_metadata_features(metadata=metadata, features=[metadata.id_name])
         return X, y, metadata

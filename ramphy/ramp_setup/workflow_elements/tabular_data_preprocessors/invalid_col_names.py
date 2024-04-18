@@ -8,6 +8,8 @@ from ramphy.ramp_setup.metadata import MetaData
 
 
 class DataPreprocessor(BaseDataPreprocessor):
+    """Modifies the invalid column names"""
+
     def transform(
         self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: MetaData
     ) -> Tuple[pd.DataFrame, Optional[np.ndarray], MetaData]:

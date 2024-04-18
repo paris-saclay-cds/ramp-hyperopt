@@ -67,3 +67,20 @@ class BaseDataPreprocessor(ABC):
         X_train, y_train, metadata = self.transform(X=X_train, y=y_train, metadata=metadata)
         X_test, _, _ = self.transform(X=X_test, metadata=metadata, y=None)
         return X_train, y_train, X_test, metadata
+
+    def drop_metadata_features(self, metadata: MetaData, features: list) -> MetaData:
+        """Drops the features from the metadata
+
+        Args:
+            metadata (MetaData): _description_
+            features (list): _description_
+
+        Returns:
+            MetaData: _description_
+        """
+        for feat in features:
+            metadata.data_description.features.remove(feat)
+            del metadata.data_description.feature_types[feat]
+            if metadata.data_description.feature_values is not None:
+                del metadata.data_description.feature_values[feat]
+        return metadata

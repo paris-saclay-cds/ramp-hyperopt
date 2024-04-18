@@ -24,11 +24,15 @@ ENCODING_STRATEGY = str(encoding_strategy)
 
 
 class DataPreprocessor(BaseDataPreprocessor):
+    """Encodes categorical feature"""
+
     def __init__(self):
         super().__init__()
         self.to_cache = ENCODING_STRATEGY in ["Hashing", "Count", "Target", "Binary"]
 
-    def transform(self, X, transformer, new_columns):
+    # TODO implement transform
+
+    def _transform(self, X, transformer, new_columns):
         X_transformed = transformer.transform(X)
         # Handling sparse matrix output
         if hasattr(X_transformed, "toarray"):
@@ -66,8 +70,8 @@ class DataPreprocessor(BaseDataPreprocessor):
         new_columns = column_transformer.named_transformers_["cat"].get_feature_names_out(cat_cols)
         non_cat_columns = X_train.columns.difference(cat_cols)
         new_columns = list(new_columns) + list(non_cat_columns)
-        X_train = self.transform(X_train, column_transformer, new_columns)
-        X_test = self.transform(X_test, column_transformer, new_columns)
+        X_train = self._transform(X_train, column_transformer, new_columns)
+        X_test = self._transform(X_test, column_transformer, new_columns)
 
         new_col_types = dict()
         for col in new_columns:
