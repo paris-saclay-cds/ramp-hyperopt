@@ -79,3 +79,19 @@ class MetaData:
                 "w",
             ),
         )
+
+
+def load_metadata_from_json(load_path: str | Path) -> MetaData:
+    """Loads metadata from json
+
+    Args:
+        load_path (str | Path): Load path
+
+    Returns:
+        MetaData: loaded metadata
+    """
+    load_path = Path(load_path) / "metadata.json"
+    metadata_dict = json.load(open(load_path))
+    metadata_dict["data_description"] = DataDescription(**metadata_dict["data_description"])
+    metadata = MetaData(**metadata_dict)
+    return metadata
