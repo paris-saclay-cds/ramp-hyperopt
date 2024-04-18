@@ -18,7 +18,7 @@ class BaseDataPreprocessor(ABC):
         self,
         X: pd.DataFrame,
         metadata: MetaData,
-        y: Optional[np.ndarray],
+        y: np.ndarray,
     ) -> None:
         """Fit preprocessing parameters on data
 
