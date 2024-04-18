@@ -4,9 +4,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import ramphy as rh
-import rampwf as rw
-
+from ramp_setup.metadata import MetaData
+from ramp_setup.metadata import load_metadata_from_json, make_metadata_injectable
 from ramphy.ramp_setup.setup_scripts import utils as ramp_setup_utils
 
 
@@ -29,15 +28,15 @@ def tabular_regression_setup(
 
     ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
-    metadata_f_name = download_dir / "metadata.json"
     problem_f_name = ramp_kit_dir / "problem.py"
 
     problem_code = open(problem_template_f_name).read()
-    metadata = json.load(open(metadata_f_name))
-    metadata = ramp_setup_utils.prepare_metadata(metadata)
-    feature_types = metadata["data_description"]["feature_types"]
-    target_name = metadata["data_description"]["target_name"]
-    problem_code = problem_code.format_map(metadata)
+    metadata = load_metadata_from_json(download_dir)
+    feature_types = metadata.data_description.feature_types
+    target_name = metadata.data_description.target_name
+
+    injectable_metadata = make_metadata_injectable(metadata.asdict())
+    problem_code = problem_code.format_map(injectable_metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
     ramp_data_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +55,7 @@ def tabular_regression_setup(
             test_data[col] = test_data[col].astype(str)
             test_data[col] = test_data[col].str.strip()
             feature_values[col] = sorted(pd.concat([train_data[col], test_data[col]]).dropna().unique().tolist())
-    metadata["data_description"]["feature_values"] = feature_values
+    metadata.data_description.feature_values = feature_values
 
     # mock test labels
     # matching mean and sigma from training set
@@ -65,13 +64,12 @@ def tabular_regression_setup(
     test_data.to_csv(ramp_data_dir / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "train.csv", index=False)
     sample_submission.to_csv(ramp_data_dir / "sample_submission.csv", index=False)
-    if metadata["score_name"] in ["mse", "rmse"]:
-        metadata["lgbm_objective"] = "mse"
-    elif metadata["score_name"] == "mae":
-        metadata["lgbm_objective"] = "mae"
+    if metadata.score_name in ["mse", "rmse"]:
+        metadata.lgbm_objective = "mse"
+    elif metadata.score_name == "mae":
+        metadata.lgbm_objective = "mae"
 
-    with open(ramp_data_dir / "metadata.json", "w") as f_out:
-        json.dump(metadata, f_out)
+    metadata.save(ramp_data_dir)
 
 
 def tabular_regression_submit(
@@ -97,14 +95,13 @@ def tabular_regression_submit(
         ramp_data_dir = Path(ramp_data_dir)
 
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
-    metadata_f_name = ramp_data_dir / "metadata.json"
-    metadata = json.load(open(metadata_f_name))
-    metadata = ramp_setup_utils.prepare_metadata(metadata)
+    metadata = load_metadata_from_json(ramp_data_dir)
     regressor_f_name = (
         ramp_templates_dir / "workflow_elements" / "tabular_regressors" / f'{workflow_element_dict["regressor"]}.py'
     )
     regressor_code = open(regressor_f_name).read()
-    regressor_code = regressor_code.format_map(metadata)
+    injectable_metadata = make_metadata_injectable(metadata.asdict())
+    regressor_code = regressor_code.format_map(injectable_metadata)
     with open(ramp_kit_dir / "submissions" / submission / "regressor.py", "w") as f_out:
         f_out.write(regressor_code)
 
@@ -115,13 +112,13 @@ def tabular_regression_submit(
         / f'{workflow_element_dict["feature_extractor"]}.py'
     )
     fe_code = open(fe_f_name).read()
-    fe_code = fe_code.format(**metadata)
+    fe_code = fe_code.format_map(injectable_metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
         f_out.write(fe_code)
 
     for i, dp in enumerate(workflow_element_dict["data_preprocessors"]):
         dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / f"{dp}.py"
         dp_code = open(dp_f_name).read()
-        dp_code = dp_code.format(**metadata)
+        dp_code = dp_code.format_map(injectable_metadata)
         with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{i}_{dp}.py", "w") as f_out:
             f_out.write(dp_code)

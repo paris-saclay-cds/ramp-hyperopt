@@ -1,8 +1,9 @@
-import json
 from pathlib import Path
 from typing import Optional
 
-from ramphy import tabular_regression_setup, tabular_regression_submit
+from ramp_setup.metadata import load_metadata_from_json
+from ramphy import tabular_regression_setup
+from ramphy import tabular_regression_submit
 
 
 def kit_setup(
@@ -34,8 +35,8 @@ def kit_setup(
         ramp_templates_dir = Path(ramp_templates_dir)
 
     # Maybe the challenge type can be passed from outside...
-    metadata = json.load(open(download_dir / "metadata.json"))
-    challenge_type = metadata["task_type"]
+    metadata = load_metadata_from_json(download_dir)
+    challenge_type = metadata.task_type
 
     if challenge_type == "regression":
         # Setup the challenge kit

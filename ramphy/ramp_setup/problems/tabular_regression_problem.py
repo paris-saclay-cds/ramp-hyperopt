@@ -1,9 +1,10 @@
-import json
-import pandas as pd
-from itertools import chain
 from pathlib import Path
-from sklearn.model_selection import ShuffleSplit
+
+import pandas as pd
 import rampwf as rw
+from ramp_setup.metadata import MetaData
+from ramp_setup.metadata import load_metadata_from_json
+from sklearn.model_selection import ShuffleSplit
 
 problem_title = "{title} tabular regression"
 Predictions = rw.prediction_types.make_regression(label_names=["{data_description[target_name]}"])
@@ -52,13 +53,12 @@ def get_test_data(path=".", data_label=None):
     return _read_data(path, f_name, data_label, is_train=False)
 
 
-def get_metadata(path=".", data_label=None):
+def get_metadata(path=".", data_label=None) -> MetaData:
     if data_label is None:
         data_path = Path(path) / "data"
     else:
         data_path = Path(path) / "data" / data_label
-    with open(data_path / "metadata.json") as f:
-        metadata = json.load(f)
+    metadata = load_metadata_from_json(load_path=data_path, as_dict=False)
     return metadata
 
 

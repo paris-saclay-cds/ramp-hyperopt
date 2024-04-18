@@ -2,6 +2,7 @@ import json
 import os
 from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -22,6 +23,7 @@ class DataDescription:
     description: str
     feature_types: Dict[str, str]
     target_types: Dict[str, str]
+    feature_values: Optional[Dict]
 
 
 @dataclass
@@ -46,6 +48,7 @@ class MetaData:
     train_target_format: Optional[DataExtension] = DataExtension.CSV
     test_target_name: Optional[str] = "test_y"
     test_target_format: Optional[DataExtension] = DataExtension.CSV
+    lgbm_objective: Optional[str] = None
 
     def __post_init__(self):
         """Used to force any format that is not an instance of DataExtension, into it"""
@@ -91,11 +94,12 @@ class MetaData:
         return metadata_dict
 
 
-def load_metadata_from_json(load_path: str | Path) -> MetaData:
+def load_metadata_from_json(load_path: str | Path, as_dict: bool = False) -> MetaData | Dict:
     """Loads metadata from json
 
     Args:
         load_path (str | Path): Load path
+        as_dict (bool): if true the metadata is returned as a dictionary. Default: False
 
     Returns:
         MetaData: loaded metadata
@@ -104,4 +108,19 @@ def load_metadata_from_json(load_path: str | Path) -> MetaData:
     metadata_dict = json.load(open(load_path))
     metadata_dict["data_description"] = DataDescription(**metadata_dict["data_description"])
     metadata = MetaData(**metadata_dict)
+    if as_dict:
+        return metadata.asdict()
+    return metadata
+
+
+def make_metadata_injectable(metadata: dict) -> dict:
+    """Function to change lists into strings in the metadata. Useful for injecting metadata lists into
+    code templates"""
+    for key in metadata:
+        if isinstance(metadata[key], list):
+            metadata[key] = ", ".join(map(str, metadata[key]))
+        elif isinstance(metadata[key], dict):
+            metadata[key] = make_metadata_injectable(metadata[key])
+        elif is_dataclass(metadata[key]):
+            metadata[key] = make_metadata_injectable(asdict(metadata[key]))
     return metadata
