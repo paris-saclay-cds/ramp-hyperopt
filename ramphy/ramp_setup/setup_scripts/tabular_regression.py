@@ -55,17 +55,13 @@ def tabular_regression_setup(
             train_data[col] = train_data[col].str.strip()
             test_data[col] = test_data[col].astype(str)
             test_data[col] = test_data[col].str.strip()
-            feature_values[col] = sorted(
-                pd.concat([train_data[col], test_data[col]]).dropna().unique().tolist()
-            )
+            feature_values[col] = sorted(pd.concat([train_data[col], test_data[col]]).dropna().unique().tolist())
     metadata["data_description"]["feature_values"] = feature_values
-    
+
     # mock test labels
     # matching mean and sigma from training set
     np.random.seed(43)
-    test_data[target_name] = np.random.normal(
-        train_data[target_name].mean(), train_data[target_name].std()
-    )
+    test_data[target_name] = np.random.normal(train_data[target_name].mean(), train_data[target_name].std())
     test_data.to_csv(ramp_data_dir / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "train.csv", index=False)
     sample_submission.to_csv(ramp_data_dir / "sample_submission.csv", index=False)
@@ -79,8 +75,8 @@ def tabular_regression_setup(
 
 
 def tabular_regression_submit(
-    submission,
-    workflow_element_dict={
+    submission: str | Path,
+    workflow_element_dict: dict = {
         "regressor": "lgbm",
         "feature_extractor": "empty",
         "data_preprocessors": [
@@ -89,19 +85,19 @@ def tabular_regression_submit(
             "cat_col_encoding",
         ],
     },
-    ramp_kit_dir=".",
-    ramp_data_dir=None,
-    ramp_templates_dir="/nas/ramp-hyperopt/ramphy/ramp_setup/",
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: str | Path = "/nas/ramp-hyperopt/ramphy/ramp_setup/",
 ) -> None:
     ramp_templates_dir = Path(ramp_templates_dir)
     ramp_kit_dir = Path(ramp_kit_dir)
     if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
+        ramp_data_dir = Path(ramp_kit_dir) / "data"
     else:
         ramp_data_dir = Path(ramp_data_dir)
 
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
-    metadata_f_name = ramp_data_dir / "data" / "metadata.json"
+    metadata_f_name = ramp_data_dir / "metadata.json"
     metadata = json.load(open(metadata_f_name))
     metadata = ramp_setup_utils.prepare_metadata(metadata)
     regressor_f_name = (

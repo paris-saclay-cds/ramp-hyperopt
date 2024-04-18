@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from ramphy import tabular_regression_setup
+from ramphy import tabular_regression_setup, tabular_regression_submit
 
 
 def kit_setup(
@@ -38,8 +38,16 @@ def kit_setup(
     challenge_type = metadata["task_type"]
 
     if challenge_type == "regression":
-        return tabular_regression_setup(
+        # Setup the challenge kit
+        tabular_regression_setup(
             download_dir=download_dir,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_templates_dir=ramp_templates_dir,
+        )
+        # Add the starting kit
+        tabular_regression_submit(
+            submission="starting_kit",
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
             ramp_templates_dir=ramp_templates_dir,
