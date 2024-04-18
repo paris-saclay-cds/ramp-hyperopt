@@ -32,7 +32,7 @@ def tabular_regression_setup(
     problem_code = open(problem_template_f_name).read()
     metadata = load_metadata_from_json(download_dir)
     feature_types = metadata.data_description.feature_types
-    target_name = metadata.data_description.target_name
+    target_cols = metadata.data_description.target_cols
 
     injectable_metadata = make_metadata_injectable(metadata.asdict())
     problem_code = problem_code.format_map(injectable_metadata)
@@ -59,7 +59,9 @@ def tabular_regression_setup(
     # mock test labels
     # matching mean and sigma from training set
     np.random.seed(43)
-    test_data[target_name] = np.random.normal(train_data[target_name].mean(), train_data[target_name].std())
+    for target_col in target_cols:
+        test_data[target_col] = np.random.normal(
+            train_data[target_col].mean(), train_data[target_col].std())
     test_data.to_csv(ramp_data_dir / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "train.csv", index=False)
     sample_submission.to_csv(ramp_data_dir / "sample_submission.csv", index=False)

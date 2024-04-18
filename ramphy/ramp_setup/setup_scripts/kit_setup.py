@@ -36,9 +36,10 @@ def kit_setup(
 
     # Maybe the challenge type can be passed from outside...
     metadata = load_metadata_from_json(download_dir)
-    challenge_type = metadata.task_type
+    prediction_type = metadata.prediction_type
+    input_types = metadata.input_types
 
-    if challenge_type == "regression":
+    if prediction_type == "regression" and len(input_types) == 1 and input_types[0] == "tabular":
         # Setup the challenge kit
         tabular_regression_setup(
             download_dir=download_dir,

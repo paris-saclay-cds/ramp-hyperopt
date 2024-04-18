@@ -1,6 +1,6 @@
 {
     "data_description": {
-        "target_name": ["target"],
+        "target_cols": ["target"],
         "feature_types" : {
           "id": "num",
           "cat0": "cat",
@@ -29,7 +29,7 @@
           "cont13": "num"
         }
     },
-    "id_name": "id",
+    "id_col": "id",
     "prediction_type": "regression",
     "input_types": ["tabular"],
     "score_name": "rmse",
