@@ -1,6 +1,6 @@
 {
     "data_description": {
-        "target_name": "target",
+        "target_name": ["target"],
         "feature_types" : {
           "id": "num",
           "cat0": "cat",
