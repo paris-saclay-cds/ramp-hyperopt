@@ -40,7 +40,7 @@ def tabular_regression_setup(
     problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
-    ramp_data_dir.mkdir(parents=True, exist_ok=True)
+    (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
     (ramp_kit_dir / "submissions").mkdir(parents=True, exist_ok=True)
 
     train_data = pd.read_csv(download_dir / "train.csv")

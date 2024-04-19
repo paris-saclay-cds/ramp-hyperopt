@@ -65,8 +65,11 @@ class DataPreprocessor(BaseDataPreprocessor):
             ]
 
         column_transformer = ColumnTransformer(transformers=transformers, remainder="passthrough")
-        column_transformer.fit(pd.concat([X_train, X_test]))
-
+        if ENCODING_STRATEGY == "Target":
+            column_transformer.fit(X_train, y_train)
+        else:
+            column_transformer.fit(pd.concat([X_train, X_test]))
+            
         new_columns = column_transformer.named_transformers_["cat"].get_feature_names_out(cat_cols)
         non_cat_columns = X_train.columns.difference(cat_cols)
         new_columns = list(new_columns) + list(non_cat_columns)

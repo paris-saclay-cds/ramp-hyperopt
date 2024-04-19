@@ -170,23 +170,26 @@ def blend(
     r : float
         The reward: the blended valid score.
     """
-    problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    if output_path is None:
-        output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
+    if len(submissions) > 0:
+        problem = rw.utils.assert_read_problem(ramp_kit_dir)
+        if output_path is None:
+            output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
+        else:
+            output_path = Path(output_path)
+        rw.utils.testing.blend_submissions(
+            submissions,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_submission_dir=str(Path(ramp_kit_dir) / "submissions"),
+            save_output=True,
+            output_path=str(output_path),
+            fold_idxs=fold_idxs,
+        )
+    
+        bagged_f_name = output_path / "bagged_scores_combined.csv"
+        return _bagged_reward(problem.score_types[0], bagged_f_name)
     else:
-        output_path = Path(output_path)
-    rw.utils.testing.blend_submissions(
-        submissions,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-        ramp_submission_dir=str(Path(ramp_kit_dir) / "submissions"),
-        save_output=True,
-        output_path=str(output_path),
-        fold_idxs=fold_idxs,
-    )
-
-    bagged_f_name = output_path / "bagged_scores_combined.csv"
-    return _bagged_reward(problem.score_types[0], bagged_f_name)
+        return None
 
 
 def submit_hybrid(
@@ -562,42 +565,43 @@ def rename_best_hyperopt_submissions(
 
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
-    select_top_hyperopt_and_blend(
+    blended_score = select_top_hyperopt_and_blend(
         submission=submission,
         fold_idxs=fold_idxs,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    contributivites_df = pd.read_csv(
-        f"{ramp_kit_dir}/submissions/training_output/contributivities.csv"
-    )
-    contributivites_df = contributivites_df.set_index("submission")
-    contributivites_df["contributivity"] = (
-        contributivites_df[[f for f in contributivites_df.columns if f[:5] == "fold_"]]
-        .sum(axis=1)
-        .round(3)
-        * 1000
-    ).astype(int)
-    contributivites_df = pd.merge(
-        contributivites_df,
-        means_df.reset_index().set_index("hyperopt_submission")[[valid_score_name]],
-        left_index=True,
-        right_index=True,
-    )
-
-    for hyperopt_submission_i, hyperopt_submission in enumerate(
-        contributivites_df.sort_values(
-            valid_score_name, ascending=is_lower_the_better
-        ).index
-    ):
-        contributivity = int(
-            contributivites_df.loc[hyperopt_submission]["contributivity"]
+    if blended_score is not None: # None: no submissions were blended
+        contributivites_df = pd.read_csv(
+            f"{ramp_kit_dir}/submissions/training_output/contributivities.csv"
         )
-        if top_n is None or hyperopt_submission_i < top_n or contributivity > 0:
-            from_f_name = f"{ramp_kit_dir}/submissions/{hyperopt_submission}"
-            to_f_name = f"{ramp_kit_dir}/submissions/{submission}_best_{hyperopt_submission_i}_{contributivity}"
-            print(f"{from_f_name} -> {to_f_name}")
-            shutil.move(from_f_name, to_f_name)
+        contributivites_df = contributivites_df.set_index("submission")
+        contributivites_df["contributivity"] = (
+            contributivites_df[[f for f in contributivites_df.columns if f[:5] == "fold_"]]
+            .sum(axis=1)
+            .round(3)
+            * 1000
+        ).astype(int)
+        contributivites_df = pd.merge(
+            contributivites_df,
+            means_df.reset_index().set_index("hyperopt_submission")[[valid_score_name]],
+            left_index=True,
+            right_index=True,
+        )
+    
+        for hyperopt_submission_i, hyperopt_submission in enumerate(
+            contributivites_df.sort_values(
+                valid_score_name, ascending=is_lower_the_better
+            ).index
+        ):
+            contributivity = int(
+                contributivites_df.loc[hyperopt_submission]["contributivity"]
+            )
+            if top_n is None or hyperopt_submission_i < top_n or contributivity > 0:
+                from_f_name = f"{ramp_kit_dir}/submissions/{hyperopt_submission}"
+                to_f_name = f"{ramp_kit_dir}/submissions/{submission}_best_{hyperopt_submission_i}_{contributivity}"
+                print(f"{from_f_name} -> {to_f_name}")
+                shutil.move(from_f_name, to_f_name)
 
 
 def delete_duplicates_hyperopt(
@@ -748,9 +752,9 @@ def select_top_hyperopt(
 
     if score_cutoff is not None:
         if is_lower_the_better:
-            new_submissions = means_df[means_df[valid_score_name] < score_cutoff].index
+            new_submissions = means_df[means_df[valid_score_name] <= score_cutoff].index
         else:
-            new_submissions = means_df[means_df[valid_score_name] > score_cutoff].index
+            new_submissions = means_df[means_df[valid_score_name] >= score_cutoff].index
     elif top_n is not None:
         new_submissions = (
             means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
@@ -835,10 +839,6 @@ def select_top_hyperopt_and_train(
         )
     for i, new_submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
-        shutil.copy(
-            f'{ramp_kit_dir}/submissions/{submission}/data_preprocessor.py',
-            f'{ramp_kit_dir}/submissions/{new_submission}/data_preprocessor.py',
-        )
         train(
             new_submission,
             fold_idxs=fold_idxs,
@@ -885,7 +885,7 @@ def select_top_hyperopt_and_blend(
     submissions = select_top_hyperopt(
         submission, fold_idxs, score_cutoff, top_n, n_sigma, ramp_kit_dir, ramp_data_dir
     )
-    blend(submissions, fold_idxs, ramp_kit_dir, ramp_data_dir)
+    return blend(submissions, fold_idxs, ramp_kit_dir, ramp_data_dir)
 
 
 def select_top_hyperopt_and_submit_hybrid(
