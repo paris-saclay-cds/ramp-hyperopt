@@ -40,7 +40,13 @@ DROP_RATE = float(drop_rate)
 
 class Regressor(BaseEstimator):
     def __init__(self, metadata):
-        self.objective = '{lgbm_objective}'
+        score_name = metadata["score_name"]
+        if score_name in ["mse", "rmse"]:
+            self.objective = "mse"
+        elif score_name == "mae":
+            self.objective = "mae"
+        else:
+            raise ValueError(f"Unknown score_name {score_name}")
 
     def fit(self, X, y):
         self.reg = lgb.LGBMRegressor(

@@ -67,10 +67,6 @@ def tabular_regression_setup(
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
     sample_submission.to_csv(ramp_data_dir / "data" / "sample_submission.csv", index=False)
-    if metadata["score_name"] in ["mse", "rmse"]:
-        metadata["lgbm_objective"] = "mse"
-    elif metadata["score_name"] == "mae":
-        metadata["lgbm_objective"] = "mae"
 
 #    metadata.save(ramp_data_dir)
     json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"))

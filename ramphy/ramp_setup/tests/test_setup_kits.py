@@ -28,3 +28,11 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_kit_dir,
         ramp_templates_dir = None,
     )
+    rh.actions.train(
+        submission = 'starting_kit',
+        fold_idxs = [400, 401],
+        force_retrain = True,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_kit_dir,
+    )
+
