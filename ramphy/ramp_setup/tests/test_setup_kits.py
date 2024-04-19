@@ -129,13 +129,16 @@ def test_submission(path_kit):
         ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir
     )
     
-    # Training and bagging the best on 63 folds
+    # Training and bagging the best on 8 folds
     submissions_f_names = glob.glob(
         f'{ramp_kit_dir}/submissions/{submission}_best_0_*')
     submissions = [f.split('/')[-1] for f in submissions_f_names]
     rh.actions.train(
-        submission=submissions[0], fold_idxs=range(900, 963),
+        submission=submissions[0], fold_idxs=range(900, 908),
         ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir
     )
+
+    # cleaning up
+    shutil.rmtree(ramp_kit_dir)
 
 
