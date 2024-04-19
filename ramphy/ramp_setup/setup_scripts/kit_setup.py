@@ -1,9 +1,10 @@
+import json
 from pathlib import Path
 from typing import Optional
 
 from ramphy import tabular_regression_setup
 from ramphy import tabular_regression_submit
-from ramphy.ramp_setup.metadata import load_metadata_from_json
+#from ramphy.ramp_setup.metadata import load_metadata_from_json
 
 
 def kit_setup(
@@ -35,9 +36,11 @@ def kit_setup(
         ramp_templates_dir = Path(ramp_templates_dir)
 
     # Maybe the challenge type can be passed from outside...
-    metadata = load_metadata_from_json(download_dir)
-    prediction_type = metadata.prediction_type
-    input_types = metadata.input_types
+#    metadata = load_metadata_from_json(download_dir)
+    metadata = json.load(open(download_dir / "metadata.json"))
+
+    prediction_type = metadata["prediction_type"]
+    input_types = metadata["input_types"]
 
     if prediction_type == "regression" and len(input_types) == 1 and input_types[0] == "tabular":
         # Setup the challenge kit

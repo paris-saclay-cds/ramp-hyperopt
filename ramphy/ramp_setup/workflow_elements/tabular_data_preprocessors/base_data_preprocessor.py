@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from ramp_setup.metadata import MetaData
+#from ramp_setup.metadata import MetaData
 
 
 class BaseDataPreprocessor(ABC):
@@ -17,7 +17,7 @@ class BaseDataPreprocessor(ABC):
     def fit(
         self,
         X: pd.DataFrame,
-        metadata: MetaData,
+        metadata: dict,
         y: np.ndarray,
     ) -> None:
         """Fit preprocessing parameters on data
@@ -32,10 +32,9 @@ class BaseDataPreprocessor(ABC):
         """
         return
 
-    @abstractmethod
     def transform(
-        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[MetaData]
-    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], Optional[MetaData]]:
+        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[dict]
+    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], Optional[dict]]:
         """Transforms the data
 
         Args:
@@ -48,15 +47,15 @@ class BaseDataPreprocessor(ABC):
         """
 
     def preprocess(
-        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: MetaData
-    ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, MetaData]:
+        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
+    ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         """Call the fit on the train data, then transform train and test data
 
         Args:
             X (pd.DataFrame): _description_
             y (np.ndarray): _description_
             X_test (pd.DataFrame): _description_
-            eda (types.ModuleType): _description_
+            metadata (Dict): _description_
 
         Returns:
             Tuple[ pd.DataFrame, np.ndarray, pd.DataFrame, types.ModuleType]: X_train, y, X_test, eda
@@ -68,7 +67,7 @@ class BaseDataPreprocessor(ABC):
         X_test, _, _ = self.transform(X=X_test, metadata=metadata, y=None)
         return X_train, y_train, X_test, metadata
 
-    def drop_metadata_features(self, metadata: MetaData, features: list) -> MetaData:
+    def drop_metadata_features(self, metadata: dict, features: list) -> dict:
         """Drops the features from the metadata
 
         Args:
@@ -79,8 +78,8 @@ class BaseDataPreprocessor(ABC):
             MetaData: _description_
         """
         for feat in features:
-            metadata.data_description.features.remove(feat)
-            del metadata.data_description.feature_types[feat]
-            if metadata.data_description.feature_values is not None:
-                del metadata.data_description.feature_values[feat]
+            metadata["data_description"]["feature_types"].pop(feat)
+#            del metadata.data_description.feature_types[feat]
+#            if metadata.data_description.feature_values is not None:
+#                del metadata.data_description.feature_values[feat]
         return metadata

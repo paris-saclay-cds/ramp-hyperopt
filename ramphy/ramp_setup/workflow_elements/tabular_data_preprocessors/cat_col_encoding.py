@@ -2,13 +2,13 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from base_data_preprocessor import BaseDataPreprocessor
+from ramphy import BaseDataPreprocessor
 from category_encoders import BinaryEncoder
 from category_encoders import CountEncoder
 from category_encoders import HashingEncoder
 from category_encoders import TargetEncoder
 from ramphy import Hyperparameter
-from ramphy.ramp_setup.metadata import MetaData
+#from ramphy.ramp_setup.metadata import MetaData
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
@@ -42,9 +42,9 @@ class DataPreprocessor(BaseDataPreprocessor):
         return X_transformed_df
 
     def preprocess(
-        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: MetaData
-    ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, MetaData]:
-        cat_cols = [col for col, col_type in metadata.data_description.feature_types.items() if col_type == "cat"]
+        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
+    ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
+        cat_cols = [col for col, col_type in metadata["data_description"]["feature_types"].items() if col_type == "cat"]
         if ENCODING_STRATEGY == "OneHot":
             transformers = [("cat", OneHotEncoder(handle_unknown="infrequent_if_exist"), cat_cols)]
         elif ENCODING_STRATEGY == "Count":
@@ -54,7 +54,7 @@ class DataPreprocessor(BaseDataPreprocessor):
         elif ENCODING_STRATEGY == "Binary":
             transformers = [("cat", BinaryEncoder(handle_unknown="value", cols=cat_cols), cat_cols)]
         elif ENCODING_STRATEGY == "Hashing":
-            n_unique_values = np.sum([len(v) for v in metadata.data_description.feature_values])
+            n_unique_values = np.sum([len(v) for v in metadata["data_description"]["feature_values"]])
             n_features_for_hashing = max(1, int(round(R_FEATURES_FOR_HASHING * n_unique_values)))
             transformers = [
                 (
@@ -77,7 +77,7 @@ class DataPreprocessor(BaseDataPreprocessor):
         for col in new_columns:
             new_col_types[col] = "cat"
         for col in non_cat_columns:
-            new_col_types[col] = metadata.data_description.feature_types[col]
-        metadata.data_description.feature_types = new_col_types
+            new_col_types[col] = metadata["data_description"]["feature_types"][col]
+        metadata["data_description"]["feature_types"] = new_col_types
 
         return X_train, y_train, X_test, metadata

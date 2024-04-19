@@ -28,9 +28,11 @@ from .ramp_setup.setup_scripts.tabular_regression import (
     tabular_regression_submit,
 )
 from .ramp_setup.setup_scripts.kit_setup import kit_setup
+from .ramp_setup.workflow_elements.tabular_data_preprocessors.base_data_preprocessor import BaseDataPreprocessor
 from ramphy import ramp_setup
 
 __all__ = [
+    "BasePreprocessor",
     "Hyperparameter",
     "init_hyperopt",
     "parse_all_hyperparameters",
