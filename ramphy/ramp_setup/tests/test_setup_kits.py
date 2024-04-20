@@ -29,7 +29,7 @@ def test_submission(path_kit):
     ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup and starting kit
-    rh.kit_setup(
+    rh.ramp_setup.kit_setup(
         download_dir = path_kit,
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
@@ -44,7 +44,7 @@ def test_submission(path_kit):
     )
     
     # lgbm submission
-    rh.ramp_setup.setup_scripts.tabular_regression.tabular_regression_submit(
+    rh.ramp_setup.tabular_regression_submit(
         submission = 'lgbm',
         workflow_element_dict = {
             'regressor': 'lgbm',

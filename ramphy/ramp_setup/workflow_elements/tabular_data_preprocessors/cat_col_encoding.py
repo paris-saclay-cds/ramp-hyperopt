@@ -2,7 +2,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from ramphy import BaseDataPreprocessor
+import ramphy.ramp_setup as rs
 from category_encoders import BinaryEncoder
 from category_encoders import CountEncoder
 from category_encoders import HashingEncoder
@@ -23,7 +23,7 @@ R_FEATURES_FOR_HASHING = float(r_features_for_hashing)
 ENCODING_STRATEGY = str(encoding_strategy)
 
 
-class DataPreprocessor(BaseDataPreprocessor):
+class DataPreprocessor(rs.BaseDataPreprocessor):
     """Encodes categorical feature"""
 
     def __init__(self):

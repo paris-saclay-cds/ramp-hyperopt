@@ -3,11 +3,10 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from ramphy import BaseDataPreprocessor
-#from ramphy.ramp_setup.metadata import MetaData
+import ramphy.ramp_setup as rs
 
 
-class DataPreprocessor(BaseDataPreprocessor):
+class DataPreprocessor(rs.BaseDataPreprocessor):
     """Modifies the invalid column names"""
 
     def transform(
