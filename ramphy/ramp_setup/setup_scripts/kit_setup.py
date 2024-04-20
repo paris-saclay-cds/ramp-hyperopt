@@ -35,11 +35,17 @@ def kit_setup(
     # Maybe the challenge type can be passed from outside...
 #    metadata = load_metadata_from_json(download_dir)
     metadata = json.load(open(download_dir / "metadata.json"))
+    
+    if metadata["score_name"] in ['mse', 'rmse', 'mae']:
+        prediction_type = "regression"
+    feature_types = list(metadata["data_description"]["feature_types"].values())
+    input_types = set()
+    if "num" in feature_types:
+        input_types.add("tabular")
+    if "cat" in feature_types:
+        input_types.add("tabular")
 
-    prediction_type = metadata["prediction_type"]
-    input_types = metadata["input_types"]
-
-    if prediction_type == "regression" and len(input_types) == 1 and input_types[0] == "tabular":
+    if prediction_type == "regression" and len(input_types) == 1 and "tabular" in input_types:
         # Setup the challenge kit
         rs.tabular_regression_setup(
             download_dir=download_dir,

@@ -30,8 +30,6 @@
         }
     },
     "id_col": "id",
-    "prediction_type": "regression",
-    "input_types": ["tabular"],
     "score_name": "rmse",
     "title": "Kaggle insurance claim",
     "kaggle_name": "tabular-playground-series-feb-2021"
