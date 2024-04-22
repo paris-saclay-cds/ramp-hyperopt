@@ -1,0 +1,68 @@
+import numpy as np
+import catboost as cb
+from sklearn.base import BaseEstimator
+from ramphy import Hyperparameter
+
+# RAMP START HYPERPARAMETERS
+n_estimators = Hyperparameter(dtype='int', default=400, values=[10, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 400, 500, 700, 1000, 2000, 3000, 5000, 7000, 10000])
+learning_rate = Hyperparameter(dtype='float', default=0.05, values=[0.0005, 0.001, 0.002, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+max_depth = Hyperparameter(dtype='int', default=5, values=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100])
+l2_leaf_reg = Hyperparameter(dtype='float', default=3.0, values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0])
+border_count = Hyperparameter(dtype='int', default=254, values=[32, 64, 128, 254, 512, 1024])
+bagging_temperature = Hyperparameter(dtype='float', default=1.0, values=[0, 1, 5, 10, 20, 50, 100])
+grow_policy = Hyperparameter(dtype='str', default='SymmetricTree', values=['SymmetricTree', 'Depthwise', 'Lossguide'])
+min_data_in_leaf = Hyperparameter(dtype='int', default=1, values=[1, 5, 10, 20, 50, 100, 200, 500, 700])
+bootstrap_type = Hyperparameter(dtype='str', default='Bayesian', values=['Bayesian', 'Bernoulli', 'MVS', 'No'])
+random_strength = Hyperparameter(dtype='float', default=1, values=[0, 1, 5, 10, 20, 50, 100])
+auto_class_weights = Hyperparameter(dtype='str', default='None', values=['None', 'Balanced', 'SqrtBalanced'])
+objective = Hyperparameter(dtype='str', default='RMSE', values=['RMSE', 'MAE', 'MAPE', 'Quantile', 'LogLinQuantile', 'Huber'])
+quantile_alpha = Hyperparameter(dtype='float', default=0.5, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
+huber_relative_delta = Hyperparameter(dtype='float', default=3.0, values=[1.0, 2.0, 3.0, 4.0, 5.0])
+# RAMP END HYPERPARAMETERS
+
+ITERATIONS = int(n_estimators)
+LEARNING_RATE = float(learning_rate)
+DEPTH = int(max_depth)
+L2_LEAF_REG = float(l2_leaf_reg)
+BORDER_COUNT = int(border_count)
+GROW_POLICY = str(grow_policy)
+MIN_DATA_IN_LEAF = int(min_data_in_leaf)
+BOOTSTRAP_TYPE = str(bootstrap_type)
+BAGGING_TEMPERATURE = float(bagging_temperature) if bootstrap_type == 'Bayesian' else None
+RANDOM_STRENGTH = float(random_strength)
+OBJECTIVE = str(objective)
+if OBJECTIVE == 'Quantile':
+    OBJECTIVE = f'Quantile:alpha={{float(quantile_alpha)}}'
+elif OBJECTIVE == 'LogLinQuantile':
+    OBJECTIVE = f'LogLinQuantile:alpha={{float(quantile_alpha)}}'
+HUBER_RELATIVE_DELTA = float(huber_relative_delta)
+
+class Regressor(BaseEstimator):
+    def __init__(self, metadata):
+        pass
+
+    def fit(self, X, y):
+        if OBJECTIVE == 'Huber':
+            std = y.std()
+            delta = HUBER_RELATIVE_DELTA * std
+            loss_function = f'Huber:delta={{delta}}'
+        else:
+            loss_function = OBJECTIVE
+        self.reg = cb.CatBoostRegressor(
+            iterations=ITERATIONS,
+            learning_rate=LEARNING_RATE,
+            depth=DEPTH,
+            l2_leaf_reg=L2_LEAF_REG,
+            border_count=BORDER_COUNT,
+            bagging_temperature=BAGGING_TEMPERATURE,
+            grow_policy=GROW_POLICY,
+            min_data_in_leaf=MIN_DATA_IN_LEAF,
+            bootstrap_type=BOOTSTRAP_TYPE,
+            random_strength=RANDOM_STRENGTH,
+            loss_function=loss_function,
+            verbose=False
+        )
+        self.reg.fit(X, y)
+
+    def predict(self, X):
+        return self.reg.predict(X)

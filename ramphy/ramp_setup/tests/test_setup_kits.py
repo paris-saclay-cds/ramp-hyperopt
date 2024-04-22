@@ -43,17 +43,18 @@ def test_submission(path_kit):
     )
 
     # optimization
-    submissions = ['xgboost', 'lgbm']
+    regressors = ['xgboost', 'lgbm', 'catboost']
     n_trials = 9
     top_n_for_mean = 3
     n_sigma = 2
     n_folds = 7
 
-    for submission in submissions:
+    for regressor in regressors:
+        submission = regressor
         rh.ramp_setup.tabular_regression_submit(
             submission = submission,
             workflow_element_dict = {
-                'regressor': 'lgbm',
+                'regressor': regressor,
                 'feature_extractor': 'empty',
                 'data_preprocessors': ['drop_id', 'invalid_col_names', 'cat_col_encoding',]
             },
@@ -137,7 +138,7 @@ def test_submission(path_kit):
     )
 
     # cleaning up
-#    shutil.rmtree(ramp_kit_dir)
-#    shutil.rmtree('cache')
+    shutil.rmtree(ramp_kit_dir)
+    shutil.rmtree('cache')
 
 
