@@ -41,6 +41,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         cat_cols = [col for col, col_type in metadata["data_description"]["feature_types"].items() if col_type == "cat"]
+        if len(cat_cols) == 0:
+            return X_train, y_train, X_test, metadata
         if ENCODING_STRATEGY == "OneHot":
             transformers = [("cat", OneHotEncoder(handle_unknown="infrequent_if_exist"), cat_cols)]
         elif ENCODING_STRATEGY == "Count":
