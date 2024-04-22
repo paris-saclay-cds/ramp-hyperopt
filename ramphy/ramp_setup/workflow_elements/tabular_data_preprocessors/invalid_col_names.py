@@ -1,18 +1,12 @@
 import re
-from typing import Optional, Tuple
-
 import numpy as np
 import pandas as pd
+from typing import Tuple
 import ramphy.ramp_setup as rs
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
-    """Modifies the invalid column names"""
-
-    def transform(
-        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: dict
-    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], dict]:
-        return X, y, metadata
+    """Modifies LGBM invalid column names"""
 
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
@@ -25,7 +19,6 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         metadata["data_description"]["feature_types"] = {{
             new_cols[col]: col_type for col, col_type in feature_types.items()
         }}
-#        metadata.data_description.features = list(new_cols.keys())
         if feature_values is not None:
             metadata["data_description"]["feature_values"] = {{
                 new_cols[col]: col_type for col, col_type in feature_values.items()

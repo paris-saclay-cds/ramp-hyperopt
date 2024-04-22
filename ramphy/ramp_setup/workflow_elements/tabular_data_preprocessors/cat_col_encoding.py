@@ -1,7 +1,6 @@
-from typing import Tuple
-
 import numpy as np
 import pandas as pd
+from typing import Tuple
 import ramphy.ramp_setup as rs
 from category_encoders import BinaryEncoder
 from category_encoders import CountEncoder
@@ -27,10 +26,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     """Encodes categorical feature"""
 
     def __init__(self):
-        super().__init__()
         self.to_cache = ENCODING_STRATEGY in ["Hashing", "Count", "Target", "Binary"]
-
-    # TODO implement transform
 
     def _transform(self, X, transformer, new_columns):
         X_transformed = transformer.transform(X)

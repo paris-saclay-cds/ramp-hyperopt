@@ -1,21 +1,17 @@
-from typing import Optional, Tuple
-
 import numpy as np
 import pandas as pd
+from typing import Tuple
 import ramphy.ramp_setup as rs
-
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
     """Drop ID column"""
 
-    def transform(
-        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: dict
-    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], dict]:
-        """Removes the id column"""
-        X = X.drop(columns=[metadata["id_col"]])
-        if metadata is not None:
-            try:
-                self.drop_metadata_features(metadata=metadata, features=[metadata["id_col"]])
-            except:
-                pass
-        return X, y, metadata
+    def preprocess(
+        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
+    ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
+        X_train = X_train.drop(columns=[metadata["id_col"]])
+        X_test = X_test.drop(columns=[metadata["id_col"]])
+        metadata["data_description"]["feature_types"].pop(metadata["id_col"])
+        return X_train, y_train, X_test, metadata
+
+        
