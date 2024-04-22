@@ -20,6 +20,7 @@ from .hyperopt import (
     write_hyperparameters,
 )
 from pathlib import Path
+from ray.tune.error import TuneError
 
 
 def _bagged_reward(score_type, bagged_f_name):
@@ -40,24 +41,31 @@ def hyperopt(
     ramp_data_dir: str = ".",
     resume: bool = True,
 ) -> None:
-    run_hyperopt(
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-        ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
-        data_label=None,
-        submission=submission,
-        engine_name="ray_hebo",
-        n_trials=n_trials,
-        fold_idxs=fold_idxs,
-        save_output=True,
-        test=False,
-        label=False,
-        resume=resume,
-        max_concurrent_runs=1,
-        n_cpu_per_run=None,
-        n_gpu_per_run=0,
-        verbose=3,
-    )
+        # hyperopt
+    try:
+        run_hyperopt(
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
+            data_label=None,
+            submission=submission,
+            engine_name="ray_hebo",
+            n_trials=n_trials,
+            fold_idxs=fold_idxs,
+            save_output=True,
+            test=False,
+            label=False,
+            resume=resume,
+            max_concurrent_runs=1,
+            n_cpu_per_run=None,
+            n_gpu_per_run=0,
+            verbose=3,
+        )
+    except TuneError:
+        # If there are trials that errored, Tune throws an error at the end
+        # This should be though through, what to do with these errors
+        pass
+
     # reward TBD
 
 

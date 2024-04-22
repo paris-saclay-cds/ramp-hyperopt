@@ -7,7 +7,6 @@ import numpy as np
 import ramphy as rh
 import rampwf as rw
 from pathlib import Path
-from ray.tune.error import TuneError
 
 PATH = os.path.dirname(__file__)
 
@@ -86,24 +85,16 @@ def test_submission(path_kit):
         shutil.move(submission_dir, output_submission_dir)
 
     # hyperopt
-    try:
-        rh.actions.hyperopt(
-            submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
-            ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
-        )
-    except TuneError:
-        # If there are trials that errored, Tune throws an error at the end
-        pass
+    rh.actions.hyperopt(
+        submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
+        ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
+    )
 
     # resume
-    try:
-        rh.actions.hyperopt(
-            submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
-            ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
-        )
-    except TuneError:
-        # If there are trials that errored, Tune throws an error at the end
-        pass
+    rh.actions.hyperopt(
+        submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
+        ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
+    )
     
     rh.actions.delete_duplicates_hyperopt(
         submission=submission, fold_idxs=range(900, 903),
