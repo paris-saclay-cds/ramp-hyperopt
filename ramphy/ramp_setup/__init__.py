@@ -11,5 +11,4 @@ __all__ = [
     "tabular_regression_setup",
     "tabular_regression_submit",
     "kit_setup",
-    "ramp_setup",
 ]

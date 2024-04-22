@@ -52,7 +52,25 @@ def test_submission(path_kit):
         },
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
-        ramp_templates_dir = '/nas/ramp-hyperopt/ramphy/ramp_setup/',
+    ) 
+    rh.actions.train(
+        submission = 'lgbm',
+        fold_idxs = range(900, 903),
+        force_retrain = True,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_kit_dir,
+    )
+
+    # xgboost submission
+    rh.ramp_setup.tabular_regression_submit(
+        submission = 'xgboost',
+        workflow_element_dict = {
+            'regressor': 'xgboost',
+            'feature_extractor': 'empty',
+            'data_preprocessors': ['drop_id', 'invalid_col_names', 'cat_col_encoding',]
+        },
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
     ) 
     rh.actions.train(
         submission = 'lgbm',
@@ -63,7 +81,7 @@ def test_submission(path_kit):
     )
 
     # optimization
-    submission = 'lgbm'
+    submission = 'xgboost'
     n_trials = 9
     top_n_for_mean = 3
     n_sigma = 2
