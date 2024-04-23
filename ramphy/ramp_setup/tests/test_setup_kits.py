@@ -45,11 +45,9 @@ def test_submission(path_kit):
     # single training
     rh.ramp_setup.tabular_regression_submit(
         submission = 'lgbm',
-        workflow_element_dict = {
-            'regressor': 'lgbm',
-            'feature_extractor': 'empty',
-            'data_preprocessors': ['drop_id', 'invalid_col_names', 'cat_col_encoding',]
-        },
+        regressor = 'lgbm',
+        feature_extractor = 'empty',
+        data_preprocessors = ['drop_id', 'invalid_col_names'],
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
     ) 
@@ -63,11 +61,10 @@ def test_submission(path_kit):
 
     rh.ramp_setup.tabular_regression_submit(
         submission = 'catboost',
-        workflow_element_dict = {
-            'regressor': 'catboost',
-            'feature_extractor': 'empty',
-            'data_preprocessors': ['drop_id', 'imputing', ]
-        },
+        regressor = 'catboost',
+        feature_extractor = 'empty',
+        data_preprocessors = ['drop_id', ],
+        cat_col_encode = False,
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
     ) 
@@ -81,11 +78,8 @@ def test_submission(path_kit):
 
     rh.ramp_setup.tabular_regression_submit(
         submission = 'xgboost',
-        workflow_element_dict = {
-            'regressor': 'xgboost',
-            'feature_extractor': 'empty',
-            'data_preprocessors': ['drop_id', 'cat_col_encoding',]
-        },
+        regressor = 'xgboost',
+        feature_extractor = 'empty',
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
     ) 
