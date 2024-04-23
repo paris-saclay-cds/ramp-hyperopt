@@ -42,8 +42,63 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_data_dir,
     )
 
+    # single training
+    rh.ramp_setup.tabular_regression_submit(
+        submission = 'lgbm',
+        workflow_element_dict = {
+            'regressor': 'lgbm',
+            'feature_extractor': 'empty',
+            'data_preprocessors': ['drop_id', 'invalid_col_names', 'cat_col_encoding',]
+        },
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    ) 
+    rh.actions.train(
+        submission = 'lgbm',
+        fold_idxs = range(900, 903),
+        force_retrain = True,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_kit_dir,
+    )
+
+    rh.ramp_setup.tabular_regression_submit(
+        submission = 'catboost',
+        workflow_element_dict = {
+            'regressor': 'catboost',
+            'feature_extractor': 'empty',
+            'data_preprocessors': ['drop_id', 'imputing', ]
+        },
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    ) 
+    rh.actions.train(
+        submission = 'catboost',
+        fold_idxs = range(900, 903),
+        force_retrain = True,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_kit_dir,
+    )
+
+    rh.ramp_setup.tabular_regression_submit(
+        submission = 'xgboost',
+        workflow_element_dict = {
+            'regressor': 'xgboost',
+            'feature_extractor': 'empty',
+            'data_preprocessors': ['drop_id', 'cat_col_encoding',]
+        },
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    ) 
+    rh.actions.train(
+        submission = 'xgboost',
+        fold_idxs = range(900, 903),
+        force_retrain = True,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_kit_dir,
+    )
+
     # optimization
-    regressors = ['xgboost', 'lgbm', 'catboost']
+    regressors = ['xgboost']
     n_trials = 9
     top_n_for_mean = 3
     n_sigma = 2
@@ -51,24 +106,6 @@ def test_submission(path_kit):
 
     for regressor in regressors:
         submission = regressor
-        rh.ramp_setup.tabular_regression_submit(
-            submission = submission,
-            workflow_element_dict = {
-                'regressor': regressor,
-                'feature_extractor': 'empty',
-                'data_preprocessors': ['drop_id', 'invalid_col_names', 'cat_col_encoding',]
-            },
-            ramp_kit_dir = ramp_kit_dir,
-            ramp_data_dir = ramp_data_dir,
-        ) 
-        rh.actions.train(
-            submission = submission,
-            fold_idxs = range(900, 903),
-            force_retrain = True,
-            ramp_kit_dir = ramp_kit_dir,
-            ramp_data_dir = ramp_kit_dir,
-        )
-
         submissions_f_names = glob.glob(
             f'{ramp_kit_dir}/submissions/{submission}_best*')
         problem = rw.utils.assert_read_problem(ramp_kit_dir=ramp_kit_dir)
@@ -132,6 +169,7 @@ def test_submission(path_kit):
     submissions_f_names = glob.glob(
         f'{ramp_kit_dir}/submissions/*_best_0_*')
     submissions = [f.split('/')[-1] for f in submissions_f_names]
+    submissions += ['lgbm', 'catboost']
     rh.actions.blend(
         submissions=submissions, fold_idxs=range(900, 908),
         ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir
