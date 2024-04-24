@@ -172,5 +172,6 @@ def test_submission(path_kit):
     # cleaning up
     shutil.rmtree(ramp_kit_dir)
     shutil.rmtree('cache')
+    shutil.rmtree('catboost_info')
 
 

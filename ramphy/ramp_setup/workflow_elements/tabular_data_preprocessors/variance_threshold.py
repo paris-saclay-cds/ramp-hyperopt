@@ -2,9 +2,8 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from base_data_preprocessor import BaseDataPreprocessor
+import ramphy.ramp_setup as rs
 from ramphy import Hyperparameter
-from ramphy.ramp_setup.metadata import MetaData
 from sklearn.feature_selection import VarianceThreshold
 
 # RAMP START HYPERPARAMETERS
@@ -18,13 +17,13 @@ threshold = Hyperparameter(
 THRESHOLD = int(threshold)
 
 
-class DataPreprocessor(BaseDataPreprocessor):
+class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
     """Uses random forest to select hte best features"""
 
     def fit(
         self,
         X: pd.DataFrame,
-        metadata: MetaData,
+        metadata: dict,
         y: np.ndarray,
     ) -> None:
         """Fit preprocessing parameters on data
@@ -43,14 +42,12 @@ class DataPreprocessor(BaseDataPreprocessor):
         self.features_set = set(self.selector.get_feature_names_out())
         self.dropped_features = list(set(X.columns) - self.features_set)
 
-        print(f"Dropped feature: {self.dropped_features}")
-
     def transform(
-        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[MetaData]
-    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], Optional[MetaData]]:
+        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[dict]
+    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], Optional[dict]]:
         selected_features = list(self.selector.get_feature_names_out())
         X_prepr = self.selector.transform(X)
         X_prepr = pd.DataFrame(X_prepr, columns=selected_features)
         if metadata is not None:
-            self.drop_metadata_features(metadata=metadata, features=self.dropped_features)
+            metadata = self.drop_metadata_features(metadata=metadata, features=self.dropped_features)
         return X, y, metadata
