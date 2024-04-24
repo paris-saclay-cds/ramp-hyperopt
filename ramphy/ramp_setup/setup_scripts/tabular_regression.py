@@ -1,4 +1,5 @@
 import json
+import glob
 from pathlib import Path
 from typing import Optional
 
@@ -99,11 +100,6 @@ def tabular_regression_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ['drop_id'],
-    cat_col_impute: bool = True,
-    cat_col_encode: bool = True,
-    num_col_impute: bool = True,
-    num_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
     ramp_templates_dir: Optional[str | Path] = None,
@@ -150,9 +146,42 @@ def tabular_regression_submit(
     fe_code = fe_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
         f_out.write(fe_code)
-    # ---------------------------
 
+
+def num_data_preprocessors(submission, ramp_kit_dir):
+    submission_path = ramp_kit_dir / "submissions" / submission
     dp_idx = 0
+    while True:
+        submissions_f_names = glob.glob(
+            f'{submission_path}/data_preprocessor_{dp_idx}_*.py')
+        if len(submissions_f_names) == 0:
+            break
+        dp_idx += 1
+    return dp_idx
+
+
+def tabular_data_preprocessors_submit(
+    submission: str | Path,
+    data_preprocessors: list[str] = ['drop_id'],
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: Optional[str | Path] = None,
+) -> None:
+    if ramp_templates_dir is None:
+        ramp_templates_dir = impresources.files(ramp_setup)
+    else:
+        ramp_templates_dir = Path(ramp_templates_dir)
+    
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+
+    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
+
+    dp_idx = num_data_preprocessors(submission, ramp_kit_dir)
     for dp in data_preprocessors:
         try:
             dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / f"{dp}.py"
@@ -163,43 +192,152 @@ def tabular_regression_submit(
         with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{dp}.py", "w") as f_out:
             f_out.write(dp_code)
         dp_idx += 1
-        
+
+
+def tabular_cat_col_imputers_submit(
+    submission: str | Path,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: Optional[str | Path] = None,
+) -> None:
+    if ramp_templates_dir is None:
+        ramp_templates_dir = impresources.files(ramp_setup)
+    else:
+        ramp_templates_dir = Path(ramp_templates_dir)
+    
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+
+    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
+
+    dp_idx = num_data_preprocessors(submission, ramp_kit_dir)
+    try:
+        dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_imputing.py"
+        dp_code = open(dp_f_name).read()
+    except AttributeError:
+        dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_imputing.py")
+    for col, col_type in metadata["data_description"]["feature_types"].items():
+        if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_imputing.py", "w") as f_out:
+                f_out.write(dp_code_formatted)
+            dp_idx += 1
+
+def tabular_num_col_imputers_submit(
+    submission: str | Path,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: Optional[str | Path] = None,
+) -> None:
+    if ramp_templates_dir is None:
+        ramp_templates_dir = impresources.files(ramp_setup)
+    else:
+        ramp_templates_dir = Path(ramp_templates_dir)
+    
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+
+    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
+
+    dp_idx = num_data_preprocessors(submission, ramp_kit_dir)
+    try:
+        dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "num_col_imputing.py"
+        dp_code = open(dp_f_name).read()
+    except AttributeError:
+        dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "num_col_imputing.py")
+    for col, col_type in metadata["data_description"]["feature_types"].items():
+        if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_num_col_imputing.py", "w") as f_out:
+                f_out.write(dp_code_formatted)
+            dp_idx += 1
+
+def tabular_cat_col_encoders_submit(
+    submission: str | Path,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: Optional[str | Path] = None,
+) -> None:
+    if ramp_templates_dir is None:
+        ramp_templates_dir = impresources.files(ramp_setup)
+    else:
+        ramp_templates_dir = Path(ramp_templates_dir)
+    
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+
+    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
+
+    dp_idx = num_data_preprocessors(submission, ramp_kit_dir)
+    try:
+        dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_encoding.py"
+        dp_code = open(dp_f_name).read()
+    except AttributeError:
+        dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_encoding.py")
+    for col, col_type in metadata["data_description"]["feature_types"].items():
+        if col_type == "cat":
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_encoding.py", "w") as f_out:
+                f_out.write(dp_code_formatted)
+            dp_idx += 1
+
+def tabular_regression_basic_submit(
+    submission: str | Path,
+    regressor: str = 'xgboost',
+    feature_extractor: str = 'empty',
+    data_preprocessors: list[str] = ['drop_id'],
+    cat_col_impute: bool = True,
+    num_col_impute: bool = True,
+    cat_col_encode: bool = True,
+    num_col_encode: bool = True,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+    ramp_templates_dir: Optional[str | Path] = None,
+) -> None:
+    tabular_regression_submit(
+        submission=submission,
+        regressor=regressor,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+        ramp_templates_dir=ramp_templates_dir,
+    )
+    tabular_data_preprocessors_submit(
+        submission=submission,
+        data_preprocessors=data_preprocessors,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+        ramp_templates_dir=ramp_templates_dir,
+    )
     if cat_col_impute:
-        try:
-            dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_imputing.py"
-            dp_code = open(dp_f_name).read()
-        except AttributeError:
-            dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_imputing.py")
-        for col, col_type in metadata["data_description"]["feature_types"].items():
-            if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
-                dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-                with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_imputing.py", "w") as f_out:
-                    f_out.write(dp_code_formatted)
-                dp_idx += 1
-
+        tabular_cat_col_imputers_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_templates_dir=ramp_templates_dir,
+        )
     if num_col_impute:
-        try:
-            dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "num_col_imputing.py"
-            dp_code = open(dp_f_name).read()
-        except AttributeError:
-            dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "num_col_imputing.py")
-        for col, col_type in metadata["data_description"]["feature_types"].items():
-            if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
-                dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-                with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_num_col_imputing.py", "w") as f_out:
-                    f_out.write(dp_code_formatted)
-                dp_idx += 1
-
+        tabular_num_col_imputers_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_templates_dir=ramp_templates_dir,
+        )
     if cat_col_encode:
-        try:
-            dp_f_name = ramp_templates_dir / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_encoding.py"
-            dp_code = open(dp_f_name).read()
-        except AttributeError:
-            dp_code = impresources.read_text(ramp_setup / "workflow_elements" / "tabular_data_preprocessors" / "cat_col_encoding.py")
-        for col, col_type in metadata["data_description"]["feature_types"].items():
-            if col_type == "cat":
-                dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-                with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_encoding.py", "w") as f_out:
-                    f_out.write(dp_code_formatted)
-                dp_idx += 1
-
+        tabular_cat_col_encoders_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            ramp_templates_dir=ramp_templates_dir,
+        )

@@ -43,14 +43,15 @@ def test_submission(path_kit):
     )
 
     # single training
-    rh.ramp_setup.tabular_regression_submit(
+    rh.ramp_setup.tabular_regression_basic_submit(
         submission = 'lgbm',
         regressor = 'lgbm',
         feature_extractor = 'empty',
         data_preprocessors = ['drop_id', 'invalid_col_names'],
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
-    ) 
+    )
+    
     rh.actions.train(
         submission = 'lgbm',
         fold_idxs = range(900, 903),
@@ -59,7 +60,7 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_kit_dir,
     )
 
-    rh.ramp_setup.tabular_regression_submit(
+    rh.ramp_setup.tabular_regression_basic_submit(
         submission = 'catboost',
         regressor = 'catboost',
         feature_extractor = 'empty',
@@ -76,7 +77,7 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_kit_dir,
     )
 
-    rh.ramp_setup.tabular_regression_submit(
+    rh.ramp_setup.tabular_regression_basic_submit(
         submission = 'xgboost',
         regressor = 'xgboost',
         feature_extractor = 'empty',
@@ -172,5 +173,6 @@ def test_submission(path_kit):
     # cleaning up
     shutil.rmtree(ramp_kit_dir)
     shutil.rmtree('cache')
+    shutil.rmtree('catboost_info')
 
 
