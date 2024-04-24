@@ -33,10 +33,10 @@ def kit_setup(
         ramp_templates_dir = Path(ramp_templates_dir)
 
     # Maybe the challenge type can be passed from outside...
-#    metadata = load_metadata_from_json(download_dir)
+    #    metadata = load_metadata_from_json(download_dir)
     metadata = json.load(open(download_dir / "metadata.json"))
-    
-    if metadata["score_name"] in ['mse', 'rmse', 'mae']:
+    prediction_type = metadata["prediction_type"]
+    if metadata["score_name"] in ["mse", "rmse", "mae"]:
         prediction_type = "regression"
     feature_types = list(metadata["data_description"]["feature_types"].values())
     input_types = set()
