@@ -42,7 +42,7 @@ def test_submission(path_kit):
     )
 
     # single training
-    rh.ramp_setup.tabular_regression_basic_submit(
+    rh.ramp_setup.tabular_regression_columnwise_last_submit(
         submission = 'lgbm',
         regressor = 'lgbm',
         feature_extractor = 'empty',
@@ -59,7 +59,7 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_kit_dir,
     )
 
-    rh.ramp_setup.tabular_regression_basic_submit(
+    rh.ramp_setup.tabular_regression_columnwise_last_submit(
         submission = 'catboost',
         regressor = 'catboost',
         feature_extractor = 'empty',
@@ -76,7 +76,7 @@ def test_submission(path_kit):
         ramp_data_dir = ramp_kit_dir,
     )
 
-    rh.ramp_setup.tabular_regression_basic_submit(
+    rh.ramp_setup.tabular_regression_columnwise_last_submit(
         submission = 'xgboost',
         regressor = 'xgboost',
         feature_extractor = 'empty',

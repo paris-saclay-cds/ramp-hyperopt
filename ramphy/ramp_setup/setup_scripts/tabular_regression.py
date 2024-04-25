@@ -288,7 +288,7 @@ def tabular_cat_col_encoders_submit(
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
-def tabular_regression_basic_submit(
+def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
@@ -300,7 +300,7 @@ def tabular_regression_basic_submit(
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-    """Make new submission
+    """Make new submission with columnwise last
 
     Args:
         submission (str | Path): Submission name
@@ -344,3 +344,60 @@ def tabular_regression_basic_submit(
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
+
+def tabular_regression_columnwise_first_submit(
+    submission: str | Path,
+    regressor: str = 'xgboost',
+    feature_extractor: str = 'empty',
+    data_preprocessors: list[str] = ['drop_id'],
+    cat_col_impute: bool = True,
+    num_col_impute: bool = True,
+    cat_col_encode: bool = True,
+    num_col_encode: bool = True,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+) -> None:
+    """Make new submission with columnwise first
+
+    Args:
+        submission (str | Path): Submission name
+        regressor (str, optional): Regressor. Defaults to 'xgboost'.
+        feature_extractor (str, optional): FE. Defaults to 'empty'.
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
+        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
+        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
+        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
+        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
+        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
+    """
+    tabular_regression_submit(
+        submission=submission,
+        regressor=regressor,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    if cat_col_impute:
+        tabular_cat_col_imputers_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
+    if num_col_impute:
+        tabular_num_col_imputers_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
+    if cat_col_encode:
+        tabular_cat_col_encoders_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
+    tabular_data_preprocessors_submit(
+        submission=submission,
+        data_preprocessors=data_preprocessors,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )

@@ -29,39 +29,14 @@ def _preprocessor_tester(path_kit: str, preprocessor_name: str):
     )
 
     submission = f'xgboost_{preprocessor_name}'
-    rh.ramp_setup.tabular_regression_submit(
+    rh.ramp_setup.tabular_regression_columnwise_first_submit(
         submission = submission,
         regressor = 'xgboost',
         feature_extractor = 'empty',
+        data_preprocessors=['drop_id', preprocessor_name],
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
     )
-
-    rh.ramp_setup.tabular_cat_col_imputers_submit(
-        submission=submission,
-        ramp_kit_dir = ramp_kit_dir,
-        ramp_data_dir = ramp_data_dir,
-    )
-
-    rh.ramp_setup.tabular_num_col_imputers_submit(
-        submission=submission,
-        ramp_kit_dir = ramp_kit_dir,
-        ramp_data_dir = ramp_data_dir,
-    )
-
-    rh.ramp_setup.tabular_cat_col_encoders_submit(
-        submission=submission,
-        ramp_kit_dir = ramp_kit_dir,
-        ramp_data_dir = ramp_data_dir,
-    )
-
-    rh.ramp_setup.tabular_data_preprocessors_submit(
-        submission=submission,
-        ramp_kit_dir = ramp_kit_dir,
-        ramp_data_dir = ramp_data_dir,
-        data_preprocessors = ['drop_id', preprocessor_name]
-    )
-
 
     n_trials = 9
 
