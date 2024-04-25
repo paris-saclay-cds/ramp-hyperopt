@@ -32,7 +32,6 @@ def test_submission(path_kit):
         download_dir = path_kit,
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
-        ramp_templates_dir = None,
     )
     rh.actions.train(
         submission = 'starting_kit',
