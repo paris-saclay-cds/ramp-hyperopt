@@ -2,14 +2,13 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from base_data_preprocessor import BaseDataPreprocessor
-from ramphy.ramp_setup.metadata import MetaData
+import ramphy.ramp_setup as rs
 
 
-class DataPreprocessor(BaseDataPreprocessor):
+class DataPreprocessor(rs.BaseDataPreprocessor):
     """Does nothing"""
 
     def transform(
-        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: MetaData
-    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], MetaData]:
+        self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: dict
+    ) -> Tuple[pd.DataFrame, Optional[np.ndarray], dict]:
         return X, y, metadata
