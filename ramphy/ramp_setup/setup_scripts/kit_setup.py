@@ -54,7 +54,7 @@ def kit_setup(
             ramp_templates_dir=ramp_templates_dir,
         )
         # Add the starting kit
-        rs.tabular_regression_submit(
+        rs.tabular_regression_basic_submit(
             submission="starting_kit",
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
