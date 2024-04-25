@@ -26,7 +26,6 @@ def _preprocessor_tester(path_kit: str, preprocessor_name: str):
         download_dir = path_kit,
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
-        ramp_templates_dir = None,
     )
 
     submission = f'xgboost_{preprocessor_name}'
@@ -34,10 +33,35 @@ def _preprocessor_tester(path_kit: str, preprocessor_name: str):
         submission = submission,
         regressor = 'xgboost',
         feature_extractor = 'empty',
-        data_preprocessors = ['drop_id', 'cat_col_encoding', preprocessor_name],
         ramp_kit_dir = ramp_kit_dir,
         ramp_data_dir = ramp_data_dir,
-    ) 
+    )
+
+    rh.ramp_setup.tabular_cat_col_imputers_submit(
+        submission=submission,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    )
+
+    rh.ramp_setup.tabular_num_col_imputers_submit(
+        submission=submission,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    )
+
+    rh.ramp_setup.tabular_cat_col_encoders_submit(
+        submission=submission,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+    )
+
+    rh.ramp_setup.tabular_data_preprocessors_submit(
+        submission=submission,
+        ramp_kit_dir = ramp_kit_dir,
+        ramp_data_dir = ramp_data_dir,
+        data_preprocessors = ['drop_id', preprocessor_name]
+    )
+
 
     n_trials = 9
 

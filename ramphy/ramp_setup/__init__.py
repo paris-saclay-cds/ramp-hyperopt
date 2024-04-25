@@ -1,6 +1,11 @@
 from .setup_scripts.tabular_regression import (
     tabular_regression_setup,
     tabular_regression_basic_submit,
+    tabular_regression_submit,
+    tabular_num_col_imputers_submit,
+    tabular_cat_col_encoders_submit,
+    tabular_cat_col_imputers_submit,
+    tabular_data_preprocessors_submit
 )
 from .setup_scripts.kit_setup import kit_setup
 from .workflow_elements.tabular_data_preprocessors.base_data_preprocessor import BaseDataPreprocessor
@@ -11,5 +16,10 @@ __all__ = [
     "score_name_type_map",
     "tabular_regression_setup",
     "tabular_regression_basic_submit",
+    "tabular_regression_submit",
+    "tabular_data_preprocessors_submit",
+    "tabular_cat_col_imputers_submit",
+    "tabular_num_col_imputers_submit",
+    "tabular_cat_col_encoders_submit",
     "kit_setup",
 ]
