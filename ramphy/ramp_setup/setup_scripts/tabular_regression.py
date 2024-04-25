@@ -13,6 +13,28 @@ except ImportError:
 
 from ramphy import ramp_setup
 
+def convert_ramp_dirs(ramp_kit_dir, ramp_data_dir):
+    """Convert ramp dirs to Path.
+
+    Remember that ramp_data_dir does not include the 
+    /data subfolder, it is usually the same as ramp_kit_dir,
+    but can point to an alternative data source for the same
+    kit.
+    Args:
+        ramp_kit_dir (str): ramp_kit_dir
+        ramp_data_dir (str): ramp_data_dir
+
+    Returns:
+        (Path, Path): converted dirs
+    """
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+    return ramp_kit_dir, ramp_data_dir
+
+
 def load_template(package, template_path):
     """Loads a template from the package
 
@@ -49,12 +71,7 @@ def tabular_regression_setup(
     problem_code = load_template(package=ramp_setup, 
                                  template_path="problems/tabular_regression_problem.py")
     download_dir = Path(download_dir)
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
     problem_f_name = ramp_kit_dir / "problem.py"
@@ -119,12 +136,7 @@ def tabular_regression_submit(
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
     
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -173,12 +185,7 @@ def tabular_data_preprocessors_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
 
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -205,12 +212,7 @@ def tabular_cat_col_imputers_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
     
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -237,12 +239,7 @@ def tabular_num_col_imputers_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
     
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -269,12 +266,7 @@ def tabular_cat_col_encoders_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
 
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
