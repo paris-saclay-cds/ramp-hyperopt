@@ -30,8 +30,8 @@ def kit_setup(
     #    metadata = load_metadata_from_json(download_dir)
     metadata = json.load(open(download_dir / "metadata.json"))
     prediction_type = metadata["prediction_type"]
-    if metadata["score_name"] in ["mse", "rmse", "mae"]:
-        prediction_type = "regression"
+    # if metadata["score_name"] in ["mse", "rmse", "mae"]:
+        # prediction_type = "regression"
     feature_types = list(metadata["data_description"]["feature_types"].values())
     input_types = set()
     if "num" in feature_types:

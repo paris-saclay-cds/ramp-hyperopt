@@ -126,7 +126,7 @@ def tabular_regression_setup(
     sample_submission.to_csv(ramp_data_dir / "data" / "sample_submission.csv", index=False)
 
     #    metadata.save(ramp_data_dir)
-    json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"))
+    json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"), indent=4)
 
 
 def tabular_regression_submit(
