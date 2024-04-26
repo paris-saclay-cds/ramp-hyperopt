@@ -34,7 +34,7 @@ class Regressor(BaseEstimator):
         score_name = metadata["score_name"]
         if score_name in ["mse", "rmse"]:
             self.objective = "reg:squarederror"
-        if score_name in ["rmsle"]:
+        elif score_name in ["rmsle"]:
             self.objective = "reg:squaredlogerror"
         elif score_name == "mae":
             self.objective = "reg:absoluteerror"
