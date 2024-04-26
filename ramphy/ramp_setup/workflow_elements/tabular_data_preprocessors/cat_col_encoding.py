@@ -11,21 +11,22 @@ from ramphy import Hyperparameter
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
+
 # RAMP START HYPERPARAMETERS
-encoding_strategy = Hyperparameter(
+encoding_strategy{var_col} = Hyperparameter(
     dtype="str", default="OneHot", values=["OneHot", "Count", "Target", "Binary", "Hashing"]
 )
-r_features_for_hashing = Hyperparameter(dtype="float", default=0.3, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7])
+r_features_for_hashing{var_col} = Hyperparameter(dtype="float", default=0.3, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7])
 # RAMP END HYPERPARAMETERS
 
-R_FEATURES_FOR_HASHING = float(r_features_for_hashing)
-ENCODING_STRATEGY = str(encoding_strategy)
+R_FEATURES_FOR_HASHING = float(r_features_for_hashing{var_col})
+ENCODING_STRATEGY = str(encoding_strategy{var_col})
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
     """Encodes categorical feature"""
 
-    def __init__(self, col={col}):
+    def __init__(self, col={str_col}):
         self.to_cache = ENCODING_STRATEGY in ["Hashing", "Count", "Target", "Binary"]
         self.col = col
 
@@ -55,14 +56,14 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_transformed = transformer.transform(X_train[[self.col]])
         if hasattr(X_transformed, "toarray"):
             X_transformed = X_transformed.toarray()
-        X_train[new_columns] = X_transformed
         X_train = X_train.drop(columns=[self.col])
+        X_train[new_columns] = X_transformed
 
         X_transformed = transformer.transform(X_test[[self.col]])
         if hasattr(X_transformed, "toarray"):
             X_transformed = X_transformed.toarray()
-        X_test[new_columns] = X_transformed
         X_test = X_test.drop(columns=[self.col])
+        X_test[new_columns] = X_transformed
 
         metadata["data_description"]["feature_types"].pop(self.col)
         for col in new_columns:

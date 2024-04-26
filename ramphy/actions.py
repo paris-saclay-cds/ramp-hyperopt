@@ -36,6 +36,7 @@ def _bagged_reward(score_type, bagged_f_name):
 def hyperopt(
     submission: str,
     n_trials: int,
+    workflow_element_names: Optional[Sequence[str]] = None,
     fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
@@ -51,6 +52,7 @@ def hyperopt(
             submission=submission,
             engine_name="ray_hebo",
             n_trials=n_trials,
+            workflow_element_names=workflow_element_names,
             fold_idxs=fold_idxs,
             save_output=True,
             test=False,

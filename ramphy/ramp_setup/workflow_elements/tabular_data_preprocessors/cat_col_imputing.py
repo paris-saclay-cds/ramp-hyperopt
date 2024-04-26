@@ -13,7 +13,7 @@ import ramphy.ramp_setup as rs
 class DataPreprocessor(rs.BaseDataPreprocessor):
     """Imputes missing values"""
 
-    def __init__(self, col={col}):
+    def __init__(self, col={str_col}):
         self.col = col
 
     def preprocess(

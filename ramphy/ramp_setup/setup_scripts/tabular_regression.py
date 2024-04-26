@@ -1,3 +1,4 @@
+import re
 import json
 import glob
 from pathlib import Path
@@ -221,8 +222,9 @@ def tabular_cat_col_imputers_submit(
     dp_code = load_template(package=ramp_setup, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_imputing.py", "w") as f_out:
+            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
+            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_cat_col_imputing.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -248,8 +250,9 @@ def tabular_num_col_imputers_submit(
     dp_code = load_template(package=ramp_setup, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_num_col_imputing.py", "w") as f_out:
+            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
+            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_num_col_imputing.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -275,8 +278,9 @@ def tabular_cat_col_encoders_submit(
     dp_code = load_template(package=ramp_setup, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat":
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_cat_col_encoding.py", "w") as f_out:
+            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
+            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_cat_col_encoding.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -306,6 +310,7 @@ def tabular_regression_columnwise_last_submit(
         ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
     """
+    print(submission)
     tabular_regression_submit(
         submission=submission,
         regressor=regressor,
