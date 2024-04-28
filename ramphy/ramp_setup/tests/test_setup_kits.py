@@ -25,6 +25,15 @@ def _generate_grid_path_kits():
 def test_submission(path_kit):
     ramp_kit_dir = Path(PATH) / 'ramp_kits' / 'test_kit'
     ramp_data_dir = ramp_kit_dir
+
+    # cleaning up
+    if ramp_kit_dir.is_dir():
+        shutil.rmtree(ramp_kit_dir)
+    if Path('cache').is_dir():
+        shutil.rmtree('cache')
+    if Path('catboost_info').is_dir():
+        shutil.rmtree('catboost_info')
+
     ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup and starting kit
