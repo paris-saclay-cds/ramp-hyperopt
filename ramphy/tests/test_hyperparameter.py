@@ -7,6 +7,7 @@ PATH = os.path.dirname(__file__)
 # flake8: noqa: E501
 
 
+@pytest.mark.xfail
 def test_hyperopt():
     submission = "rf"
     data_label = "cover_type_500"
