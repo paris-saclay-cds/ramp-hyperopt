@@ -36,37 +36,69 @@ def _bagged_reward(score_type, bagged_f_name):
 def hyperopt(
     submission: str,
     n_trials: int,
+    fold_idxs: Sequence[int],
     workflow_element_names: Optional[Sequence[str]] = None,
-    fold_idxs: Optional[Sequence[int]] = None,
     ramp_kit_dir: str = ".",
     ramp_data_dir: str = ".",
     resume: bool = True,
+    subtract_existing: bool = False,
 ) -> None:
-        # hyperopt
-    try:
-        run_hyperopt(
+    fold_idxs = list(fold_idxs)
+    existing_submissions = select_top_hyperopt(
+        submission=submission,
+        fold_idxs=fold_idxs,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    n_existing_submissions = len(existing_submissions)
+    n_existing_trials = n_existing_submissions * len(fold_idxs)
+    if subtract_existing:
+        n_total_trials = n_trials
+    else:
+        n_total_trials = n_trials + n_existing_trials
+    while True:
+        n_trials_remaining = n_total_trials - n_existing_trials
+        print(f'remaining trials = {n_trials_remaining}')
+        if n_trials_remaining <= 0:
+            print("n_trials_remaining <= 0, finished")
+            return
+        exception = ValueError("Unknown hyperopt exception, no submission trained.")
+        try:
+            run_hyperopt(
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+                ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
+                data_label=None,
+                submission=submission,
+                engine_name="ray_hebo",
+                n_trials=n_trials_remaining,
+                workflow_element_names=workflow_element_names,
+                fold_idxs=fold_idxs,
+                save_output=True,
+                test=False,
+                label=False,
+                resume=resume,
+                max_concurrent_runs=1,
+                n_cpu_per_run=None,
+                n_gpu_per_run=0,
+                verbose=3,
+            )
+        except Exception as e:
+            exception = e        
+        existing_submissions = select_top_hyperopt(
+            submission=submission,
+            fold_idxs=fold_idxs,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
-            ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
-            data_label=None,
-            submission=submission,
-            engine_name="ray_hebo",
-            n_trials=n_trials,
-            workflow_element_names=workflow_element_names,
-            fold_idxs=fold_idxs,
-            save_output=True,
-            test=False,
-            label=False,
-            resume=resume,
-            max_concurrent_runs=1,
-            n_cpu_per_run=None,
-            n_gpu_per_run=0,
-            verbose=3,
         )
-    except TuneError:
-        # If there are trials that errored, Tune throws an error at the end
-        # This should be though through, what to do with these errors
-        pass
+        n_trained_submissions = len(existing_submissions) - n_existing_submissions
+        # We raise only if there was no new submissions trained
+        if n_trained_submissions <= 0:
+            raise exception
+        n_existing_submissions = len(existing_submissions)
+        n_existing_trials = n_existing_submissions * len(fold_idxs)
+            
+            
 
     # reward TBD
 
@@ -674,7 +706,7 @@ def select_top_hyperopt(
     trained on fold_idxs. Then selects either the top_n
     according to mean score, or those with mean score better than
     score_cutoff. If both are None, return all hyperopts that were trained
-    on fold-idxs.
+    on fold_idxs.
     Parameters
     ----------
     submission : str
@@ -706,9 +738,12 @@ def select_top_hyperopt(
     valid_score_name = f"valid_{score_names[0]}"
     is_lower_the_better = problem.score_types[0].is_lower_the_better
 
+    print("Loading existing hyperopt submissions...")
     summary_df = get_hyperopt_score_summary(
         submission, fold_idxs, ramp_kit_dir, ramp_data_dir
     )
+    if len(summary_df) == 0:
+        return []
 
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
