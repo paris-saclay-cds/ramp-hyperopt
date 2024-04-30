@@ -3,8 +3,11 @@
 import os
 import time
 import shutil
+import pickle
 import hashlib
 import itertools
+import functools
+import datetime
 
 import glob
 import json
@@ -22,6 +25,32 @@ from .hyperopt import (
 from pathlib import Path
 from ray.tune.error import TuneError
 
+RAMP_ACTIONS = list()
+
+def ramp_action(action_function):
+    """ """
+    @functools.wraps(action_function)
+    def ramp_decorator(*args, **kwargs):
+        global RAMP_ACTIONS
+        if not action_function in RAMP_ACTIONS:
+            RAMP_ACTIONS += [action_function]
+        action_dict = {}
+        action_dict['function_name'] = action_function.__name__
+        action_dict['module'] = action_function.__module__
+        action_dict['args'] = args
+        action_dict['kwargs'] = kwargs
+        action_dict['start_time'] = datetime.datetime.utcnow()
+        value = action_function(*args, **kwargs)
+        action_dict['stop_time'] = datetime.datetime.utcnow()
+        action_dict['return'] = repr(value)
+        ramp_kit_dir = '.'
+        if 'ramp_kit_dir' in kwargs.keys():
+            ramp_kit_dir = kwargs['ramp_kit_dir']
+        pickle_f_name = Path(ramp_kit_dir) / 'actions' / f'{action_dict["start_time"]}.pkl'
+        with open(pickle_f_name, 'wb') as f: 
+            pickle.dump(action_dict, f)
+        return value    
+    return ramp_decorator
 
 def _bagged_reward(score_type, bagged_f_name):
     bagged_scores_df = pd.read_csv(bagged_f_name)
@@ -102,7 +131,7 @@ def hyperopt(
 
     # reward TBD
 
-
+@ramp_action
 def train(
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
