@@ -8,14 +8,14 @@ from ramphy import Hyperparameter
 import ramphy.ramp_setup as rs
 
 # RAMP START HYPERPARAMETERS
-impute_strategy_num{var_col} = Hyperparameter(
+impute_strategy_num{col} = Hyperparameter(
     dtype='str', default='mean', values=['mean', 'median', 'most_frequent', 'constant'])
-fill_value_num{var_col} = Hyperparameter(
+fill_value_num{col} = Hyperparameter(
     dtype='float', default=-1.0, values=[-1.0, 0.0])
 # RAMP END HYPERPARAMETERS
 
-IMPUTE_STRATEGY_NUM = str(impute_strategy_num{var_col})
-FILL_VALUE_NUM = float(fill_value_num{var_col})
+IMPUTE_STRATEGY_NUM = str(impute_strategy_num{col})
+FILL_VALUE_NUM = float(fill_value_num{col})
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
     """Imputes missing values"""

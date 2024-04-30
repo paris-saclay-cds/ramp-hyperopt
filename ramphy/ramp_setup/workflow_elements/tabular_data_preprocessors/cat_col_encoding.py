@@ -13,14 +13,14 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 # RAMP START HYPERPARAMETERS
-encoding_strategy{var_col} = Hyperparameter(
+encoding_strategy{col} = Hyperparameter(
     dtype="str", default="OneHot", values=["OneHot", "Count", "Target", "Binary", "Hashing"]
 )
-r_features_for_hashing{var_col} = Hyperparameter(dtype="float", default=0.3, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7])
+r_features_for_hashing{col} = Hyperparameter(dtype="float", default=0.3, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7])
 # RAMP END HYPERPARAMETERS
 
-R_FEATURES_FOR_HASHING = float(r_features_for_hashing{var_col})
-ENCODING_STRATEGY = str(encoding_strategy{var_col})
+R_FEATURES_FOR_HASHING = float(r_features_for_hashing{col})
+ENCODING_STRATEGY = str(encoding_strategy{col})
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):

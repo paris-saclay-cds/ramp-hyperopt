@@ -29,21 +29,36 @@ def tabular_regression_setup(
 
     problem_f_name = ramp_kit_dir / "problem.py"
 
+    train_data = pd.read_csv(download_dir / "train.csv")
+    test_data = pd.read_csv(download_dir / "test.csv")
+    sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
+    
+
     metadata = json.load(open(download_dir / "metadata.json"))
     feature_types = metadata["data_description"]["feature_types"]
     target_cols = metadata["data_description"]["target_cols"]
 
-    #    injectable_metadata = make_metadata_injectable(metadata.asdict())
-    #    problem_code = problem_code.format_map(injectable_metadata)
+    # Converting col names to a name that can become a python variable
+    # and adding _<i> to col names to avoid clash
+    new_feature_types = {}
+    for col_i, (col, col_type) in enumerate(feature_types.items()):
+        var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
+        new_col = f'{var_col}_{col_i}'
+        if col == metadata["id_col"]:
+            new_feature_types[col] = col_type
+        else:
+            new_feature_types[new_col] = col_type
+    train_data = train_data.rename(
+        columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
+    test_data = train_data.rename(
+        columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
+    feature_types = metadata["data_description"]["feature_types"] = new_feature_types    
+
     problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
     (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
     (ramp_kit_dir / "submissions").mkdir(parents=True, exist_ok=True)
-
-    train_data = pd.read_csv(download_dir / "train.csv")
-    test_data = pd.read_csv(download_dir / "test.csv")
-    sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
 
     feature_values = {}
     missing_data_count = {}
@@ -165,9 +180,8 @@ def tabular_cat_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
-            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
-            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_cat_col_imputing.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_imputing.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -193,9 +207,8 @@ def tabular_num_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
-            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
-            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_num_col_imputing.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_num_col_imputing.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -221,9 +234,8 @@ def tabular_cat_col_encoders_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat":
-            var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
-            dp_code_formatted = dp_code.format_map(metadata | {"str_col": f'"{col}"', "var_col": f'{var_col}'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{var_col}_cat_col_encoding.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
+            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_encoding.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
