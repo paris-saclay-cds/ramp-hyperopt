@@ -11,6 +11,7 @@ except ImportError:
 score_name_type_map = {
     'rmse' : rw.score_types.RMSE,
     'mae' : rw.score_types.MAE,
+    'r2' : rw.score_types.R2,
 }
 
 def convert_ramp_dirs(ramp_kit_dir: Path | str, ramp_data_dir: Optional[Path | str]) -> Tuple[Path, Path]:

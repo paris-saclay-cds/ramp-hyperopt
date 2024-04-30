@@ -127,6 +127,7 @@ def test_submission(path_kit):
         # hyperopt
         rh.actions.hyperopt(
             submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
+            workflow_element_names=['regressor'],
             ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
         )
     
@@ -134,6 +135,13 @@ def test_submission(path_kit):
         rh.actions.hyperopt(
             submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
             ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True
+        )
+        
+        # subtract_existing - no new trials
+        rh.actions.hyperopt(
+            submission=submission, n_trials=n_trials, fold_idxs=range(900, 903),
+            ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, resume=True,
+            subtract_existing=True,
         )
         
         rh.actions.delete_duplicates_hyperopt(
