@@ -14,7 +14,6 @@ grow_policy = Hyperparameter(dtype='str', default='SymmetricTree', values=['Symm
 min_data_in_leaf = Hyperparameter(dtype='int', default=1, values=[1, 5, 10, 20, 50, 100, 200, 500, 700])
 bootstrap_type = Hyperparameter(dtype='str', default='Bayesian', values=['Bayesian', 'Bernoulli', 'MVS', 'No'])
 random_strength = Hyperparameter(dtype='float', default=1, values=[0, 1, 5, 10, 20, 50, 100])
-auto_class_weights = Hyperparameter(dtype='str', default='None', values=['None', 'Balanced', 'SqrtBalanced'])
 objective = Hyperparameter(dtype='str', default='RMSE', values=['RMSE', 'MAE', 'MAPE', 'Quantile', 'LogLinQuantile', 'Huber'])
 quantile_alpha = Hyperparameter(dtype='float', default=0.5, values=[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
 huber_relative_delta = Hyperparameter(dtype='float', default=3.0, values=[1.0, 2.0, 3.0, 4.0, 5.0])
