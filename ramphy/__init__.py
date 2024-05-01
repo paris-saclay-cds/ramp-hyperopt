@@ -24,6 +24,7 @@ from .actions import (
     train,
 )
 from ramphy import ramp_setup
+from ramphy import actions
 
 __all__ = [
     "BasePreprocessor",

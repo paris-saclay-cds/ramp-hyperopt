@@ -2,8 +2,10 @@ import json
 from pathlib import Path
 from typing import Optional
 import ramphy.ramp_setup as rs
+from ramphy.actions import ramp_action, RAMP_ACTIONS
 
 
+@ramp_action
 def kit_setup(
     download_dir: str | Path,
     ramp_kit_dir: str | Path = ".",

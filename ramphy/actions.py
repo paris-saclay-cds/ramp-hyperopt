@@ -7,6 +7,7 @@ import pickle
 import hashlib
 import itertools
 import functools
+import importlib
 import datetime
 
 import glob
@@ -25,31 +26,41 @@ from .hyperopt import (
 from pathlib import Path
 from ray.tune.error import TuneError
 
-RAMP_ACTIONS = list()
+RAMP_ACTIONS = set()
+
+class RampAction():
+    @property
+    def run_time(self):
+        return self.stop_time - self.start_time
+
+    def execute(self):
+        module = importlib.import_module(self.module)
+        action_function = getattr(module, self.function_name)
+        return action_function(*self.args, **self.kwargs)
 
 def ramp_action(action_function):
     """ """
+    global RAMP_ACTIONS
+    RAMP_ACTIONS.add(action_function)
     @functools.wraps(action_function)
     def ramp_decorator(*args, **kwargs):
-        global RAMP_ACTIONS
-        if not action_function in RAMP_ACTIONS:
-            RAMP_ACTIONS += [action_function]
-        action_dict = {}
-        action_dict['function_name'] = action_function.__name__
-        action_dict['module'] = action_function.__module__
-        action_dict['args'] = args
-        action_dict['kwargs'] = kwargs
-        action_dict['start_time'] = datetime.datetime.utcnow()
-        value = action_function(*args, **kwargs)
-        action_dict['stop_time'] = datetime.datetime.utcnow()
-        action_dict['return'] = repr(value)
+        ramp_action = RampAction()
+        ramp_action.function_name = action_function.__name__
+        ramp_action.module = action_function.__module__
+        ramp_action.args = args
+        ramp_action.kwargs = kwargs
+        ramp_action.start_time = datetime.datetime.utcnow()
+        ramp_action.value = action_function(*args, **kwargs)
+        ramp_action.stop_time = datetime.datetime.utcnow()
         ramp_kit_dir = '.'
         if 'ramp_kit_dir' in kwargs.keys():
             ramp_kit_dir = kwargs['ramp_kit_dir']
-        pickle_f_name = Path(ramp_kit_dir) / 'actions' / f'{action_dict["start_time"]}.pkl'
+        actions_dir = Path(ramp_kit_dir) / 'actions'
+        actions_dir.mkdir(parents=False, exist_ok=True)
+        pickle_f_name = actions_dir / f'{ramp_action.start_time}.pkl'
         with open(pickle_f_name, 'wb') as f: 
-            pickle.dump(action_dict, f)
-        return value    
+            pickle.dump(ramp_action, f)
+        return ramp_action.value    
     return ramp_decorator
 
 def _bagged_reward(score_type, bagged_f_name):
@@ -61,7 +72,7 @@ def _bagged_reward(score_type, bagged_f_name):
     else:
         return r
 
-
+@ramp_action
 def hyperopt(
     submission: str,
     n_trials: int,
@@ -187,7 +198,7 @@ def train(
         bagged_f_name = submission_dir / "training_output" / "bagged_scores.csv"
         return _bagged_reward(problem.score_types[0], bagged_f_name)
 
-
+@ramp_action
 def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") -> None:
     """Retraining action.
 
@@ -213,7 +224,7 @@ def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") 
         fold_idxs=[],
     )
 
-
+@ramp_action
 def blend(
     submissions: List[str],
     fold_idxs: Optional[Sequence[int]] = None,
@@ -262,7 +273,7 @@ def blend(
     else:
         return None
 
-
+@ramp_action
 def submit_hybrid(
     new_submission: str,
     parent_submissions: dict,
@@ -333,6 +344,7 @@ def _select_all_hyperopt(submission: str, ramp_kit_dir: str = ".") -> List[str]:
     return submissions_f_names
 
 
+@ramp_action
 def get_hyperopt_score_summary(
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
@@ -406,8 +418,12 @@ def get_hyperopt_score_summary(
     return summary_df
 
 
+@ramp_action
 def filter_full_folds(
-    summary_df: pd.DataFrame, fold_idxs: Sequence[int]
+    summary_df: pd.DataFrame,
+    fold_idxs: Sequence[int],
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -436,8 +452,12 @@ def filter_full_folds(
     ]
 
 
+@ramp_action
 def get_hyperopt_score_means(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
+    summary_df: pd.DataFrame,
+    fold_idxs: Optional[Sequence[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a mean DataFrame.
 
@@ -474,8 +494,12 @@ def get_hyperopt_score_means(
     return means_df
 
 
+@ramp_action
 def get_hyperopt_score_stds(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
+    summary_df: pd.DataFrame,
+    fold_idxs: Optional[Sequence[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns an std DataFrame.
 
@@ -512,8 +536,12 @@ def get_hyperopt_score_stds(
     return stds_df
 
 
+@ramp_action
 def get_hyperopt_score_counts(
-    summary_df: pd.DataFrame, fold_idxs: Optional[Sequence[int]] = None
+    summary_df: pd.DataFrame,
+    fold_idxs: Optional[Sequence[int]] = None,
+    ramp_kit_dir: str = ".",
+    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a count DataFrame.
 
@@ -550,6 +578,7 @@ def get_hyperopt_score_counts(
     return counts_df
 
 
+@ramp_action
 def save_hyperopt_score_summary(
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
@@ -588,6 +617,7 @@ def save_hyperopt_score_summary(
     summary_df.to_csv(f_name)
 
 
+@ramp_action
 def rename_best_hyperopt_submissions(
     submission: str,
     fold_idxs: Sequence[int],
@@ -675,6 +705,7 @@ def rename_best_hyperopt_submissions(
                 shutil.move(from_f_name, to_f_name)
 
 
+@ramp_action
 def delete_duplicates_hyperopt(
     submission: str,
     fold_idxs: Sequence[int],
@@ -720,6 +751,7 @@ def delete_duplicates_hyperopt(
             shutil.rmtree(Path(ramp_kit_dir) / "submissions" / submission)
 
 
+@ramp_action
 def select_top_hyperopt(
     submission: str,
     fold_idxs: Sequence[int],
@@ -841,6 +873,7 @@ def select_top_hyperopt(
     return new_submissions.to_list()
 
 
+@ramp_action
 def select_top_hyperopt_and_train(
     submission: str,
     fold_idxs: Sequence[int],
@@ -923,6 +956,7 @@ def select_top_hyperopt_and_train(
         )
 
 
+@ramp_action
 def select_top_hyperopt_and_blend(
     submission: str,
     fold_idxs: Sequence[int],
@@ -962,6 +996,7 @@ def select_top_hyperopt_and_blend(
     return blend(submissions, fold_idxs, ramp_kit_dir, ramp_data_dir)
 
 
+@ramp_action
 def select_top_hyperopt_and_submit_hybrid(
     new_submission: str,
     parent_submissions: dict,
@@ -1066,6 +1101,7 @@ def select_top_hyperopt_and_submit_hybrid(
             shutil.move(module_path, output_submission_dir)
 
 
+@ramp_action
 def clean_up_predictions(
     submission: str,
     fold_idxs: Sequence[int],

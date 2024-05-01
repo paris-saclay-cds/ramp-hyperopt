@@ -7,7 +7,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from ramphy import ramp_setup as rs
+from ramphy.actions import ramp_action, RAMP_ACTIONS
 
+
+@ramp_action
 def tabular_regression_setup(
     download_dir: str | Path,
     ramp_kit_dir: str | Path = ".",
@@ -96,6 +99,7 @@ def tabular_regression_setup(
     json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"), indent=4)
 
 
+@ramp_action
 def tabular_regression_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
@@ -126,9 +130,7 @@ def tabular_regression_submit(
         f_out.write(fe_code)
 
 
-
-
-
+@ramp_action
 def tabular_data_preprocessors_submit(
     submission: str | Path,
     data_preprocessors: list[str] = ['drop_id'],
@@ -158,6 +160,7 @@ def tabular_data_preprocessors_submit(
         dp_idx += 1
 
 
+@ramp_action
 def tabular_cat_col_imputers_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
@@ -185,6 +188,8 @@ def tabular_cat_col_imputers_submit(
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
+
+@ramp_action
 def tabular_num_col_imputers_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
@@ -212,6 +217,8 @@ def tabular_num_col_imputers_submit(
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
+
+@ramp_action
 def tabular_cat_col_encoders_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
@@ -239,6 +246,8 @@ def tabular_cat_col_encoders_submit(
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
+
+@ramp_action
 def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
@@ -297,6 +306,7 @@ def tabular_regression_columnwise_last_submit(
             ramp_data_dir=ramp_data_dir,
         )
 
+@ramp_action
 def tabular_regression_columnwise_first_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
