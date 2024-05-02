@@ -186,6 +186,20 @@ def test_submission(path_kit):
         ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir
     )
 
+    
+    ramp_action = rh.actions.RampAction(
+        module = "ramphy.actions",
+        name = "train",
+        kwargs = {
+            'submission': 'catboost',
+            'fold_idxs': range(900, 903),
+            'force_retrain': True,
+            'ramp_kit_dir': ramp_kit_dir,
+            'ramp_data_dir': ramp_data_dir,
+        }
+    )
+    ramp_action.execute()
+
     # cleaning up
     shutil.rmtree(ramp_kit_dir)
     shutil.rmtree('cache')

@@ -26,29 +26,36 @@ from .hyperopt import (
 from pathlib import Path
 from ray.tune.error import TuneError
 
-RAMP_ACTIONS = set()
+RAMP_ACTIONS = dict()
 
 class RampAction():
+    def __init__(self, module, name, args=(), kwargs={}):
+        self.module = module
+        self.name = name
+        self.args = args
+        self.kwargs = kwargs
+        
     @property
     def run_time(self):
         return self.stop_time - self.start_time
 
     def execute(self):
         module = importlib.import_module(self.module)
-        action_function = getattr(module, self.function_name)
+        action_function = getattr(module, self.name)
         return action_function(*self.args, **self.kwargs)
 
 def ramp_action(action_function):
     """ """
     global RAMP_ACTIONS
-    RAMP_ACTIONS.add(action_function)
+    RAMP_ACTIONS[f'{action_function.__module__}.{action_function.__name__}'] = action_function
     @functools.wraps(action_function)
     def ramp_decorator(*args, **kwargs):
-        ramp_action = RampAction()
-        ramp_action.function_name = action_function.__name__
-        ramp_action.module = action_function.__module__
-        ramp_action.args = args
-        ramp_action.kwargs = kwargs
+        ramp_action = RampAction(
+            module = action_function.__module__,
+            name = action_function.__name__,
+            args = args,
+            kwargs = kwargs,
+        )
         ramp_action.start_time = datetime.datetime.utcnow()
         ramp_action.value = action_function(*args, **kwargs)
         ramp_action.stop_time = datetime.datetime.utcnow()
