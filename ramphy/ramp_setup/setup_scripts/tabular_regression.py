@@ -1,6 +1,7 @@
 import re
 import json
 import glob
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -109,7 +110,10 @@ def tabular_regression_submit(
 ) -> None:
     
     ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
-    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    submission_dir = ramp_kit_dir / "submissions" / submission
+    if submission_dir.exists():
+        shutil.rmtree(submission_dir)
+    submission_dir.mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
     # Regressor
