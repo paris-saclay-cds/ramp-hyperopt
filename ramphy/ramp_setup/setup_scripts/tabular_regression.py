@@ -8,6 +8,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from ramphy import ramp_setup as rs
+from ramphy import actions as ra
 from ramphy.actions import ramp_action, RAMP_ACTIONS
 
 
@@ -28,7 +29,7 @@ def tabular_regression_setup(
     problem_code = rs.utils.load_template(package=rs, 
                                  template_path="problems/tabular_regression_problem.py")
     download_dir = Path(download_dir)
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
     problem_f_name = ramp_kit_dir / "problem.py"
@@ -109,7 +110,7 @@ def tabular_regression_submit(
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
     
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     submission_dir = ramp_kit_dir / "submissions" / submission
     if submission_dir.exists():
         shutil.rmtree(submission_dir)
@@ -150,7 +151,7 @@ def tabular_data_preprocessors_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
 
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -178,7 +179,7 @@ def tabular_cat_col_imputers_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
     
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -207,7 +208,7 @@ def tabular_num_col_imputers_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
     
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -236,7 +237,7 @@ def tabular_cat_col_encoders_submit(
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
 
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -309,6 +310,7 @@ def tabular_regression_columnwise_last_submit(
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
+    return {"created_submissions": [submission]}
 
 @ramp_action
 def tabular_regression_columnwise_first_submit(
@@ -367,3 +369,4 @@ def tabular_regression_columnwise_first_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    return {"created_submissions": [submission]}

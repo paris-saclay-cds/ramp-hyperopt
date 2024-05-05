@@ -2,17 +2,17 @@
 
 import os
 import time
+import glob
+import json
 import shutil
 import pickle
 import hashlib
+import datetime
 import itertools
 import functools
 import importlib
-import datetime
 
-import glob
-import json
-from typing import Sequence, Optional, List
+from typing import Sequence, Optional, List, Tuple, Dict
 
 import numpy as np
 import pandas as pd
@@ -34,7 +34,7 @@ class RampAction():
         self.name = name
         self.args = args
         self.kwargs = kwargs
-        
+       
     @property
     def run_time(self):
         return self.stop_time - self.start_time
@@ -57,8 +57,13 @@ def ramp_action(action_function):
             kwargs = kwargs,
         )
         ramp_action.start_time = datetime.datetime.utcnow()
-        ramp_action.value = action_function(*args, **kwargs)
+        action_return = action_function(*args, **kwargs)
         ramp_action.stop_time = datetime.datetime.utcnow()
+        try:
+            for key, value in action_return.items():
+                setattr(ramp_action, key, value)
+        except:
+            pass
         ramp_kit_dir = '.'
         if 'ramp_kit_dir' in kwargs.keys():
             ramp_kit_dir = kwargs['ramp_kit_dir']
@@ -67,36 +72,132 @@ def ramp_action(action_function):
         pickle_f_name = actions_dir / f'{ramp_action.start_time}.pkl'
         with open(pickle_f_name, 'wb') as f: 
             pickle.dump(ramp_action, f)
-        return ramp_action.value    
+        return action_return    
     return ramp_decorator
 
-def _bagged_reward(score_type, bagged_f_name):
+def _bagged_score(score_type, bagged_f_name):
     bagged_scores_df = pd.read_csv(bagged_f_name)
     valid_scores_df = bagged_scores_df[bagged_scores_df["step"] == "valid"]
-    r = valid_scores_df.iloc[-1][score_type.name]
-    if score_type.is_lower_the_better:
-        return -r
+    return valid_scores_df.iloc[-1][score_type.name]
+
+def _mean_score(submission, fold_idxs, score_type, ramp_kit_dir):
+    foldwise_scores = []
+    for fold_idx in fold_idxs:
+        score_df = pd.read_csv(
+            Path(ramp_kit_dir) / "submissions" / submission / "training_output"
+            / f"fold_{fold_idx}" / "scores.csv"
+        )
+        score_df = score_df.set_index("step")
+        foldwise_scores.append(score_df.loc["valid", score_type.name])
+    return np.mean(foldwise_scores)
+
+def  _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir):
+    if fold_idxs is None:
+        cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir, fold_idxs=fold_idxs)
+        fold_idxs = range(len(cv))
     else:
-        return r
+        fold_idxs = list(fold_idxs)
+    return fold_idxs
+
+
+def convert_ramp_dirs(
+    ramp_kit_dir: Path | str,
+    ramp_data_dir: Optional[Path | str]
+) -> Tuple[Path, Path]:
+    """Convert ramp dirs to Path.
+
+    Remember that ramp_data_dir does not include the 
+    /data subfolder, it is usually the same as ramp_kit_dir,
+    but can point to an alternative data source for the same
+    kit.
+    Args:
+        ramp_kit_dir (str): ramp_kit_dir
+        ramp_data_dir (str): ramp_data_dir
+
+    Returns:
+        (Path, Path): converted dirs
+    """
+    ramp_kit_dir = Path(ramp_kit_dir)
+    if ramp_data_dir is None:
+        ramp_data_dir = Path(ramp_kit_dir)
+    else:
+        ramp_data_dir = Path(ramp_data_dir)
+    return ramp_kit_dir, ramp_data_dir
+
 
 @ramp_action
 def hyperopt(
+    ramp_kit_dir: str,
     submission: str,
     n_trials: int,
-    fold_idxs: Sequence[int],
+    fold_idxs: Optional[Sequence[int]] = None,
     workflow_element_names: Optional[Sequence[str]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
-    resume: bool = True,
-    subtract_existing: bool = False,
-) -> None:
-    fold_idxs = list(fold_idxs)
+    resume: Optional[bool] = True,
+    subtract_existing: Optional[bool] = False,
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
+    """Hyperopting action.
+
+    Hyperopts submission using HEBO, creating
+    <submission>_hyperopt_<hash> submissions, where hash hashes
+    the list of hyperparameter values (even those that are not hyperopted,
+    not selected in workflow_element_names). The number of trials
+    n_trials is counted per fold, so should be a multiple of len(folds_idxs).
+    Resume means we restart from existing models, fully trained on all folds.
+    If subtract_existing is True, we subtract the number of hyperopted models
+    times the number of folds from n_trials.
+
+    We catch all exceptions in case at least one model is trained, and resume.
+    If no model is trained, we re-raise the exception.
+
+    Parameters
+    ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
+    submission : str
+        The name of the submission to be hyperopted.
+    n_trials : int
+        Number of hyperopt trials, counting per fold.
+        Should be a multiple of len(fold_idxs).
+    fold_idxs : list of int, default=None
+        Fold indices to hyperopt on.
+        If None, we will train on all folds in problem.cv.
+    workflow_element_names : list of strings, default=None
+        The workflow elements that we hyperopt. None means we
+        hyperopt all elements. For elements not hyperopted, we
+        set the hyperopt space to the list of the single instance
+        of default hyperparameter in the submission, so it seems
+        like all elements are hyperopted, except that hypers of the
+        unselected elements cannot "move".
+    resume : bool, default=True
+        If True, we resume from existing submissions hyperopted on 
+        all the folds in fold_idxs.
+    subtract_existing : bool, default=False
+        If True, we discount len(fold_idxs) x len(hyperopted submssions)
+        from n_trials.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
+    Returns
+    -------
+    scores : dict
+        Dictionary containing "created_submissions": list(str) - all the 
+        submissions created in this round of hyperopt;
+        "mean_scores": list(float) - all the scores of created submissions; 
+        "mean_score": float - the score of the best submission, given that
+        at least one submission was successfully trained.
+    """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    fold_ixs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
+
     existing_submissions = select_top_hyperopt(
         submission=submission,
         fold_idxs=fold_idxs,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    previous_submissions = existing_submissions.copy()
     n_existing_submissions = len(existing_submissions)
     n_existing_trials = n_existing_submissions * len(fold_idxs)
     if subtract_existing:
@@ -108,13 +209,13 @@ def hyperopt(
         print(f'remaining trials = {n_trials_remaining}')
         if n_trials_remaining <= 0:
             print("n_trials_remaining <= 0, finished")
-            return
+            break
         exception = ValueError("Unknown hyperopt exception, no submission trained.")
         try:
             run_hyperopt(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
-                ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
+                ramp_submission_dir=ramp_kit_dir / "submissions",
                 data_label=None,
                 submission=submission,
                 engine_name="ray_hebo",
@@ -133,62 +234,79 @@ def hyperopt(
         except Exception as e:
             exception = e        
         existing_submissions = select_top_hyperopt(
+            ramp_kit_dir=ramp_kit_dir,
             submission=submission,
             fold_idxs=fold_idxs,
-            ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
-        )
+        )["selected_submissions"]
         n_trained_submissions = len(existing_submissions) - n_existing_submissions
         # We raise only if there was no new submissions trained
         if n_trained_submissions <= 0:
             raise exception
         n_existing_submissions = len(existing_submissions)
         n_existing_trials = n_existing_submissions * len(fold_idxs)
-            
-            
-
-    # reward TBD
+    r = dict()
+    created_submissions = set(existing_submissions) - set(previous_submissions)
+    r["created_submissions"] = list(created_submissions)
+    r["mean_scores"] = {}
+    for submission in created_submissions:
+        r["mean_scores"][submission] = _mean_score(
+            submission, fold_idxs, problem.score_types[0], ramp_kit_dir)
+    if len(r["mean_scores"]) > 0:
+        if problem.score_types[0].is_lower_the_better:
+            r["mean_score"] = min(r["mean_scores"].values())
+        else:
+            r["mean_score"] = max(r["mean_scores"].values())
+    return r
 
 @ramp_action
 def train(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
-    bag: bool = True,
-    force_retrain: bool = False,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    bag: Optional[bool] = True,
+    force_retrain: Optional[bool] = False,
     ignore_errors: Optional[bool] = False,
-) -> Optional[pd.Series]:
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
     """Training action.
 
-    Trains and bags a submission on a set of folds
+    Trains and bags a submission on a set of folds.
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the submission to be tested.
     fold_idxs : list of int, default=None
         Fold indices to train on.
-        If None, we will train on all folds.
+        If None, we will train on all folds in problem.cv.
     bag : bool, default=True
-        Whether to bag the folds after training.
+        If True, we bag the folds after training.
     force_retrain : bool, default=False
-        Whether to retrain on folds with existing scores.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+        If True, we retrain on folds with existing scores.
+    ignore_errors : bool, default=False
+        If True, we silently return
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     Returns
     -------
-    r : float
-        The reward: the bagged valid score.
+    scores : dict
+        Dictionary of mean score (if training is successful) and bagged score 
+        (if bag is True).
     """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    fold_ixs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
+
+    scores = dict()
     try:
         rw.utils.testing.assert_submission(
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
-            ramp_submission_dir=os.path.join(ramp_kit_dir, "submissions"),
+            ramp_submission_dir=ramp_kit_dir / "submissions",
             submission=submission,
             save_output=True,
             retrain=False,
@@ -196,17 +314,34 @@ def train(
             force_retrain=force_retrain,
             fold_idxs=fold_idxs,
         )
+        foldwise_scores = []
+        for fold_idx in fold_idxs:
+            score_df = pd.read_csv(
+                ramp_kit_dir / "submissions" / submission
+                / "training_output"
+                / f"fold_{fold_idx}"
+                / "scores.csv"
+            )
+            score_df = score_df.set_index("step")
+            foldwise_scores.append(score_df.loc["valid", problem.score_types[0].name])
+        scores["mean_score"] = _mean_score(
+            submission, fold_idxs, problem.score_types[0], ramp_kit_dir)
     except Exception as e:
-        print("called")
         if not ignore_errors:
             raise e
+        return scores
     if bag:
         submission_dir = Path(ramp_kit_dir) / "submissions" / submission
         bagged_f_name = submission_dir / "training_output" / "bagged_scores.csv"
-        return _bagged_reward(problem.score_types[0], bagged_f_name)
+        scores["bagged_score"] = _bagged_score(problem.score_types[0], bagged_f_name)
+    return scores
 
 @ramp_action
-def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") -> None:
+def retrain(
+    ramp_kit_dir: str,
+    submission: str,
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
     """Retraining action.
 
     Trains the submissin on full training data. No reward since no
@@ -214,12 +349,17 @@ def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") 
 
     Parameters
     ----------
-    submission : str
-        The name of the submission to be tested.
-    ramp_kit_dir : str, default='.'
+    ramp_kit_dir : str
         The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    submission : str
+        The name of the submission to be retrained.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
+    Returns
+    -------
+    scores : dict
+        Empty dict since no validaton score.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     rw.utils.testing.assert_submission(
@@ -230,39 +370,47 @@ def retrain(submission: str, ramp_kit_dir: str = ".", ramp_data_dir: str = ".") 
         retrain=True,
         fold_idxs=[],
     )
+    return dict()
 
 @ramp_action
 def blend(
+    ramp_kit_dir: str,
     submissions: List[str],
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
     output_path: Optional[str] = None,
-) -> pd.Series:
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
     """Blending action.
 
-    Blends a list of submissions
+    Blends a list of submissions.
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submissions : list of str
         The name of the submissions to be blended.
     fold_idxs : list of int, default=None
         Fold indices to blend.
         If None, we will blend all folds.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    output_path : str, default=None.
+        The folder where bagged_scores_combined.csv and 
+        submission_combined_bagged_test.csv are saved. If None, defaults
+        to <ramp_kit_dir>/submissions/training_output.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     Returns
     -------
-    r : float
-        The reward: the blended valid score.
+    scores : dict
+        A dictionary with a single element "blended_score": float. If submissions = []
+        it returns an empty dictionary.
     """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     if len(submissions) > 0:
         problem = rw.utils.assert_read_problem(ramp_kit_dir)
         if output_path is None:
-            output_path = Path(ramp_kit_dir) / "submissions" / "training_output"
+            output_path = ramp_kit_dir / "submissions" / "training_output"
         else:
             output_path = Path(output_path)
         rw.utils.testing.blend_submissions(
@@ -276,40 +424,38 @@ def blend(
         )
     
         bagged_f_name = output_path / "bagged_scores_combined.csv"
-        return _bagged_reward(problem.score_types[0], bagged_f_name)
+        return {"blended_score": _bagged_score(problem.score_types[0], bagged_f_name)}
     else:
-        return None
+        return {}
 
+# has to be redesigned because of variable number of data preprocessors.
 @ramp_action
 def submit_hybrid(
+    ramp_kit_dir: str,
     new_submission: str,
-    parent_submissions: dict,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
-) -> None:
+    parent_submissions: Dict[str, str],
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
     """Combines workflow elements coming from different submissions.
 
-    Borrowing workflow elements from parent submissions.
-
-    The number of submission must match the number of workflow elements.
-    For example, in FeatureExtractorClassifierWithEDA workflow, there
-    is a feature_extractor and a classifier. The new submission will
-    use the feature_extractor of the first parent and the classifier
-    of the second parent.
+    Inheriting workflow elements from parent submissions.
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     new_submission : str
         The name of the new submission to be submitted.
-    parent_submissions : list of str
-        The names of the submissions from which the workflow elements
-        will come.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    parent_submissions : dict
+        A dictionary of elements parent_submission: workflow_element.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     """
-    new_submission_dir = Path(ramp_kit_dir) / "submissions" / new_submission
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    new_submission_dir = ramp_kit_dir / "submissions" / new_submission
+    if new_submission_dir.exists():
+        shutil.rmtree(new_submission_dir)
     new_submission_dir.mkdir(parents=False, exist_ok=True)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     if len(parent_submissions) != len(problem.workflow.element_names):
@@ -331,15 +477,18 @@ def submit_hybrid(
         print(f"Copying {from_file} to {to_file}")
 
 
-def _select_all_hyperopt(submission: str, ramp_kit_dir: str = ".") -> List[str]:
+def _select_all_hyperopt(
+    ramp_kit_dir: str,
+    submission: str,
+) -> List[str]:
     """Returns all submissions {submission}_hyperopt*.
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
     Returns
     -------
     new_submissions : list of str
@@ -351,12 +500,11 @@ def _select_all_hyperopt(submission: str, ramp_kit_dir: str = ".") -> List[str]:
     return submissions_f_names
 
 
-@ramp_action
 def get_hyperopt_score_summary(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    ramp_data_dir: Optional[str] = None,
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -364,35 +512,36 @@ def get_hyperopt_score_summary(
     trained on fold_idxs.
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int, default=None
         Fold indices that the {submission}_hyperopt*'s
         have been trained on. If None, return summary of all
         folds.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     Returns
     -------
-    new_submissions : list of str
-        The list of selected submissions.
+    summary_df : pd.DataFrame
+        DataFrame of submissions, hypers, scores
     """
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     X_train, y_train = problem.get_train_data(ramp_data_dir)
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
     is_lower_the_better = problem.score_types[0].is_lower_the_better
-    module_path = Path(ramp_kit_dir) / "submissions" / submission
-    hypers = parse_all_hyperparameters(module_path, problem.workflow)
+    submission_path = ramp_kit_dir / "submissions" / submission
+    hypers = parse_all_hyperparameters(submission_path, problem.workflow)
     hyper_names = [f"hyper_{h.name}" for h in hypers]
     hyper_index_names = [f"{hn}_i" for hn in hyper_names]
     hyper_grid_sizes = [len(h.values) for h in hypers]
 
     score_f_names = glob.glob(
-        f"{ramp_kit_dir}/submissions/{submission}_hyperopt*/training_output/fold*/scores.csv"
+        f"{str(ramp_kit_dir)}/submissions/{submission}_hyperopt*/training_output/fold*/scores.csv"
     )
     row_dicts = []
     for score_f_name in score_f_names:
@@ -401,17 +550,17 @@ def get_hyperopt_score_summary(
         if fold_idxs is None or fold_idx in fold_idxs:
             row_dict["hyperopt_submission"] = score_f_name.split("/")[-4]
             row_dict["fold_idx"] = fold_idx
-            hyper_module_path = (
-                Path(ramp_kit_dir) / "submissions" / row_dict["hyperopt_submission"]
+            hyper_submission_path = (
+                ramp_kit_dir / "submissions" / row_dict["hyperopt_submission"]
             )
             hyper_hypers = parse_all_hyperparameters(
-                hyper_module_path, problem.workflow
+                hyper_submission_path, problem.workflow
             )
             for h in hyper_hypers:
                 row_dict[f"hyper_{h.name}_i"] = h.default_index
                 row_dict[f"hyper_{h.name}"] = h.default
             score_df = pd.read_csv(
-                hyper_module_path
+                hyper_submission_path
                 / "training_output"
                 / f"fold_{fold_idx}"
                 / "scores.csv"
@@ -425,12 +574,9 @@ def get_hyperopt_score_summary(
     return summary_df
 
 
-@ramp_action
 def filter_full_folds(
     summary_df: pd.DataFrame,
     fold_idxs: Sequence[int],
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -459,12 +605,9 @@ def filter_full_folds(
     ]
 
 
-@ramp_action
 def get_hyperopt_score_means(
     summary_df: pd.DataFrame,
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a mean DataFrame.
 
@@ -501,12 +644,9 @@ def get_hyperopt_score_means(
     return means_df
 
 
-@ramp_action
 def get_hyperopt_score_stds(
     summary_df: pd.DataFrame,
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns an std DataFrame.
 
@@ -543,12 +683,9 @@ def get_hyperopt_score_stds(
     return stds_df
 
 
-@ramp_action
 def get_hyperopt_score_counts(
     summary_df: pd.DataFrame,
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
 ) -> pd.DataFrame:
     """Returns a count DataFrame.
 
@@ -585,12 +722,11 @@ def get_hyperopt_score_counts(
     return counts_df
 
 
-@ramp_action
 def save_hyperopt_score_summary(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Optional[Sequence[int]] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    ramp_data_dir: Optional[str] = None,
 ) -> None:
     """Saves a summary csv.
 
@@ -600,37 +736,168 @@ def save_hyperopt_score_summary(
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int, default=None
         Fold indices that the {submission}_hyperopt*'s
         have been trained on. If None, return summary of all
         folds.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     """
     print("Loading hyperopt scores.")
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     summary_df = get_hyperopt_score_summary(
-        submission, fold_idxs, ramp_kit_dir, ramp_data_dir
+        ramp_kit_dir=ramp_kit_dir,
+        submission=submission,
+        fold_idxs=fold_idxs,
+        ramp_data_dir=ramp_data_dir,
     )
-    f_name = (
-        f"{ramp_kit_dir}/submissions/{submission}/training_output/hyperopt_summary.csv"
-    )
+    training_output_path = ramp_kit_dir / "submissions" / submission / "training_output"
+    training_output_path.mkdir(parents=False, exist_ok=True)
+    f_name = training_output_path / "hyperopt_summary.csv"
     print(f"Saving hyperopt scores into {f_name}.")
-    if not os.path.exists(f"{ramp_kit_dir}/submissions/{submission}/training_output/"):
-        os.makedirs(f"{ramp_kit_dir}/submissions/{submission}/training_output/")
     summary_df.to_csv(f_name)
+
+@ramp_action
+def select_top_hyperopt(
+    ramp_kit_dir: str,
+    submission: str,
+    fold_idxs: Sequence[int],
+    score_cutoff: Optional[float] = None,
+    top_n: Optional[int] = None,
+    n_sigma: Optional[float] = None,
+    ramp_data_dir: Optional[str] = None,
+) -> List[str]:
+    """Returns submissions {submission}_hyperopt* with top score.
+
+    Selects all {submission}_hyperopt* submissions which have been
+    trained on fold_idxs. Then selects either the top_n
+    according to mean score, or those with mean score better than
+    score_cutoff, or those that are within n_sigma x SE of the top.
+    If all three are None, return all hyperopts that were trained
+    on fold_idxs.
+    Parameters
+    ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
+    submission : str
+        The name of the original hyperopted submission.
+    fold_idxs : list or generator of int
+        Fold indices that the {submission}_hyperopt*'s
+        have been trained on.
+    score_cutoff : float, default=None
+        Worst mean score of the {submission}_hyperopt*'s
+        to be returned.
+        Either score_cutoff or top_n must be non None.
+    top_n : int, default=None
+        Number of the best {submission}_hyperopt*'s
+        to be returned.
+    n_sigma : float, default=None
+        Top 20 submissions: score_cutoff = mean - sigma * n
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
+    Returns
+    -------
+    new_submissions : list of str
+        The list of selected submissions.
+    """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    score_names = [st.name for st in problem.score_types]
+    valid_score_name = f"valid_{score_names[0]}"
+    is_lower_the_better = problem.score_types[0].is_lower_the_better
+
+    print("Loading existing hyperopt submissions...")
+    summary_df = get_hyperopt_score_summary(
+        ramp_kit_dir=ramp_kit_dir,
+        submission=submission,
+        fold_idxs=fold_idxs,
+        ramp_data_dir=ramp_data_dir,
+    )
+    if len(summary_df) == 0:
+        return {"selected_submissions": [], "score_cutoff": None}
+
+    means_df = get_hyperopt_score_means(summary_df, fold_idxs)
+
+    if n_sigma is not None:
+        # foldwise means for unbiasing
+        summary_df = filter_full_folds(summary_df, fold_idxs)
+        groupby_columns = ["fold_idx"]
+        non_hyper_columns = [
+            col for col in summary_df.set_index(groupby_columns).columns
+            if col[:6] != "hyper_"
+        ]
+        agg = {
+            col: "mean" if col in non_hyper_columns else "first"
+            for col in summary_df.set_index(
+                groupby_columns + ["hyperopt_submission"]
+            ).columns
+        }
+        foldwise_means_df = summary_df.groupby(groupby_columns).agg(agg)
+        foldwise_means_df[f"{valid_score_name}_bias"] = (
+            foldwise_means_df[f"{valid_score_name}"]
+            - foldwise_means_df[f"{valid_score_name}"].mean()
+        )
+        # unbiasing summary
+        summary_df = (
+            summary_df.set_index("fold_idx")
+            .join(foldwise_means_df[[f"{valid_score_name}_bias"]])
+            .reset_index()
+        )
+        summary_df[f"{valid_score_name}_unbiased"] = (
+            summary_df[f"{valid_score_name}"]
+            - summary_df[f"{valid_score_name}_bias"]
+        )
+        # computing standard errors
+        stds_df = get_hyperopt_score_stds(summary_df, fold_idxs)
+        counts_df = get_hyperopt_score_counts(summary_df, fold_idxs)
+        counts_df["fold_count"] = counts_df["fold_idx"]
+        means_df = means_df.join(stds_df[[f"{valid_score_name}_unbiased"]])
+        means_df = means_df.join(counts_df[["fold_count"]])
+        means_df["mean_std"] = means_df[f"{valid_score_name}_unbiased"] / np.sqrt(
+            means_df["fold_count"]
+        )
+
+        means_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
+        top_mean = means_df.iloc[:top_n][valid_score_name].mean()
+        top_std = means_df.iloc[:top_n]["mean_std"].mean()
+        if is_lower_the_better:
+            score_cutoff = top_mean + n_sigma * top_std
+        else:
+            score_cutoff = top_mean - n_sigma * top_std
+
+    if score_cutoff is not None:
+        if is_lower_the_better:
+            new_submissions = means_df[means_df[valid_score_name] <= score_cutoff].index
+        else:
+            new_submissions = means_df[means_df[valid_score_name] >= score_cutoff].index
+    else:
+        sorted_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
+        if top_n is None:
+            top_n = len(sorted_df)
+        new_submissions = (sorted_df.iloc[:top_n].index)
+        score_cutoff = sorted_df.iloc[top_n - 1][valid_score_name]
+    print(f"Selected {len(new_submissions)} submissions")
+    print(f"score_cutoff = {score_cutoff}")
+
+    r = dict()
+    r["selected_submissions"] = new_submissions.to_list()
+    r["score_cutoff"] = score_cutoff
+    return r
 
 
 @ramp_action
 def rename_best_hyperopt_submissions(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Sequence[int],
     top_n: Optional[int] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    ramp_data_dir: Optional[str] = None,
 ) -> None:
     """Renames best submissions for archiving.
 
@@ -640,6 +907,8 @@ def rename_best_hyperopt_submissions(
 
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int
@@ -648,47 +917,45 @@ def rename_best_hyperopt_submissions(
     top_n : int, default=None
         Number of the best {submission}_hyperopt*'s
         to be renamed.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
     is_lower_the_better = problem.score_types[0].is_lower_the_better
 
-    module_path = Path(ramp_kit_dir) / "submissions" / submission
-    hypers = parse_all_hyperparameters(module_path, problem.workflow)
+    submission_path = Path(ramp_kit_dir) / "submissions" / submission
+    hypers = parse_all_hyperparameters(submission_path, problem.workflow)
     hyper_names = [f"hyper_{h.name}" for h in hypers]
     hyper_index_names = [f"{hn}_i" for hn in hyper_names]
 
     print("Loading hyperopt scores.")
     summary_df = get_hyperopt_score_summary(
+        ramp_kit_dir=ramp_kit_dir,
         submission=submission,
         fold_idxs=fold_idxs,
-        ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
 
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
 
-    blended_score = select_top_hyperopt_and_blend(
+    blended_return = select_top_hyperopt_and_blend(
+        ramp_kit_dir=ramp_kit_dir,
         submission=submission,
         fold_idxs=fold_idxs,
-        ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    if blended_score is not None: # None: no submissions were blended
+    if "blended_score" in blended_return.keys(): # otherwise no submissions were blended
         contributivites_df = pd.read_csv(
             f"{ramp_kit_dir}/submissions/training_output/contributivities.csv"
         )
         contributivites_df = contributivites_df.set_index("submission")
         contributivites_df["contributivity"] = (
             contributivites_df[[f for f in contributivites_df.columns if f[:5] == "fold_"]]
-            .sum(axis=1)
-            .round(3)
-            * 1000
+            .sum(axis=1).round(3) * 1000
         ).astype(int)
         contributivites_df = pd.merge(
             contributivites_df,
@@ -714,10 +981,10 @@ def rename_best_hyperopt_submissions(
 
 @ramp_action
 def delete_duplicates_hyperopt(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Sequence[int],
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    ramp_data_dir: Optional[str] = None,
 ) -> None:
     """Deletes duplicates of {submission}_hyperopt*.
 
@@ -725,23 +992,27 @@ def delete_duplicates_hyperopt(
     is exactly the same.
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int
         Fold indices that the {submission}_hyperopt*'s
         have been trained on.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     """
-
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
 
     summary_df = get_hyperopt_score_summary(
-        submission, fold_idxs, ramp_kit_dir, ramp_data_dir
+        ramp_kit_dir=ramp_kit_dir,
+        submission=submission,
+        fold_idxs=fold_idxs,
+        ramp_data_dir=ramp_data_dir,
     )
 
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
@@ -758,139 +1029,16 @@ def delete_duplicates_hyperopt(
             shutil.rmtree(Path(ramp_kit_dir) / "submissions" / submission)
 
 
-@ramp_action
-def select_top_hyperopt(
-    submission: str,
-    fold_idxs: Sequence[int],
-    score_cutoff: Optional[float] = None,
-    top_n: Optional[int] = None,
-    n_sigma: Optional[float] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
-) -> List[str]:
-    """Returns submissions {submission}_hyperopt* with top score.
-
-    Selects all {submission}_hyperopt* submissions which have been
-    trained on fold_idxs. Then selects either the top_n
-    according to mean score, or those with mean score better than
-    score_cutoff. If both are None, return all hyperopts that were trained
-    on fold_idxs.
-    Parameters
-    ----------
-    submission : str
-        The name of the original hyperopted submission.
-    fold_idxs : list or generator of int
-        Fold indices that the {submission}_hyperopt*'s
-        have been trained on.
-    score_cutoff : float, default=None
-        Worst mean score of the {submission}_hyperopt*'s
-        to be returned.
-        Either score_cutoff or top_n must be non None.
-    top_n : int, default=None
-        Number of the best {submission}_hyperopt*'s
-        to be returned.
-    n_sigma : float, default=None
-        Top 20 submissions: score_cutoff = mean - sigma * n
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
-    Returns
-    -------
-    new_submissions : list of str
-        The list of selected submissions.
-    """
-
-    problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    score_names = [st.name for st in problem.score_types]
-    valid_score_name = f"valid_{score_names[0]}"
-    is_lower_the_better = problem.score_types[0].is_lower_the_better
-
-    print("Loading existing hyperopt submissions...")
-    summary_df = get_hyperopt_score_summary(
-        submission, fold_idxs, ramp_kit_dir, ramp_data_dir
-    )
-    if len(summary_df) == 0:
-        return []
-
-    means_df = get_hyperopt_score_means(summary_df, fold_idxs)
-
-    if n_sigma is not None:
-        # foldwise means for unbiasing
-        summary_df = filter_full_folds(summary_df, fold_idxs)
-        groupby_columns = ["fold_idx"]
-        non_hyper_columns = [
-            col
-            for col in summary_df.set_index(groupby_columns).columns
-            if col[:6] != "hyper_"
-        ]
-        agg = {
-            col: "mean" if col in non_hyper_columns else "first"
-            for col in summary_df.set_index(
-                groupby_columns + ["hyperopt_submission"]
-            ).columns
-        }
-        foldwise_means_df = summary_df.groupby(groupby_columns).agg(agg)
-        foldwise_means_df[f"{valid_score_name}_bias"] = (
-            foldwise_means_df[f"{valid_score_name}"]
-            - foldwise_means_df[f"{valid_score_name}"].mean()
-        )
-        # unbiasing summary
-        summary_df = (
-            summary_df.set_index("fold_idx")
-            .join(foldwise_means_df[[f"{valid_score_name}_bias"]])
-            .reset_index()
-        )
-        summary_df[f"{valid_score_name}_unbiased"] = (
-            summary_df[f"{valid_score_name}"] - summary_df[f"{valid_score_name}_bias"]
-        )
-        # computing standard errors
-        stds_df = get_hyperopt_score_stds(summary_df, fold_idxs)
-        counts_df = get_hyperopt_score_counts(summary_df, fold_idxs)
-        counts_df["fold_count"] = counts_df["fold_idx"]
-        means_df = means_df.join(stds_df[[f"{valid_score_name}_unbiased"]])
-        means_df = means_df.join(counts_df[["fold_count"]])
-        means_df["mean_std"] = means_df[f"{valid_score_name}_unbiased"] / np.sqrt(
-            means_df["fold_count"]
-        )
-
-        means_df = means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
-        top_mean = means_df.iloc[:top_n][valid_score_name].mean()
-        top_std = means_df.iloc[:top_n]["mean_std"].mean()
-        if is_lower_the_better:
-            score_cutoff = top_mean + n_sigma * top_std
-        else:
-            score_cutoff = top_mean - n_sigma * top_std
-        print(f"score_cutoff = {score_cutoff}")
-
-    if score_cutoff is not None:
-        if is_lower_the_better:
-            new_submissions = means_df[means_df[valid_score_name] <= score_cutoff].index
-        else:
-            new_submissions = means_df[means_df[valid_score_name] >= score_cutoff].index
-    elif top_n is not None:
-        new_submissions = (
-            means_df.sort_values(valid_score_name, ascending=is_lower_the_better)
-            .iloc[:top_n]
-            .index
-        )
-    else:
-        new_submissions = means_df.index
-    print(f"Selected {len(new_submissions)} subissions")
-    return new_submissions.to_list()
-
-
-@ramp_action
 def select_top_hyperopt_and_train(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Sequence[int],
-    trained_fold_idxs: Sequence[int] = None,
+    trained_fold_idxs: Optional[Sequence[int]] = None,
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
     ignore_errors: Optional[bool] = False,
+    ramp_data_dir: Optional[str] = None,
 ):
     """Selects and trains submissions {submission}_hyperopt*.
 
@@ -910,6 +1058,8 @@ def select_top_hyperopt_and_train(
     of larger folds fold_idxs = [700, 701, 702, 703, 704].
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int
@@ -930,48 +1080,50 @@ def select_top_hyperopt_and_train(
         top_n must be non None.
     n_sigma : float, default=None
         Top 20 submissions: score_cutoff = mean - sigma * n
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     Returns
     -------
     new_submissions : list of str
         The list of selected submissions.
     """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     if trained_fold_idxs is None:
-        new_submissions = _select_all_hyperopt(submission, ramp_kit_dir)
+        new_submissions = _select_all_hyperopt(
+            ramp_kit_dir = ramp_kit_dir,
+            submission = submission,
+        )
     else:
         new_submissions = select_top_hyperopt(
-            submission,
-            trained_fold_idxs,
-            score_cutoff,
-            top_n,
-            n_sigma,
-            ramp_kit_dir,
-            ramp_data_dir,
-        )
+            ramp_kit_dir = ramp_kit_dir,
+            submission = submission,
+            fold_idxs = trained_fold_idxs,
+            score_cutoff = score_cutoff,
+            top_n = top_n,
+            n_sigma = n_sigma,
+            ramp_data_dir = ramp_data_dir,
+        )["selected_submissions"]
     for i, new_submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
         train(
-            new_submission,
+            ramp_kit_dir=ramp_kit_dir,
+            submission=new_submission,
             fold_idxs=fold_idxs,
             bag=False,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
             ignore_errors=ignore_errors,
+            ramp_data_dir=ramp_data_dir,
         )
 
 
-@ramp_action
 def select_top_hyperopt_and_blend(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
-    ramp_kit_dir: str = ".",
-    ramp_data_dir: str = ".",
+    ramp_data_dir: Optional[str] = None,
 ) -> None:
     """Selects and blends submissions {submission}_hyperopt*.
 
@@ -979,6 +1131,8 @@ def select_top_hyperopt_and_blend(
     which have been trained on fold_idxs, and blends them.
     Parameters
     ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
     fold_idxs : list or generator of int
@@ -992,18 +1146,26 @@ def select_top_hyperopt_and_blend(
         trained.
     n_sigma : float, default=None
         Top 20 submissions: score_cutoff = mean - sigma * n
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
     """
     submissions = select_top_hyperopt(
-        submission, fold_idxs, score_cutoff, top_n, n_sigma, ramp_kit_dir, ramp_data_dir
+        ramp_kit_dir = ramp_kit_dir,
+        submission = submission,
+        fold_idxs = fold_idxs,
+        score_cutoff = score_cutoff,
+        top_n = top_n,
+        n_sigma = n_sigma,
+        ramp_data_dir = ramp_data_dir,
+    )["selected_submissions"]
+    return blend(
+        ramp_kit_dir = ramp_kit_dir,
+        submissions = submissions,
+        fold_idxs = fold_idxs,
+        ramp_data_dir = ramp_data_dir,
     )
-    return blend(submissions, fold_idxs, ramp_kit_dir, ramp_data_dir)
 
-
-@ramp_action
 def select_top_hyperopt_and_submit_hybrid(
     new_submission: str,
     parent_submissions: dict,
@@ -1073,28 +1235,28 @@ def select_top_hyperopt_and_submit_hybrid(
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     new_submissions = select_top_hyperopt(
+        ramp_kit_dir=ramp_kit_dir,
         submission=parent_submissions[select_element],
         fold_idxs=fold_idxs,
         score_cutoff=score_cutoff,
         top_n=top_n,
-        ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
-    )
+    )["selected_submissions"]
     for submission in new_submissions:
         parent_submissions[select_element] = submission
         submit_hybrid(
             "__new_submission__", parent_submissions, ramp_kit_dir, ramp_data_dir
         )
-        module_path = Path(ramp_kit_dir) / "submissions" / "__new_submission__"
+        submission_path = Path(ramp_kit_dir) / "submissions" / "__new_submission__"
         if keep_hypers:
-            orig_module_path = Path(ramp_kit_dir) / "submissions" / submission
+            orig_submission_path = Path(ramp_kit_dir) / "submissions" / submission
             hypers_per_workflow_element = {}
             for wen in problem.workflow.element_names:
                 hypers_per_workflow_element[wen] = parse_hyperparameters(
-                    orig_module_path, wen
+                    orig_submission_path, wen
                 )
-            write_hyperparameters(module_path, module_path, hypers_per_workflow_element)
-        hypers = parse_all_hyperparameters(module_path, problem.workflow)
+            write_hyperparameters(submission_path, submission_path, hypers_per_workflow_element)
+        hypers = parse_all_hyperparameters(submission_path, problem.workflow)
         hyper_indices = [h.default_index for h in hypers]
         hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[
             :10
@@ -1105,55 +1267,34 @@ def select_top_hyperopt_and_submit_hybrid(
             / f"{new_submission}_hyperopt_{hyper_hash}"
         )
         if not output_submission_dir.exists():  # force resubmit perhaps?
-            shutil.move(module_path, output_submission_dir)
+            shutil.move(submission_path, output_submission_dir)
 
 
-@ramp_action
 def clean_up_predictions(
+    ramp_kit_dir: str,
     submission: str,
     fold_idxs: Sequence[int],
     score_cutoff: Optional[float] = None,
-    ramp_kit_dir: str = ".",
 ) -> None:
     """
 
     Parameters
     ----------
-    new_submission : str
-        The name of the new submission to be submitted.
-    parent_submissions : list of str
-        The names of the submissions from which the workflow elements
-        will come.
-    select_idx : int
-        The index of the parent submission whose (typically)
-        hyperopted children will be used in the hybrid.
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
+    submission : str
+        The name of the new submission to be cleaned.
     fold_idxs : list or generator of int
-        Fold indices to train selected submissions on.
+        Fold indices to select submissions on.
     score_cutoff : float, default=None
         Worst mean score of the {submission}_hyperopt*'s to be
         trained.
         Either score_cutoff or top_n must be non None.
-    top_n : int, default=None
-        Number of the best {submission}_hyperopt*'s to be
-        trained.
-        Either score_cutoff or top_n must be non None.
-    keep_hypers : bool, default=False
-        If True, hypers of the top
-        {parent_submissions[select_idx]}_hyperopt* will be kept
-        even for the workflow elements that do not come
-        from the {parent_submissions[select_idx]}_hyperopt*.
-        Only works if all the parent submissions share the same
-        hypers.
-    ramp_kit_dir : str, default='.'
-        The directory of the ramp-kit.
-    ramp_data_dir : str, default='.'
-        The directory of the data.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     if score_cutoff is None:
         submissions_f_names = glob.glob(f"{ramp_kit_dir}/submissions/{submission}*")
     else:
-        # ,,,
         submissions = select_top_hyperopt(
             submission=submission,
             fold_idxs=fold_idxs,
@@ -1163,9 +1304,9 @@ def clean_up_predictions(
         submissions_f_names = [
             f"submissions/{submission}" for submission in submissions
         ]
-    for module_path in submissions_f_names:
+    for submission_path in submissions_f_names:
         for fold_idx in fold_idxs:
-            fold_path = Path(module_path) / "training_output" / f"fold_{fold_idx}"
+            fold_path = Path(submission_path) / "training_output" / f"fold_{fold_idx}"
             for f_name in [
                 fold_path / "y_pred_test.npz",
                 fold_path / "y_pred_train.npz",

@@ -14,28 +14,6 @@ score_name_type_map = {
     'r2' : rw.score_types.R2,
 }
 
-def convert_ramp_dirs(ramp_kit_dir: Path | str, ramp_data_dir: Optional[Path | str]) -> Tuple[Path, Path]:
-    """Convert ramp dirs to Path.
-
-    Remember that ramp_data_dir does not include the 
-    /data subfolder, it is usually the same as ramp_kit_dir,
-    but can point to an alternative data source for the same
-    kit.
-    Args:
-        ramp_kit_dir (str): ramp_kit_dir
-        ramp_data_dir (str): ramp_data_dir
-
-    Returns:
-        (Path, Path): converted dirs
-    """
-    ramp_kit_dir = Path(ramp_kit_dir)
-    if ramp_data_dir is None:
-        ramp_data_dir = Path(ramp_kit_dir)
-    else:
-        ramp_data_dir = Path(ramp_data_dir)
-    return ramp_kit_dir, ramp_data_dir
-
-
 def load_template(package, template_path) -> str:
     """Loads a template from the package
 
