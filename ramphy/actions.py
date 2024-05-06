@@ -7,6 +7,7 @@ import json
 import shutil
 import pickle
 import hashlib
+import pathlib
 import datetime
 import itertools
 import functools
@@ -475,29 +476,6 @@ def submit_hybrid(
         )
         shutil.copy(from_file, to_file)
         print(f"Copying {from_file} to {to_file}")
-
-
-def _select_all_hyperopt(
-    ramp_kit_dir: str,
-    submission: str,
-) -> List[str]:
-    """Returns all submissions {submission}_hyperopt*.
-
-    Parameters
-    ----------
-    ramp_kit_dir : str
-        The directory of the ramp-kit.
-    submission : str
-        The name of the original hyperopted submission.
-    Returns
-    -------
-    new_submissions : list of str
-        The list of selected submissions.
-    """
-    submissions_f_names = glob.glob(
-        f"{ramp_kit_dir}/submissions/{submission}_hyperopt*"
-    )
-    return submissions_f_names
 
 
 def get_hyperopt_score_summary(
@@ -1090,10 +1068,9 @@ def select_top_hyperopt_and_train(
     """
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     if trained_fold_idxs is None:
-        new_submissions = _select_all_hyperopt(
-            ramp_kit_dir = ramp_kit_dir,
-            submission = submission,
-        )
+        submissions_paths = glob.glob(
+            f"{ramp_kit_dir}/submissions/{submission}_hyperopt*")
+        new_submissions = [pathlib.PurePath(path) for path in submissions_paths]
     else:
         new_submissions = select_top_hyperopt(
             ramp_kit_dir = ramp_kit_dir,
