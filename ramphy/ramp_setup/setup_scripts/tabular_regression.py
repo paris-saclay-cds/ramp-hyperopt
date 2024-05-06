@@ -55,7 +55,7 @@ def tabular_regression_setup(
             new_feature_types[new_col] = col_type
     train_data = train_data.rename(
         columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
-    test_data = train_data.rename(
+    test_data = test_data.rename(
         columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
     feature_types = metadata["data_description"]["feature_types"] = new_feature_types    
 
