@@ -58,38 +58,42 @@ def submit_to_kaggle(
     ramp_kit_dir: Path | str,
     competition_name: str,
     submission_description: Optional[str] = None,
-    submit_blended: bool = False,
 ) -> Dict:
     """Submits the predictions to Kaggle
 
     Args:
-        submission (str): Submission name
-        ramp_kit_dir (Path | str): Kit dir
+        submission (str): RAMP Submission name. If blended it submits the blended results
+        ramp_kit_dir (Path | str): Path to ramp kit
+        competition_name (str): Kaggle competition name
+        submission_description (Optional[str], optional): Description to Kaggle submission. Defaults to None.
+
+    Returns:
+        Dict: _description_
     """
     kaggle_api = KaggleApi()
     kaggle_api.authenticate()
     action_output = {}
 
-    if submission_description is None:
-        submission_description = submission
-
-    file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
-    assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
-    assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
-    submission_status = kaggle_api.competition_submit(
-        file_name=file_path, message=submission_description, competition=competition_name
-    )
-    action_output["submission_status"] = submission_status
-    action_output["kaggle_submission"] = submission_description
-
-    if submit_blended:
+    if submission == "blended":
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-        assert file_path.exists(), "No bagged test data found."
-        submission_description = f"Bagged {Path(ramp_kit_dir).name}"
+        assert file_path.exists(), "No blended test data found."
+        submission_description = f"Blended {Path(ramp_kit_dir).name}"
         submission_status = kaggle_api.competition_submit(
             file_name=file_path, message=submission_description, competition=competition_name
         )
-        action_output["bagged_submission_status"] = submission_status
-        action_output["bagged_kaggle_submission"] = submission_description
+        action_output["submission_status"] = submission_status
+        action_output["kaggle_submission"] = submission_description
+    else:
+        if submission_description is None:
+            submission_description = submission
+
+        file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
+        assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
+        assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=submission_description, competition=competition_name
+        )
+        action_output["submission_status"] = submission_status
+        action_output["kaggle_submission"] = submission_description
 
     return action_output
