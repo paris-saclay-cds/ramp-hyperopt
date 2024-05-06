@@ -1,10 +1,14 @@
 import json
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
 
+from kaggle.api.kaggle_api_extended import KaggleApi
+
+import ramphy as rh
 from ramphy import ramp_setup as rs
 
 
+@rh.actions.ramp_action
 def submit_llm_feature_rejector(
     asking_function: Callable,
     parser_function: Callable,
@@ -23,7 +27,7 @@ def submit_llm_feature_rejector(
         submission (Path | str): Name of the submission
         ramp_data_dir (Optional[str  |  Path], optional): Path of the ramp data dir. Defaults to None.
     """
-    ramp_kit_dir, ramp_data_dir = rs.utils.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    ramp_kit_dir, ramp_data_dir = rh.actions.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
@@ -46,3 +50,46 @@ def submit_llm_feature_rejector(
         ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_llm_drop_{feature_to_drop}.py", "w"
     ) as f_out:
         f_out.write(dp_code)
+
+
+@rh.actions.ramp_action
+def submit_to_kaggle(
+    submission: str,
+    ramp_kit_dir: Path | str,
+    competition_name: str,
+    submission_description: Optional[str] = None,
+    submit_blended: bool = False,
+) -> Dict:
+    """Submits the predictions to Kaggle
+
+    Args:
+        submission (str): Submission name
+        ramp_kit_dir (Path | str): Kit dir
+    """
+    kaggle_api = KaggleApi()
+    kaggle_api.authenticate()
+    action_output = {}
+
+    if submission_description is None:
+        submission_description = submission
+
+    file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
+    assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
+    assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
+    submission_status = kaggle_api.competition_submit(
+        file_name=file_path, message=submission_description, competition=competition_name
+    )
+    action_output["submission_status"] = submission_status
+    action_output["kaggle_submission"] = submission_description
+
+    if submit_blended:
+        file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
+        assert file_path.exists(), "No bagged test data found."
+        submission_description = f"Bagged {Path(ramp_kit_dir).name}"
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=submission_description, competition=competition_name
+        )
+        action_output["bagged_submission_status"] = submission_status
+        action_output["bagged_kaggle_submission"] = submission_description
+
+    return action_output
