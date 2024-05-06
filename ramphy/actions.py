@@ -196,7 +196,7 @@ def hyperopt(
         fold_idxs=fold_idxs,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
-    )
+    )["selected_submissions"]
     previous_submissions = existing_submissions.copy()
     n_existing_submissions = len(existing_submissions)
     n_existing_trials = n_existing_submissions * len(fold_idxs)
