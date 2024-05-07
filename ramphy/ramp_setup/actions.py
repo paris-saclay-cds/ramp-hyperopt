@@ -53,10 +53,10 @@ def submit_llm_feature_rejector(
 
 
 @rh.actions.ramp_action
-def submit_to_kaggle(
+def kaggle_submit(
     submission: str,
     ramp_kit_dir: Path | str,
-    competition_name: str,
+    kaggle_name: str,
     submission_description: Optional[str] = None,
 ) -> Dict:
     """Submits the predictions to Kaggle
@@ -79,7 +79,7 @@ def submit_to_kaggle(
         assert file_path.exists(), "No blended test data found."
         submission_description = f"Blended {Path(ramp_kit_dir).name}"
         submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=submission_description, competition=competition_name
+            file_name=file_path, message=submission_description, competition=kaggle_name
         )
         action_output["submission_status"] = submission_status
         action_output["kaggle_submission"] = submission_description
@@ -91,7 +91,7 @@ def submit_to_kaggle(
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
         assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
         submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=submission_description, competition=competition_name
+            file_name=file_path, message=submission_description, competition=kaggle_name
         )
         action_output["submission_status"] = submission_status
         action_output["kaggle_submission"] = submission_description
