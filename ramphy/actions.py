@@ -47,6 +47,15 @@ class RampAction():
         action_function = getattr(module, self.name)
         return action_function(*self.args, **self.kwargs)
 
+    def save(self, f_name):
+        f_name = f'{f_name}.pkl'
+        with open(f_name, 'wb') as f: 
+            pickle.dump(self, f)
+
+def load_ramp_action(f_name: Path) -> RampAction:
+    with open(f_name, "rb") as f:
+        return pickle.load(f)
+
 def ramp_action(action_function):
     """ """
     global RAMP_ACTIONS
@@ -56,32 +65,31 @@ def ramp_action(action_function):
         global EXECUTE_PLAN
         # If EXECUTE_PLAN is False, we don't execute the action, only dump it
         # into <ramp_kit_dir>/actions.
-        ramp_action = RampAction(
+        ramp_action_object = RampAction(
             module = action_function.__module__,
             name = action_function.__name__,
             args = args,
             kwargs = kwargs,
         )
-        ramp_action.start_time = datetime.datetime.utcnow()
+        ramp_action_object.start_time = datetime.datetime.utcnow()
+        action_return = {}
         if EXECUTE_PLAN:
             action_return = action_function(*args, **kwargs)
-            ramp_action.stop_time = datetime.datetime.utcnow()
+            ramp_action_object.stop_time = datetime.datetime.utcnow()
             try:
                 for key, value in action_return.items():
-                    setattr(ramp_action, key, value)
+                    setattr(ramp_action_object, key, value)
             except:
                 pass
         ramp_kit_dir = kwargs['ramp_kit_dir']
         actions_dir = Path(ramp_kit_dir) / 'actions'
         actions_dir.mkdir(parents=False, exist_ok=True)
-        pickle_f_name = actions_dir / f'{ramp_action.start_time}.pkl'
-        with open(pickle_f_name, 'wb') as f: 
-            pickle.dump(ramp_action, f)
-        if EXECUTE_PLAN:
-            return action_return
-        else:
-            return {}
+        f_name = actions_dir / f'{ramp_action_object.start_time}'
+        ramp_action_object.save(f_name)
+        return action_return
+
     return ramp_decorator
+
 
 def _bagged_score(score_type, bagged_f_name):
     bagged_scores_df = pd.read_csv(bagged_f_name)
@@ -316,7 +324,6 @@ def train(
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     fold_ixs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
-
     scores = dict()
     try:
         rw.utils.testing.assert_submission(
