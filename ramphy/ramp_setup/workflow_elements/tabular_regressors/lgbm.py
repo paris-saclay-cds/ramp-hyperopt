@@ -15,9 +15,8 @@ reg_alpha = Hyperparameter(dtype='float', default=2.0, values=[0.0, 0.1, 0.2, 0.
 reg_lambda = Hyperparameter(dtype='float', default=5.0, values=[0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0])
 subsample = Hyperparameter(dtype='float', default=0.9, values=[0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
 max_bin = Hyperparameter(dtype='int', default=256, values=[256, 512, 1024])
-bagging_freq = Hyperparameter(dtype='int', default=1, values=[0, 1, 5, 10])
 min_data_in_leaf = Hyperparameter(dtype='int', default=1, values=[1, 5, 10, 20, 50, 100, 200, 500, 700])
-boosting_type = Hyperparameter(dtype='str', default='gbdt', values=['gbdt', 'dart', 'goss'])
+boosting_type = Hyperparameter(dtype='str', default='gbdt_5', values=['gbdt_0', 'gbdt_1', 'gbdt_5', 'gbdt_10', 'dart_0', 'dart_1', 'dart_5', 'dart_10', 'goss'])
 drop_rate = Hyperparameter(dtype='float', default=0.1, values=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
 # RAMP END HYPERPARAMETERS
 
@@ -34,8 +33,14 @@ SUBSAMPLE = float(subsample)
 MAX_BIN = int(max_bin)
 MIN_DATA_IN_LEAF = int(min_data_in_leaf)
 BOOSTING_TYPE = str(boosting_type)
-BAGGING_FREQ = int(bagging_freq)
-BAGGING_FREQ = BAGGING_FREQ if boosting_type != 'goss' else None
+if BOOSTING_TYPE[:4] == 'dart':
+    BAGGING_FREQ = int(BOOSTING_TYPE[5:])
+    BOOSTING_TYPE = 'dart'
+elif BOOSTING_TYPE[:4] == 'gbdt':
+    BAGGING_FREQ = int(BOOSTING_TYPE[5:])
+    BOOSTING_TYPE = 'gbdt'
+else:
+    BAGGING_FREQ = None
 DROP_RATE = float(drop_rate)
 
 class Regressor(BaseEstimator):
@@ -65,7 +70,8 @@ class Regressor(BaseEstimator):
             min_data_in_leaf=MIN_DATA_IN_LEAF,
             boosting_type=BOOSTING_TYPE,
             drop_rate=DROP_RATE,
-            objective= self.objective,
+            objective=self.objective,
+            verbose=-1,
         )
         self.reg.fit(X, y)
 
