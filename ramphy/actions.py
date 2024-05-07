@@ -28,6 +28,8 @@ from pathlib import Path
 from ray.tune.error import TuneError
 
 RAMP_ACTIONS = dict()
+# Set it to False in script to only dump action functions to turn into a plan
+EXECUTE_PLAN = True
 
 class RampAction():
     def __init__(self, module, name, args=(), kwargs={}):
@@ -51,6 +53,9 @@ def ramp_action(action_function):
     RAMP_ACTIONS[f'{action_function.__module__}.{action_function.__name__}'] = action_function
     @functools.wraps(action_function)
     def ramp_decorator(*args, **kwargs):
+        global EXECUTE_PLAN
+        # If EXECUTE_PLAN is False, we don't execute the action, only dump it
+        # into <ramp_kit_dir>/actions.
         ramp_action = RampAction(
             module = action_function.__module__,
             name = action_function.__name__,
@@ -58,22 +63,24 @@ def ramp_action(action_function):
             kwargs = kwargs,
         )
         ramp_action.start_time = datetime.datetime.utcnow()
-        action_return = action_function(*args, **kwargs)
-        ramp_action.stop_time = datetime.datetime.utcnow()
-        try:
-            for key, value in action_return.items():
-                setattr(ramp_action, key, value)
-        except:
-            pass
-        ramp_kit_dir = '.'
-        if 'ramp_kit_dir' in kwargs.keys():
-            ramp_kit_dir = kwargs['ramp_kit_dir']
+        if EXECUTE_PLAN:
+            action_return = action_function(*args, **kwargs)
+            ramp_action.stop_time = datetime.datetime.utcnow()
+            try:
+                for key, value in action_return.items():
+                    setattr(ramp_action, key, value)
+            except:
+                pass
+        ramp_kit_dir = kwargs['ramp_kit_dir']
         actions_dir = Path(ramp_kit_dir) / 'actions'
         actions_dir.mkdir(parents=False, exist_ok=True)
         pickle_f_name = actions_dir / f'{ramp_action.start_time}.pkl'
         with open(pickle_f_name, 'wb') as f: 
             pickle.dump(ramp_action, f)
-        return action_return    
+        if EXECUTE_PLAN:
+            return action_return
+        else:
+            return {}
     return ramp_decorator
 
 def _bagged_score(score_type, bagged_f_name):
@@ -192,12 +199,16 @@ def hyperopt(
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     fold_ixs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
 
-    existing_submissions = select_top_hyperopt(
+    top_hyperopt_dict = select_top_hyperopt(
+        ramp_kit_dir=ramp_kit_dir,
         submission=submission,
         fold_idxs=fold_idxs,
-        ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
-    )["selected_submissions"]
+    )
+    if "selected_submissions" in top_hyperopt_dict:
+        existing_submissions = top_hyperopt_dict["selected_submissions"]
+    else:
+        existing_submissions = []
     previous_submissions = existing_submissions.copy()
     n_existing_submissions = len(existing_submissions)
     n_existing_trials = n_existing_submissions * len(fold_idxs)
@@ -234,12 +245,16 @@ def hyperopt(
             )
         except Exception as e:
             exception = e        
-        existing_submissions = select_top_hyperopt(
+        top_hyperopt_dict = select_top_hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
             fold_idxs=fold_idxs,
             ramp_data_dir=ramp_data_dir,
-        )["selected_submissions"]
+        )
+        if "selected_submissions" in top_hyperopt_dict:
+            existing_submissions = top_hyperopt_dict["selected_submissions"]
+        else:
+            existing_submissions = []
         n_trained_submissions = len(existing_submissions) - n_existing_submissions
         # We raise only if there was no new submissions trained
         if n_trained_submissions <= 0:
@@ -749,7 +764,7 @@ def select_top_hyperopt(
     top_n: Optional[int] = None,
     n_sigma: Optional[float] = None,
     ramp_data_dir: Optional[str] = None,
-) -> List[str]:
+) -> Dict:
     """Returns submissions {submission}_hyperopt* with top score.
 
     Selects all {submission}_hyperopt* submissions which have been
@@ -1072,7 +1087,7 @@ def select_top_hyperopt_and_train(
             f"{ramp_kit_dir}/submissions/{submission}_hyperopt*")
         new_submissions = [pathlib.PurePath(path) for path in submissions_paths]
     else:
-        new_submissions = select_top_hyperopt(
+        top_hyperopt_dict = select_top_hyperopt(
             ramp_kit_dir = ramp_kit_dir,
             submission = submission,
             fold_idxs = trained_fold_idxs,
@@ -1080,7 +1095,11 @@ def select_top_hyperopt_and_train(
             top_n = top_n,
             n_sigma = n_sigma,
             ramp_data_dir = ramp_data_dir,
-        )["selected_submissions"]
+        )
+        if "selected_submissions" in top_hyperopt_dict:
+            new_submissions = top_hyperopt_dict["selected_submissions"]
+        else:
+            new_submissions = []
     for i, new_submission in enumerate(new_submissions):
         print(f"Training submission {i}/{len(new_submissions)}")
         train(
@@ -1127,7 +1146,7 @@ def select_top_hyperopt_and_blend(
         Alternative ramp_kit_dir for using another data set. If None,
         set to ramp_kit_dir.
     """
-    submissions = select_top_hyperopt(
+    top_hyperopt_dict = select_top_hyperopt(
         ramp_kit_dir = ramp_kit_dir,
         submission = submission,
         fold_idxs = fold_idxs,
@@ -1135,7 +1154,11 @@ def select_top_hyperopt_and_blend(
         top_n = top_n,
         n_sigma = n_sigma,
         ramp_data_dir = ramp_data_dir,
-    )["selected_submissions"]
+    )
+    if "selected_submissions" in top_hyperopt_dict:
+        submissions = top_hyperopt_dict["selected_submissions"]
+    else:
+        submissions = []
     return blend(
         ramp_kit_dir = ramp_kit_dir,
         submissions = submissions,
@@ -1211,14 +1234,18 @@ def select_top_hyperopt_and_submit_hybrid(
         The directory of the data.
     """
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    new_submissions = select_top_hyperopt(
+    top_hyperopt_dict = select_top_hyperopt(
         ramp_kit_dir=ramp_kit_dir,
         submission=parent_submissions[select_element],
         fold_idxs=fold_idxs,
         score_cutoff=score_cutoff,
         top_n=top_n,
         ramp_data_dir=ramp_data_dir,
-    )["selected_submissions"]
+    )
+    if "selected_submissions" in top_hyperopt_dict:
+        new_submissions = top_hyperopt_dict["selected_submissions"]
+    else:
+        new_submissions = []
     for submission in new_submissions:
         parent_submissions[select_element] = submission
         submit_hybrid(
@@ -1272,12 +1299,16 @@ def clean_up_predictions(
     if score_cutoff is None:
         submissions_f_names = glob.glob(f"{ramp_kit_dir}/submissions/{submission}*")
     else:
-        submissions = select_top_hyperopt(
+        top_hyperopt_dict = select_top_hyperopt(
+            ramp_kit_dir=ramp_kit_dir,
             submission=submission,
             fold_idxs=fold_idxs,
             score_cutoff=score_cutoff,
-            ramp_kit_dir=ramp_kit_dir,
         )
+        if "selected_submissions" in top_hyperopt_dict:
+            submissions = top_hyperopt_dict["selected_submissions"]
+        else:
+            submissions = []
         submissions_f_names = [
             f"submissions/{submission}" for submission in submissions
         ]
