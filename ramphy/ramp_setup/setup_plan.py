@@ -2,6 +2,8 @@ from pathlib import Path
 
 from ramphy.actions import RampAction
 
+DOWNLOAD_DIR = "/home/gpaolo/src/pangu-kits/playground-series-s3e14/data"
+
 RAMP_KIT_NAME = "kaggle_blueberry_v1"
 RAMP_KITS = "/home/gpaolo/src/ramp-kits/"
 RAMP_KIT_DIR = Path(RAMP_KITS) / RAMP_KIT_NAME
@@ -17,7 +19,7 @@ plan = [
         module=RAMP_SETUP_MODULE,
         name="tabular_regression_setup",
         kwargs={
-            "download_dir": "/home/gpaolo/src/pangu-kits/playground-series-s3e14/data",
+            "download_dir": DOWNLOAD_DIR,
             "ramp_kit_dir": RAMP_KIT_DIR,
         },
     ),
