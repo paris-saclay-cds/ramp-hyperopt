@@ -92,7 +92,7 @@ def test_submission(path_kit):
     )
 
     # optimization
-    regressors = ['xgboost']
+    regressors = ['lgbm']
     n_trials = 9
     top_n_for_mean = 3
     n_sigma = 2
@@ -185,7 +185,7 @@ def test_submission(path_kit):
     submissions_f_names = glob.glob(
         f'{ramp_kit_dir}/submissions/*_best_0_*')
     submissions = [f.split('/')[-1] for f in submissions_f_names]
-    submissions += ['lgbm', 'catboost']
+    submissions += ['xgboost', 'catboost']
     rh.actions.blend(
         ramp_kit_dir=ramp_kit_dir,
         submissions=submissions,

@@ -50,6 +50,8 @@ class Regressor(BaseEstimator):
             self.objective = "mse"
         elif score_name == "mae":
             self.objective = "mae"
+        elif score_name == "mape":
+            self.objective = "mape"
         else:
             raise ValueError(f"Unknown score_name {score_name}")
 
