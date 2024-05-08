@@ -32,13 +32,11 @@ REG_LAMBDA = float(reg_lambda)
 class Regressor(BaseEstimator):
     def __init__(self, metadata):
         score_name = metadata["score_name"]
-        if score_name in ["mse", "rmse"]:
+        if score_name in ["mse", "rmse", "r2"]:
             self.objective = "reg:squarederror"
         elif score_name in ["rmsle"]:
             self.objective = "reg:squaredlogerror"
         elif score_name == "mae":
-            self.objective = "reg:absoluteerror"
-        elif score_name == "r2":
             self.objective = "reg:absoluteerror"
         else:
             raise ValueError(f"Unknown score_name {score_name}")
