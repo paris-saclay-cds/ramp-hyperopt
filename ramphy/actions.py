@@ -96,6 +96,17 @@ def _bagged_score(score_type, bagged_f_name):
     valid_scores_df = bagged_scores_df[bagged_scores_df["step"] == "valid"]
     return valid_scores_df.iloc[-1][score_type.name]
 
+def load_contributivities(ramp_kit_dir):
+    contributivites_df = pd.read_csv(
+        f"{ramp_kit_dir}/submissions/training_output/contributivities.csv"
+    )
+    contributivites_df = contributivites_df.set_index("submission")
+    contributivites_df["contributivity"] = (
+        contributivites_df[[f for f in contributivites_df.columns if f[:5] == "fold_"]]
+        .sum(axis=1).round(3) * 1000
+    ).astype(int)
+    return contributivites_df
+
 def _mean_score(submission, fold_idxs, score_type, ramp_kit_dir):
     foldwise_scores = []
     for fold_idx in fold_idxs:
@@ -952,11 +963,7 @@ def rename_best_hyperopt_submissions(
         contributivites_df = pd.read_csv(
             f"{ramp_kit_dir}/submissions/training_output/contributivities.csv"
         )
-        contributivites_df = contributivites_df.set_index("submission")
-        contributivites_df["contributivity"] = (
-            contributivites_df[[f for f in contributivites_df.columns if f[:5] == "fold_"]]
-            .sum(axis=1).round(3) * 1000
-        ).astype(int)
+        contributivites_df = load_contributivities(ramp_kit_dir)
         contributivites_df = pd.merge(
             contributivites_df,
             means_df.reset_index().set_index("hyperopt_submission")[[valid_score_name]],
@@ -1113,7 +1120,7 @@ def select_top_hyperopt_and_train(
             ramp_kit_dir=ramp_kit_dir,
             submission=new_submission,
             fold_idxs=fold_idxs,
-            bag=False,
+            bag=True,
             ignore_errors=ignore_errors,
             ramp_data_dir=ramp_data_dir,
         )
