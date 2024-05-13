@@ -96,4 +96,11 @@ def kaggle_submit(
         action_output["submission_status"] = submission_status
         action_output["kaggle_submission"] = submission_description
 
+    leaderboard_raw = kaggle_api.competition_leaderboard_view(competition=kaggle_name)
+    leaderboard = {sub.teamName: sub.score for sub in leaderboard_raw}
+    action_output["leaderboard"] = leaderboard
+
+    submissions_raw = kaggle_api.competition_submissions(competition=kaggle_name)
+    action_output["submissions"] = submissions_raw
+
     return action_output
