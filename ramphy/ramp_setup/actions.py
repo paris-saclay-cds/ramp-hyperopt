@@ -52,6 +52,14 @@ def submit_llm_feature_rejector(
         f_out.write(dp_code)
 
 
+def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
+    submissions = os.listdir(str(Path(ramp_kit_dir) / "submissions"))
+    for sub in submissions:
+        if submission in sub:
+            return sub
+    raise ValueError(f"No hyperopted best submission {submission}")
+
+
 @rh.actions.ramp_action
 def kaggle_submit(
     submission: str,
@@ -86,6 +94,9 @@ def kaggle_submit(
     else:
         if submission_description is None:
             submission_description = submission
+
+        if "_best_0_" in submission:
+            submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
 
         file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
