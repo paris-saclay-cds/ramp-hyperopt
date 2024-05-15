@@ -216,7 +216,7 @@ def hyperopt(
     """
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    fold_ixs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
+    fold_idxs = _make_fold_idxs(fold_idxs, ramp_kit_dir, ramp_data_dir)
 
     top_hyperopt_dict = select_top_hyperopt(
         ramp_kit_dir=ramp_kit_dir,

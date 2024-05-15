@@ -85,4 +85,4 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
         X_prepr = pd.DataFrame(X_prepr, columns=selected_features)
         if metadata is not None:
             metadata = self.drop_metadata_features(metadata=metadata, features=self.dropped_features)
-        return X, y, metadata
+        return X_prepr, y, metadata

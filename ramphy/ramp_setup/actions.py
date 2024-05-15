@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
@@ -56,6 +57,7 @@ def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
     submissions = os.listdir(str(Path(ramp_kit_dir) / "submissions"))
     for sub in submissions:
         if submission in sub:
+            print(f"Best submission: {sub}")
             return sub
     raise ValueError(f"No hyperopted best submission {submission}")
 
@@ -115,3 +117,12 @@ def kaggle_submit(
     action_output["submissions"] = submissions_raw
 
     return action_output
+
+
+if __name__ == "__main__":
+    kaggle_submit(
+        submission="blended",
+        ramp_kit_dir="/home/gpaolo/src/ramp-kits/kaggle_blueberry_v1",
+        kaggle_name="playground-series-s3e14",
+        submission_description="BAGGED_lgbm_fe_best_0",
+    )
