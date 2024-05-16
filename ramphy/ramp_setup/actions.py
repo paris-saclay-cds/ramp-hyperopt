@@ -308,16 +308,16 @@ def kaggle_submit(
     public_score, private_score = get_submission_scores(kaggle_api, competition)
 
     if is_lower_the_better:
-        public_percentile = np.mean(public_scores > public_score)
-        private_percentile = np.mean(private_scores > private_score)
+        public_rank = np.mean(public_scores > public_score)
+        private_rank = np.mean(private_scores > private_score)
     else:
-        public_percentile = np.mean(public_scores < public_score)
-        private_percentile = np.mean(private_scores < private_score)
+        public_rank = np.mean(public_scores < public_score)
+        private_rank = np.mean(private_scores < private_score)
 
     action_output['public_score'] = public_score
     action_output['private_score'] = private_score
-    action_output['public_rank'] = public_percentile
-    action_output['private_rank'] = private_percentile
+    action_output['public_rank'] = public_rank
+    action_output['private_rank'] = private_rank
 
     return action_output
 
