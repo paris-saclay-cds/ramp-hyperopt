@@ -226,7 +226,8 @@ def get_submission_scores(
                 time.sleep(10)
             else:
                 raise RuntimeError(
-                    f"Maximum number of retries ({max_retry}) exceeded and submission " "is still being evaluated by Kaggle. Consider increasing max_retry")
+                    f"Maximum number of retries ({max_retry}) exceeded and submission "
+                    "is still being evaluated by Kaggle. Consider increasing max_retry")
 
     public_score = kaggle_api.string(getattr(submission_kaggle_id, "publicScore"))
     public_score = float(public_score)
