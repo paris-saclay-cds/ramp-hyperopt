@@ -235,6 +235,7 @@ def hyperopt(
         n_total_trials = n_trials
     else:
         n_total_trials = n_trials + n_existing_trials
+    n_exceptions = 0
     while True:
         n_trials_remaining = n_total_trials - n_existing_trials
         print(f'remaining trials = {n_trials_remaining}')
@@ -275,9 +276,18 @@ def hyperopt(
         else:
             existing_submissions = []
         n_trained_submissions = len(existing_submissions) - n_existing_submissions
-        # We raise only if there was no new submissions trained
+        # We raise only if there was no new submissions trained,
+        # and it happened 10x in a row
         if n_trained_submissions <= 0:
-            raise exception
+            if n_exceptions > 10:
+                r = dict()
+                r["created_submissions"] = []
+                r["mean_scores"] = {}
+                return r
+            else:
+                n_exceptions += 1
+        else:
+            n_exceptions = 0
         n_existing_submissions = len(existing_submissions)
         n_existing_trials = n_existing_submissions * len(fold_idxs)
     r = dict()
@@ -456,9 +466,12 @@ def blend(
             output_path=str(output_path),
             fold_idxs=fold_idxs,
         )
-    
+        r = {}
         bagged_f_name = output_path / "bagged_scores_combined.csv"
-        return {"blended_score": _bagged_score(problem.score_types[0], bagged_f_name)}
+        r["blended_score"] = _bagged_score(problem.score_types[0], bagged_f_name)
+        contributivities_df = load_contributivities(ramp_kit_dir)
+        r["contributivities"] = contributivities_df["contributivity"].to_dict()
+        return r
     else:
         return {}
 
