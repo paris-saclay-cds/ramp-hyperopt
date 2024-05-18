@@ -1,9 +1,19 @@
+import os
 import json
+import time
+import zipfile
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
+import csv
+from io import StringIO
 
+import requests
 from kaggle.api.kaggle_api_extended import KaggleApi
 
+import numpy as np
+import pandas as pd
+
+import rampwf as rw
 import ramphy as rh
 from ramphy import ramp_setup as rs
 
@@ -52,48 +62,270 @@ def submit_llm_feature_rejector(
         f_out.write(dp_code)
 
 
+def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
+    submissions = os.listdir(str(Path(ramp_kit_dir) / "submissions"))
+    for sub in submissions:
+        if submission in sub:
+            print(f"Best submission: {sub}")
+            return sub
+    raise ValueError(f"No hyperopted best submission {submission}")
+
+
+def download_file(url: str, destination: Path):
+    """Downloads a file from the specified URL
+
+    Saves the file to the provided destination path.
+
+    Args:
+        url (str): The URL to download the file from.
+        destination (str): The local path to save the downloaded file.
+    """
+    try:
+        response = requests.get(url, stream=True, verify=False)
+        response.raise_for_status()  # raises an HTTPError for bad responses
+
+        with open(destination, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        print("Download complete. File saved to:", destination)
+    except requests.RequestException as e:
+        print("Error downloading the file:", e)
+
+
+def download_private_leaderboard(
+    kaggle_api: KaggleApi, competition: str, zip_destination: Path):
+    """Downloads private leaderboard.
+
+    This is not supported by the Kaggle API so we implement it ourselves as there is
+    a link on the leaderboard webpage to download it.
+
+    Args:
+        kaggle_api (object): KaggleAPI instance
+        competition (str): Identifier of the competition
+    """
+    # the url that is required to download the private leaderboard needs the numeric
+    # identifier of the competition, we first retrieve it.
+    # using 'default' for the group parameter only returns the active competitions so
+    # we use the entered one.
+    result = kaggle_api.process_response(
+        kaggle_api.competitions_list_with_http_info(
+            group="entered", category="", sort_by="", page=1, search=competition
+        )
+    )
+    # there can be several competitions satisfying the search query, we pick the one
+    # we are looking for using the unique competition url
+    competition_url = f"https://www.kaggle.com/competitions/{competition}"
+    for competition in result:
+        if competition["url"] == competition_url:
+            break
+    num_id = competition["id"]
+
+    download_file(
+        f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/private",
+        zip_destination,
+    )
+
+
+def read_private_leaderboard_scores(
+    competition: str, zip_file: Path, destination_folder: Path) -> np.ndarray:
+    """Read private leaderboard scores from file.
+
+    Args:
+        competition (str): Identifier of the competition
+        zip_file (Path): Zip file containing the private leaderboard
+        destination_folder (Path): Where to extract the zip file contents.
+
+    Returns:
+        private_scores (np.array): Private leaderboard scores.
+    """
+    with zipfile.ZipFile(zip_file, "r") as zip_ref:
+        zip_ref.extractall(destination_folder)
+
+    # the file contains the download date in its name so we consider the case where
+    # there are several of them. they should all be the same.
+    files = list(destination_folder.glob(f"{competition}-privateleaderboard-*.csv"))
+    private_leaderboard_file = files[0]
+    return pd.read_csv(private_leaderboard_file)['Score'].to_numpy()
+
+
+def get_private_leaderboard_scores(
+    kaggle_api: KaggleApi, competition: str) -> np.ndarray:
+    """Get private leaderboard scores from Kaggle.
+
+    Args:
+        kaggle_api (object): KaggleAPI instance.
+        competition (str): Kaggle competition name.
+
+    Returns:
+        private_scores (np.array): Private leaderboard scores.
+            Sorted from best to worst.
+    """
+    destination_folder = Path(f"private_leaderboard_{competition}")
+    zip_destination = destination_folder / f"private_leaderboard_{competition}.zip"
+    if not zip_destination.exists():
+        destination_folder.mkdir(exist_ok=True)
+        download_private_leaderboard(
+            kaggle_api, competition, zip_destination)
+    private_scores = read_private_leaderboard_scores(
+        competition,
+        zip_destination,
+        destination_folder,
+    )
+    return private_scores
+
+
+def get_public_leaderboard_scores(
+    kaggle_api: KaggleApi, competition: str) -> np.ndarray:
+    """Get public leaderboard scores from Kaggle.
+
+    Args:
+        kaggle_api (object): KaggleApi instance.
+        competition (str): Kaggle competition name.
+
+    Returns:
+        public_scores (np.array): public leaderboard scores.
+            Sorted from best to worst.
+    """
+    public_leaderboard_raw = kaggle_api.competition_leaderboard_view(
+        competition=competition
+    )
+    public_scores = np.array([sub.score for sub in public_leaderboard_raw]).astype(
+        float
+    )
+    return public_scores
+
+
+def get_submission_scores(
+    kaggle_api: KaggleApi, competition: str) -> Tuple[float, float]:
+    """Get submission scores from Kaggle.
+
+    This takes the scoers of the most recent submission.
+
+    Args:
+        kaggle_api (object): KaggleApi instance.
+        competition (str): Kaggle competition name.
+
+    Returns:
+        public_score, private_score (float): Public and private scores of the submission
+    """
+    # XXX this should be improved to make sure we retrieve the submission we are
+    # interested in (using an unique identifier or something like this).
+    # here we assume that our submission is the most recent one.
+    status = 'pending'  # the last submission is still being evaluated by Kaggle
+    max_retry = 30
+    n_retries = 0
+    while status == 'pending':
+        # submissions are listed from most recent to oldest.
+        submission_kaggle_id = kaggle_api.competition_submissions(
+            competition=competition)[0]
+        status = kaggle_api.string(getattr(submission_kaggle_id, "status"))
+        if status == 'pending':
+            if n_retries < max_retry:
+                n_retries += 1
+                time.sleep(10)
+            else:
+                raise RuntimeError(
+                    f"Maximum number of retries ({max_retry}) exceeded and submission "
+                    "is still being evaluated by Kaggle. Consider increasing max_retry")
+
+    public_score = kaggle_api.string(getattr(submission_kaggle_id, "publicScore"))
+    public_score = float(public_score)
+    private_score = kaggle_api.string(getattr(submission_kaggle_id, "privateScore"))
+    private_score = float(private_score)
+
+    # use the following if you need to have access to all the submissions and process
+    # all the results
+    # it is adapted from kaggle_api.print_csv
+    # fields = [
+    #     'fileName', 'date', 'description', 'status', 'publicScore', 'privateScore'
+    # ]
+    # csv_buffer = StringIO()
+    # writer = csv.writer(csv_buffer)
+    # writer.writerow(fields)
+    # for i in submissions_raw:
+    #     i_fields = [kaggle_api.string(getattr(i, f)) for f in fields]
+    #     writer.writerow(i_fields)
+    # csv_buffer.seek(0)
+    # df = pd.read_csv(csv_buffer)
+
+    return public_score, private_score
+
+
 @rh.actions.ramp_action
 def kaggle_submit(
     submission: str,
     ramp_kit_dir: Path | str,
-    kaggle_name: str,
-    submission_description: Optional[str] = None,
+    competition: str,
+    message: Optional[str] = None,
 ) -> Dict:
     """Submits the predictions to Kaggle
 
     Args:
         submission (str): RAMP Submission name. If blended it submits the blended results
         ramp_kit_dir (Path | str): Path to ramp kit
-        competition_name (str): Kaggle competition name
-        submission_description (Optional[str], optional): Description to Kaggle submission. Defaults to None.
+        competition (str): Kaggle competition identifier name
+        message (Optional[str], optional): Description to Kaggle submission. Defaults to None.
 
     Returns:
         Dict: _description_
     """
+    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    is_lower_the_better = problem.score_types[0].is_lower_the_better
+
     kaggle_api = KaggleApi()
     kaggle_api.authenticate()
     action_output = {}
 
+    private_scores = get_private_leaderboard_scores(kaggle_api, competition)
+    public_scores = get_public_leaderboard_scores(kaggle_api, competition)
+
     if submission == "blended":
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         assert file_path.exists(), "No blended test data found."
-        submission_description = f"Blended {Path(ramp_kit_dir).name}"
+        message = f"Blended {Path(ramp_kit_dir).name}"
         submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=submission_description, competition=kaggle_name
+            file_name=file_path, message=message, competition=competition
         )
-        action_output["submission_status"] = submission_status
-        action_output["kaggle_submission"] = submission_description
     else:
-        if submission_description is None:
-            submission_description = submission
+        if "_best_0_" in submission:
+            submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
+
+        if message is None:
+            message = submission
 
         file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
         assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
         submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=submission_description, competition=kaggle_name
+            file_name=file_path, message=message, competition=competition
         )
-        action_output["submission_status"] = submission_status
-        action_output["kaggle_submission"] = submission_description
+
+    action_output["kaggle_submission_status"] = submission_status
+    action_output["kaggle_submission_message"] = message
+
+    # get private and public scores of the submission
+    public_score, private_score = get_submission_scores(kaggle_api, competition)
+
+    if is_lower_the_better:
+        public_rank = np.mean(public_scores > public_score)
+        private_rank = np.mean(private_scores > private_score)
+    else:
+        public_rank = np.mean(public_scores < public_score)
+        private_rank = np.mean(private_scores < private_score)
+
+    action_output['public_score'] = public_score
+    action_output['private_score'] = private_score
+    action_output['public_rank'] = public_rank
+    action_output['private_rank'] = private_rank
 
     return action_output
+
+
+if __name__ == "__main__":
+    kaggle_submit(
+        submission="blended",
+        ramp_kit_dir="/home/gpaolo/src/ramp-kits/kaggle_blueberry_v1",
+        kaggle_name="playground-series-s3e14",
+        submission_description="BAGGED_lgbm_fe_best_0",
+    )

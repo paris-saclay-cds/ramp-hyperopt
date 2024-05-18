@@ -9,8 +9,10 @@ from copy import deepcopy
 
 class TransformerBaseDataPreprocessor(rs.BaseDataPreprocessor):
     """Feature Preprocessor (apply to all models)."""
+
     @abstractmethod
-    def fit(self,
+    def fit(
+        self,
         X: pd.DataFrame,
         metadata: dict,
         y: np.ndarray,
@@ -40,10 +42,12 @@ class TransformerBaseDataPreprocessor(rs.BaseDataPreprocessor):
             Tuple[ pd.DataFrame, np.ndarray, pd.DataFrame, dict]: X_train, y_train, X_test, metadata
         """
         self.fit(X=X_train, y=y_train, metadata=metadata)
+        print(f"X train columns {len(X_train.columns)} before transform: {list(X_train.columns)}")
         X_train, y_train, metadata = self.transform(X=X_train, y=y_train, metadata=metadata)
         X_test, _, _ = self.transform(X=X_test, y=None, metadata=None)
+        print(f"X train columns {len(X_train.columns)} after transform: {list(X_train.columns)}")
         return X_train, y_train, X_test, metadata
-    
+
     def drop_metadata_features(self, metadata: dict, features: List[str]) -> dict:
         """Makes a copy of the metadata without the features to drop
 
@@ -56,5 +60,5 @@ class TransformerBaseDataPreprocessor(rs.BaseDataPreprocessor):
         """
         new_metadata = deepcopy(metadata)
         for feat in features:
-            new_metadata['data_description']['feature_types'].pop(feat, None)
+            new_metadata["data_description"]["feature_types"].pop(feat, None)
         return new_metadata

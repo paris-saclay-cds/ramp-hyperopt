@@ -16,7 +16,7 @@ from sklearn.feature_selection import (
 
 # RAMP START HYPERPARAMETERS
 removed_features = Hyperparameter(dtype="int", default=-1, values=[-1, -2, -3, -5, -10, -15, -20, -25])
-score_function = Hyperparameter(dtype="int", default=2, values=[2, 3])
+score_function = Hyperparameter(dtype="int", default=2, values=[1, 2, 3])
 # RAMP END HYPERPARAMETERS
 
 REMOVED_FEATURES = int(removed_features)
@@ -45,7 +45,7 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
         # We keep at least 1 feature if we ask to remove too many
         K = max(X.shape[1] + REMOVED_FEATURES, 1)
 
-        if "classification" in metadata['prediction_type']:
+        if "classification" in metadata["prediction_type"]:
             if SCORE_FUNCTION == 1:
                 scoring_function = chi2
             elif SCORE_FUNCTION == 2:
@@ -56,7 +56,7 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
                 raise ValueError(
                     "Only 3 score functions for classification are available. You asked for %s." % SCORE_FUNCTION
                 )
-        elif "regression" in metadata['prediction_type']:
+        elif "regression" in metadata["prediction_type"]:
             if SCORE_FUNCTION == 1:
                 scoring_function = r_regression
             elif SCORE_FUNCTION == 2:
@@ -70,13 +70,12 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
 
         self.selector = SelectKBest(scoring_function, k=K)
 
-        if metadata['prediction_type'] == "classification" and y is not None:
+        if metadata["prediction_type"] == "classification" and y is not None:
             y = y.flatten()
         self.selector.fit(X, y)
         # Saves the features
         self.features_set = set(self.selector.get_feature_names_out())
         self.dropped_features = list(set(X.columns) - self.features_set)
-
 
     def transform(
         self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[dict]
@@ -86,4 +85,4 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
         X_prepr = pd.DataFrame(X_prepr, columns=selected_features)
         if metadata is not None:
             metadata = self.drop_metadata_features(metadata=metadata, features=self.dropped_features)
-        return X, y, metadata
+        return X_prepr, y, metadata
