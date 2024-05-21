@@ -39,7 +39,7 @@ class Regressor(BaseEstimator):
             if type == "cat"
         ]
         score_name = metadata["score_name"]
-        if score_name in ["mse", "rmse"]:
+        if score_name in ["mse", "rmse", "rmsle", "r2"]:
             self.objective = "RMSE"
         elif score_name == "mae":
             self.objective = "MAE"
@@ -49,6 +49,8 @@ class Regressor(BaseEstimator):
             raise ValueError(f"Unknown score_name {score_name}")
 
     def fit(self, X, y):
+        if self.metadata["score_name"] == "rmsle":
+            y = np.log(y)
         self.reg = cb.CatBoostRegressor(
             cat_features=self.cat_features,
             iterations=ITERATIONS,
@@ -67,4 +69,7 @@ class Regressor(BaseEstimator):
         self.reg.fit(X, y)
 
     def predict(self, X):
-        return self.reg.predict(X)
+        y_pred = self.reg.predict(X)
+        if self.metadata["score_name"] == "rmsle":
+            y_pred = np.exp(y_pred)
+        return y_pred

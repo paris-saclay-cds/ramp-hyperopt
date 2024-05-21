@@ -31,8 +31,9 @@ REG_LAMBDA = float(reg_lambda)
 
 class Regressor(BaseEstimator):
     def __init__(self, metadata):
+        self.metadata = metadata
         score_name = metadata["score_name"]
-        if score_name in ["mse", "rmse", "r2"]:
+        if score_name in ["mse", "rmse", "rmsle", "r2"]:
             self.objective = "reg:squarederror"
         elif score_name in ["rmsle"]:
             self.objective = "reg:squaredlogerror"
@@ -42,6 +43,8 @@ class Regressor(BaseEstimator):
             raise ValueError(f"Unknown score_name {score_name}")
 
     def fit(self, X, y):
+        if self.metadata["score_name"] == "rmsle":
+            y = np.log(y)
         self.reg = XGBRegressor(
             n_estimators=N_ESTIMATORS,
             max_depth=MAX_DEPTH,
@@ -59,4 +62,7 @@ class Regressor(BaseEstimator):
         self.reg.fit(X, y)
 
     def predict(self, X):
-        return self.reg.predict(X)
+        y_pred = self.reg.predict(X)
+        if self.metadata["score_name"] == "rmsle":
+            y_pred = np.exp(y_pred)
+        return y_pred

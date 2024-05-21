@@ -1,5 +1,6 @@
 import numpy as np
 import lightgbm as lgb
+from sklearn.metrics import root_mean_squared_log_error
 from sklearn.base import BaseEstimator
 from ramphy import Hyperparameter
 
@@ -45,8 +46,9 @@ DROP_RATE = float(drop_rate)
 
 class Regressor(BaseEstimator):
     def __init__(self, metadata):
+        self.metadata = metadata
         score_name = metadata["score_name"]
-        if score_name in ["mse", "rmse"]:
+        if score_name in ["mse", "rmse", "rmsle", "r2"]:
             self.objective = "mse"
         elif score_name == "mae":
             self.objective = "mae"
@@ -56,6 +58,8 @@ class Regressor(BaseEstimator):
             raise ValueError(f"Unknown score_name {score_name}")
 
     def fit(self, X, y):
+        if self.metadata["score_name"] == "rmsle":
+            y = np.log(y)
         self.reg = lgb.LGBMRegressor(
             n_estimators=N_ESTIMATORS,
             max_depth=MAX_DEPTH,
@@ -78,4 +82,7 @@ class Regressor(BaseEstimator):
         self.reg.fit(X, y)
 
     def predict(self, X):
-        return self.reg.predict(X)
+        y_pred = self.reg.predict(X)
+        if self.metadata["score_name"] == "rmsle":
+            y_pred = np.exp(y_pred)
+        return y_pred
