@@ -244,7 +244,7 @@ def hyperopt(
             break
         exception = ValueError("Unknown hyperopt exception, no submission trained.")
         try:
-            run_hyperopt(
+            created_submissions = run_hyperopt(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
                 ramp_submission_dir=ramp_kit_dir / "submissions",
@@ -263,21 +263,24 @@ def hyperopt(
                 n_gpu_per_run=0,
                 verbose=3,
             )
+            n_trained_submissions = len(created_submissions)
+            existing_submissions = existing_submissions + created_submissions
         except Exception as e:
-            exception = e        
-        top_hyperopt_dict = select_top_hyperopt(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            fold_idxs=fold_idxs,
-            ramp_data_dir=ramp_data_dir,
-        )
-        if "selected_submissions" in top_hyperopt_dict:
-            existing_submissions = top_hyperopt_dict["selected_submissions"]
-        else:
-            existing_submissions = []
-        n_trained_submissions = len(existing_submissions) - n_existing_submissions
-        # We raise only if there was no new submissions trained,
-        # and it happened 10x in a row
+            exception = e
+#            raise e
+            top_hyperopt_dict = select_top_hyperopt(
+                ramp_kit_dir=ramp_kit_dir,
+                submission=submission,
+                fold_idxs=fold_idxs,
+                ramp_data_dir=ramp_data_dir,
+            )
+            if "selected_submissions" in top_hyperopt_dict:
+                existing_submissions = top_hyperopt_dict["selected_submissions"]
+            else:
+                existing_submissions = []
+            n_trained_submissions = len(existing_submissions) - n_existing_submissions
+            # We raise only if there was no new submissions trained,
+            # and it happened 10x in a row
         if n_trained_submissions <= 0:
             if n_exceptions > 10:
                 r = dict()
@@ -524,11 +527,41 @@ def submit_hybrid(
         print(f"Copying {from_file} to {to_file}")
 
 
+def update_hyperopt_score_summary(
+    ramp_kit_dir: str,
+    submission: str,
+    ramp_data_dir: Optional[str] = None,
+) -> None:
+    """Updates hyperopt_output/summary.csv by reading existing scores.
+
+    Should be called any time when hyperopt submissions are manipualated
+    outside hyperopt, e.g., retrained on folds or deleted.
+    Parameters
+    ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
+    submission : str
+        The name of the original hyperopted submission.
+    """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    summary_fname = ramp_kit_dir / "submissions" / submission / "hyperopt_output" / "summary.csv"
+    print(f"Updating {summary_fname} from score files...")
+    summary_df = get_hyperopt_score_summary(
+        ramp_kit_dir = ramp_kit_dir,
+        submission = submission,
+        ramp_data_dir = ramp_data_dir,
+        force_reload = True,
+    )
+    summary_df.to_csv(summary_fname)
+
+
 def get_hyperopt_score_summary(
     ramp_kit_dir: str,
     submission: str,
+    selected_submissions: Optional[Sequence[str]] = None,
     fold_idxs: Optional[Sequence[int]] = None,
     ramp_data_dir: Optional[str] = None,
+    force_reload: Optional[bool] = False,
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -540,6 +573,9 @@ def get_hyperopt_score_summary(
         The directory of the ramp-kit.
     submission : str
         The name of the original hyperopted submission.
+    selected_submissions : list of str, default=None
+        The list of hyperopted submissions. If None, all
+        hyperopted submissions will be loaded.
     fold_idxs : list or generator of int, default=None
         Fold indices that the {submission}_hyperopt*'s
         have been trained on. If None, return summary of all
@@ -553,6 +589,11 @@ def get_hyperopt_score_summary(
         DataFrame of submissions, hypers, scores
     """
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+
+    summary_fname = ramp_kit_dir / "submissions" / submission / "hyperopt_output" / "summary.csv"
+    if summary_fname.is_file() and not force_reload:
+        return pd.read_csv(summary_fname, index_col=0)
+
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
     X_train, y_train = problem.get_train_data(ramp_data_dir)
     score_names = [st.name for st in problem.score_types]
@@ -564,15 +605,20 @@ def get_hyperopt_score_summary(
     hyper_index_names = [f"{hn}_i" for hn in hyper_names]
     hyper_grid_sizes = [len(h.values) for h in hypers]
 
-    score_f_names = glob.glob(
-        f"{str(ramp_kit_dir)}/submissions/{submission}_hyperopt*/training_output/fold*/scores.csv"
-    )
+    if selected_submissions is None:
+        score_f_names = glob.glob(
+            f"{str(ramp_kit_dir)}/submissions/{submission}_hyperopt*/training_output/fold*/scores.csv"
+        )
+    else:
+        score_f_names = []
+        for ss in selected_submissions:
+            score_f_names.append(glob.glob(f"{str(ramp_kit_dir)}/submissions/{ss}/training_output/fold*/scores.csv"))
     row_dicts = []
     for score_f_name in score_f_names:
         row_dict = {}
-        fold_idx = int(score_f_name.split("/")[-2].split("_")[1])
+        fold_idx = int(Path(score_f_name).parent.name.split("_")[1])
         if fold_idxs is None or fold_idx in fold_idxs:
-            row_dict["hyperopt_submission"] = score_f_name.split("/")[-4]
+            row_dict["hyperopt_submission"] = Path(score_f_name).parent.parent.parent.name
             row_dict["fold_idx"] = fold_idx
             hyper_submission_path = (
                 ramp_kit_dir / "submissions" / row_dict["hyperopt_submission"]
@@ -581,8 +627,9 @@ def get_hyperopt_score_summary(
                 hyper_submission_path, problem.workflow
             )
             for h in hyper_hypers:
-                row_dict[f"hyper_{h.name}_i"] = h.default_index
                 row_dict[f"hyper_{h.name}"] = h.default
+            for h in hyper_hypers:
+                row_dict[f"hyper_{h.name}_i"] = h.default_index
             score_df = pd.read_csv(
                 hyper_submission_path
                 / "training_output"
@@ -847,7 +894,9 @@ def select_top_hyperopt(
         return {"selected_submissions": [], "score_cutoff": None}
 
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
-
+    if len(means_df) == 0:
+        return {"selected_submissions": [], "score_cutoff": None}
+    
     if n_sigma is not None:
         # foldwise means for unbiasing
         summary_df = filter_full_folds(summary_df, fold_idxs)
@@ -894,7 +943,6 @@ def select_top_hyperopt(
             score_cutoff = top_mean + n_sigma * top_std
         else:
             score_cutoff = top_mean - n_sigma * top_std
-
     if score_cutoff is not None:
         if is_lower_the_better:
             new_submissions = means_df[means_df[valid_score_name] <= score_cutoff].index
@@ -1043,10 +1091,15 @@ def delete_duplicates_hyperopt(
         .first()["hyperopt_submission"]
         .to_numpy()
     )
-    for submission in means_df.reset_index()["hyperopt_submission"]:
-        if submission not in unique_submissions:
-            print(f"Removing {ramp_kit_dir}/submissions/{submission}")
-            shutil.rmtree(Path(ramp_kit_dir) / "submissions" / submission)
+    for s in means_df.reset_index()["hyperopt_submission"]:
+        if s not in unique_submissions:
+            print(f"Removing {ramp_kit_dir}/submissions/{s}")
+            shutil.rmtree(Path(ramp_kit_dir) / "submissions" / s)
+
+    update_hyperopt_score_summary(
+        ramp_kit_dir = ramp_kit_dir,
+        submission = submission,
+    )
 
 
 def select_top_hyperopt_and_train(
@@ -1137,6 +1190,10 @@ def select_top_hyperopt_and_train(
             ignore_errors=ignore_errors,
             ramp_data_dir=ramp_data_dir,
         )
+    update_hyperopt_score_summary(
+        ramp_kit_dir = ramp_kit_dir,
+        submission = submission,
+    )
 
 
 def select_top_hyperopt_and_blend(
