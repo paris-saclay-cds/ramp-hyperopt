@@ -1,22 +1,21 @@
-import os
+import csv
 import json
+import os
+import subprocess
 import time
 import zipfile
+from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
-import csv
-from io import StringIO
-
-import requests
-from kaggle.api.kaggle_api_extended import KaggleApi
 
 import numpy as np
 import pandas as pd
-
 import rampwf as rw
+import requests
+from kaggle.api.kaggle_api_extended import KaggleApi
+
 import ramphy as rh
 from ramphy import ramp_setup as rs
-import subprocess
 
 
 @rh.actions.ramp_action
@@ -63,7 +62,7 @@ def submit_llm_feature_rejector(
         f_out.write(dp_code)
 
 
-def execute_script(script_path: str | Path, script_args: Dict) -> bool:
+def execute_script(script_path: str | Path, env_args: Dict, script_args: Dict, hydra_args: Dict) -> bool:
     """executes the required python script
 
     Args:
@@ -76,11 +75,20 @@ def execute_script(script_path: str | Path, script_args: Dict) -> bool:
     # Ensure script_path is a Path object
     script_path = str(script_path)
 
+    # Add environment args
+    cmd = []
+    for key, value in env_args.items():
+        cmd.append(f"{key}={value} ")
+
     # Construct the command to run the script with its arguments
-    cmd = ["python", script_path]
+    cmd = cmd + ["python", script_path]
     for key, value in script_args.items():
         cmd.append(f"--{key}")
         cmd.append(str(value))
+
+    # Add any arguments for hydra (these are handled differently than script)
+    for key, value in hydra_args.items():
+        cmd.append(f"{key}={value} ")
 
     try:
         # Run the script
