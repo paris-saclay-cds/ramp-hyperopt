@@ -67,10 +67,12 @@ def execute_script(script_path: str | Path, env_args: Dict, script_args: Dict, h
 
     Args:
         script_path (str | Path): _description_
+        env_args (Dict): _description_
         script_args (Dict): _description_
+        hydra_args (Dict): _description_
 
     Returns:
-        bool: True if the script finished, False otherwise
+        bool: True if terminated properly, False otherwise
     """
     # Ensure script_path is a Path object
     script_path = str(script_path)
