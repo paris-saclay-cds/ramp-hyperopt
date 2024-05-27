@@ -39,7 +39,7 @@ class RampAction():
         self.kwargs = kwargs
        
     @property
-    def run_time(self):
+    def runtime(self):
         return self.stop_time - self.start_time
 
     def execute(self):
