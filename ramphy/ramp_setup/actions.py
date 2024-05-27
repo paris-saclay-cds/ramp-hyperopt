@@ -16,6 +16,7 @@ import pandas as pd
 import rampwf as rw
 import ramphy as rh
 from ramphy import ramp_setup as rs
+import subprocess
 
 
 @rh.actions.ramp_action
@@ -62,6 +63,43 @@ def submit_llm_feature_rejector(
         f_out.write(dp_code)
 
 
+def execute_script(script_path: str | Path, script_args: Dict) -> bool:
+    """executes the required python script
+
+    Args:
+        script_path (str | Path): _description_
+        script_args (Dict): _description_
+
+    Returns:
+        bool: True if the script finished, False otherwise
+    """
+    # Ensure script_path is a Path object
+    script_path = str(script_path)
+
+    # Construct the command to run the script with its arguments
+    cmd = ["python", script_path]
+    for key, value in script_args.items():
+        cmd.append(f"--{key}")
+        cmd.append(str(value))
+
+    try:
+        # Run the script
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        # Optionally, you can print or log the output
+        print(result.stdout)
+        print(result.stderr)
+        return True
+    except subprocess.CalledProcessError as e:
+        # Handle errors in the script execution
+        print(f"Script failed with exit code {e.returncode}")
+        print(e.output)
+        return False
+    except Exception as e:
+        # Handle other potential exceptions
+        print(f"An error occurred: {e}")
+        return False
+
+
 def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
     submissions = os.listdir(str(Path(ramp_kit_dir) / "submissions"))
     for sub in submissions:
@@ -93,8 +131,7 @@ def download_file(url: str, destination: Path):
         print("Error downloading the file:", e)
 
 
-def download_private_leaderboard(
-    kaggle_api: KaggleApi, competition: str, zip_destination: Path):
+def download_private_leaderboard(kaggle_api: KaggleApi, competition: str, zip_destination: Path):
     """Downloads private leaderboard.
 
     This is not supported by the Kaggle API so we implement it ourselves as there is
@@ -127,8 +164,7 @@ def download_private_leaderboard(
     )
 
 
-def read_private_leaderboard_scores(
-    competition: str, zip_file: Path, destination_folder: Path) -> np.ndarray:
+def read_private_leaderboard_scores(competition: str, zip_file: Path, destination_folder: Path) -> np.ndarray:
     """Read private leaderboard scores from file.
 
     Args:
@@ -146,11 +182,10 @@ def read_private_leaderboard_scores(
     # there are several of them. they should all be the same.
     files = list(destination_folder.glob(f"{competition}-privateleaderboard-*.csv"))
     private_leaderboard_file = files[0]
-    return pd.read_csv(private_leaderboard_file)['Score'].to_numpy()
+    return pd.read_csv(private_leaderboard_file)["Score"].to_numpy()
 
 
-def get_private_leaderboard_scores(
-    kaggle_api: KaggleApi, competition: str) -> np.ndarray:
+def get_private_leaderboard_scores(kaggle_api: KaggleApi, competition: str) -> np.ndarray:
     """Get private leaderboard scores from Kaggle.
 
     Args:
@@ -165,8 +200,7 @@ def get_private_leaderboard_scores(
     zip_destination = destination_folder / f"private_leaderboard_{competition}.zip"
     if not zip_destination.exists():
         destination_folder.mkdir(exist_ok=True)
-        download_private_leaderboard(
-            kaggle_api, competition, zip_destination)
+        download_private_leaderboard(kaggle_api, competition, zip_destination)
     private_scores = read_private_leaderboard_scores(
         competition,
         zip_destination,
@@ -175,8 +209,7 @@ def get_private_leaderboard_scores(
     return private_scores
 
 
-def get_public_leaderboard_scores(
-    kaggle_api: KaggleApi, competition: str) -> np.ndarray:
+def get_public_leaderboard_scores(kaggle_api: KaggleApi, competition: str) -> np.ndarray:
     """Get public leaderboard scores from Kaggle.
 
     Args:
@@ -187,17 +220,12 @@ def get_public_leaderboard_scores(
         public_scores (np.array): public leaderboard scores.
             Sorted from best to worst.
     """
-    public_leaderboard_raw = kaggle_api.competition_leaderboard_view(
-        competition=competition
-    )
-    public_scores = np.array([sub.score for sub in public_leaderboard_raw]).astype(
-        float
-    )
+    public_leaderboard_raw = kaggle_api.competition_leaderboard_view(competition=competition)
+    public_scores = np.array([sub.score for sub in public_leaderboard_raw]).astype(float)
     return public_scores
 
 
-def get_submission_scores(
-    kaggle_api: KaggleApi, competition: str) -> Tuple[float, float]:
+def get_submission_scores(kaggle_api: KaggleApi, competition: str) -> Tuple[float, float]:
     """Get submission scores from Kaggle.
 
     This takes the scoers of the most recent submission.
@@ -212,22 +240,22 @@ def get_submission_scores(
     # XXX this should be improved to make sure we retrieve the submission we are
     # interested in (using an unique identifier or something like this).
     # here we assume that our submission is the most recent one.
-    status = 'pending'  # the last submission is still being evaluated by Kaggle
+    status = "pending"  # the last submission is still being evaluated by Kaggle
     max_retry = 30
     n_retries = 0
-    while status == 'pending':
+    while status == "pending":
         # submissions are listed from most recent to oldest.
-        submission_kaggle_id = kaggle_api.competition_submissions(
-            competition=competition)[0]
+        submission_kaggle_id = kaggle_api.competition_submissions(competition=competition)[0]
         status = kaggle_api.string(getattr(submission_kaggle_id, "status"))
-        if status == 'pending':
+        if status == "pending":
             if n_retries < max_retry:
                 n_retries += 1
                 time.sleep(10)
             else:
                 raise RuntimeError(
                     f"Maximum number of retries ({max_retry}) exceeded and submission "
-                    "is still being evaluated by Kaggle. Consider increasing max_retry")
+                    "is still being evaluated by Kaggle. Consider increasing max_retry"
+                )
 
     public_score = kaggle_api.string(getattr(submission_kaggle_id, "publicScore"))
     public_score = float(public_score)
@@ -284,9 +312,7 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         assert file_path.exists(), "No blended test data found."
         message = f"Blended {Path(ramp_kit_dir).name}"
-        submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=message, competition=competition
-        )
+        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
     else:
         if "_best_0_" in submission:
             submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
@@ -297,9 +323,7 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
         assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
-        submission_status = kaggle_api.competition_submit(
-            file_name=file_path, message=message, competition=competition
-        )
+        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
 
     action_output["kaggle_submission_status"] = submission_status
     action_output["kaggle_submission_message"] = message
@@ -314,18 +338,9 @@ def kaggle_submit(
         public_rank = np.mean(public_scores < public_score)
         private_rank = np.mean(private_scores < private_score)
 
-    action_output['public_score'] = public_score
-    action_output['private_score'] = private_score
-    action_output['public_rank'] = public_rank
-    action_output['private_rank'] = private_rank
+    action_output["public_score"] = public_score
+    action_output["private_score"] = private_score
+    action_output["public_rank"] = public_rank
+    action_output["private_rank"] = private_rank
 
     return action_output
-
-
-if __name__ == "__main__":
-    kaggle_submit(
-        submission="blended",
-        ramp_kit_dir="/home/gpaolo/src/ramp-kits/kaggle_blueberry_v1",
-        kaggle_name="playground-series-s3e14",
-        submission_description="BAGGED_lgbm_fe_best_0",
-    )
