@@ -57,6 +57,8 @@ setup(
     entry_points={
         'console_scripts': [
             'ramp-hyperopt = ramphy.cli.hyperopt:start',
+            'ramp-setup = ramphy.cli.setup:start',
+            'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
         ]
     }
 )
