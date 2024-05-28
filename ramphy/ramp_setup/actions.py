@@ -312,10 +312,11 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         assert file_path.exists(), "No blended test data found."
         message = f"Blended {Path(ramp_kit_dir).name}"
-        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
-    else:
-        if "_best_0_" in submission:
-            submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
+    elif "_best_0_" in submission:
+        submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
 
         if message is None:
             message = submission
@@ -323,7 +324,18 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
         assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
-        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
+    else:  # submission is a path
+        if message is None:
+            message = ''
+
+        file_path = Path(submission)
+
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
 
     action_output["kaggle_submission_status"] = submission_status
     action_output["kaggle_submission_message"] = message
