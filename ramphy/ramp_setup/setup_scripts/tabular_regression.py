@@ -258,6 +258,46 @@ def tabular_cat_col_encoders_submit(
 
 
 @ramp_action
+def tabular_date_col_encoder_submit(
+    submission: str | Path,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+) -> None:
+    """Submit datetime column encoders.
+
+    Args:
+        submission (str | Path): New submission name
+        ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
+        ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    """
+
+    ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
+    metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
+
+    dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
+    dp_template_path = (
+        Path("workflow_elements") / "tabular_data_preprocessors" /
+        "date_col_encoding.py"
+    )
+    dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    for col, col_type in metadata["data_description"]["feature_types"].items():
+        if col_type == "date":
+            dp_code_formatted = dp_code.format_map(
+                metadata | {"col": f"{col}", "str_col": f'"{col}"'}
+            )
+            with open(
+                ramp_kit_dir
+                / "submissions"
+                / submission
+                / f"data_preprocessor_{dp_idx}_{col}_date_col_encoding.py",
+                "w",
+            ) as f_out:
+                f_out.write(dp_code_formatted)
+            dp_idx += 1
+
+
+@ramp_action
 def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
@@ -267,6 +307,7 @@ def tabular_regression_columnwise_last_submit(
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
+    date_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -281,6 +322,7 @@ def tabular_regression_columnwise_last_submit(
         num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
         cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
         num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
+        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
         ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
     """
@@ -297,6 +339,12 @@ def tabular_regression_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    if date_col_encode:
+        tabular_date_col_encoder_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
     if cat_col_impute:
         tabular_cat_col_imputers_submit(
             submission=submission,
@@ -327,6 +375,7 @@ def tabular_regression_columnwise_first_submit(
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
+    date_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -341,6 +390,7 @@ def tabular_regression_columnwise_first_submit(
         num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
         cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
         num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
+        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
         ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
     """
@@ -350,6 +400,12 @@ def tabular_regression_columnwise_first_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    if date_col_encode:
+        tabular_date_col_encoder_submit(
+            submission=submission,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
     if cat_col_impute:
         tabular_cat_col_imputers_submit(
             submission=submission,
