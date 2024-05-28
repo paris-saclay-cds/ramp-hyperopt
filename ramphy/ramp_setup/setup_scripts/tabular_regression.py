@@ -25,8 +25,8 @@ def tabular_regression_setup(
         ramp_kit_dir (str | Path, optional): Dir where to put the kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Dir where the kit data will be stored. Defaults to None.
     """
-    
-    problem_code = rs.utils.load_template(package=rs, 
+
+    problem_code = rs.utils.load_template(package=rs,
                                  template_path="problems/tabular_regression_problem.py")
     download_dir = Path(download_dir)
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -37,7 +37,6 @@ def tabular_regression_setup(
     train_data = pd.read_csv(download_dir / "train.csv")
     test_data = pd.read_csv(download_dir / "test.csv")
     sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
-    
 
     metadata = json.load(open(download_dir / "metadata.json"))
     feature_types = metadata["data_description"]["feature_types"]
@@ -57,7 +56,7 @@ def tabular_regression_setup(
         columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
     test_data = test_data.rename(
         columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
-    feature_types = metadata["data_description"]["feature_types"] = new_feature_types    
+    feature_types = metadata["data_description"]["feature_types"] = new_feature_types
 
     problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
@@ -109,7 +108,7 @@ def tabular_regression_submit(
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-    
+
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     submission_dir = ramp_kit_dir / "submissions" / submission
     if submission_dir.exists():
@@ -178,7 +177,7 @@ def tabular_cat_col_imputers_submit(
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
-    
+
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
@@ -207,7 +206,7 @@ def tabular_num_col_imputers_submit(
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
-    
+
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     (ramp_kit_dir / "submissions" / submission).mkdir(parents=True, exist_ok=True)
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
