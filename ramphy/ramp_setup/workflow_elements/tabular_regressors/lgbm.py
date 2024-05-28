@@ -2,6 +2,7 @@ import numpy as np
 import lightgbm as lgb
 from sklearn.metrics import root_mean_squared_log_error
 from sklearn.base import BaseEstimator
+from sklearn.multioutput import MultiOutputRegressor
 from ramphy import Hyperparameter
 
 # RAMP START HYPERPARAMETERS
@@ -60,7 +61,7 @@ class Regressor(BaseEstimator):
     def fit(self, X, y):
         if self.metadata["score_name"] == "rmsle":
             y = np.log(y)
-        self.reg = lgb.LGBMRegressor(
+        self.reg = MultiOutputRegressor(lgb.LGBMRegressor(
             n_estimators=N_ESTIMATORS,
             max_depth=MAX_DEPTH,
             learning_rate=LEARNING_RATE,
