@@ -1,3 +1,4 @@
+import re
 import numpy as np
 import pandas as pd
 from typing import Tuple
@@ -34,7 +35,15 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         if ENCODING_STRATEGY == "OneHot":
-            transformer = OneHotEncoder(handle_unknown="infrequent_if_exist")
+            # to avoid non authorized characters in column names
+            def feature_name_combiner(input_feature, category):
+                output_feature = input_feature + '_' + str(category)
+                output_feature = re.sub(r'[^a-zA-Z0-9_]', '_', output_feature)
+                return output_feature
+
+            transformer = OneHotEncoder(
+                handle_unknown="infrequent_if_exist",
+                feature_name_combiner=feature_name_combiner)
         elif ENCODING_STRATEGY == "Count":
             transformer = CountEncoder(handle_unknown=0, min_group_size=1, cols=[self.col])
         elif ENCODING_STRATEGY == "Target":
@@ -50,7 +59,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             transformer.fit(X_train[[self.col]], y_train)
         else:
             transformer.fit(pd.concat([X_train, X_test])[[self.col]])
-            
+
         new_columns = transformer.get_feature_names_out([self.col])
 
         X_transformed = transformer.transform(X_train[[self.col]])
