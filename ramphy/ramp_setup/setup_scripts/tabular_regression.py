@@ -67,7 +67,13 @@ def tabular_regression_setup(
     feature_values = {}
     missing_data_count = {}
     for col, col_type in feature_types.items():
-        missing_data_count[col] = int(train_data[col].isna().sum() + test_data[col].isna().sum())
+        # in some challenges some columns can be in the train and not in the test and
+        # vice versa (see for instance https://www.kaggle.com/c/bike-sharing-demand)
+        missing_data_count[col] = 0
+        if col in train_data.columns:
+            missing_data_count[col] += int(train_data[col].isna().sum())
+        if col in test_data.columns:
+            missing_data_count[col] += int(test_data[col].isna().sum())
         if col_type == "cat" or col_type == "bin":
             # Ensure the column is treated as string to safely use .str accessor
             try:
