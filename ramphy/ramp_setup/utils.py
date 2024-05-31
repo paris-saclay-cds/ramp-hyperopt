@@ -14,6 +14,7 @@ score_name_type_map = {
     'r2' : rw.score_types.R2,
     'rmsle': rw.score_types.RMSLE,
     'medae': rw.score_types.MedAE,
+    'smape': rw.score_types.SMAPE,
 }
 
 def load_template(package, template_path) -> str:
@@ -29,7 +30,7 @@ def load_template(package, template_path) -> str:
     templates_dir = impresources.files(package)
     try:
         template_f_name = templates_dir / template_path
-        with template_f_name.open("r") as f: 
+        with template_f_name.open("r") as f:
             template_code = f.read()
     except AttributeError:
         # Python < PY3.9, fall back to method deprecated in PY3.11.

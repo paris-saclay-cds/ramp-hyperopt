@@ -1,22 +1,21 @@
-import os
+import csv
 import json
+import os
+import subprocess
 import time
 import zipfile
+from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple
-import csv
-from io import StringIO
-
-import requests
-from kaggle.api.kaggle_api_extended import KaggleApi
 
 import numpy as np
 import pandas as pd
-
 import rampwf as rw
+import requests
+from kaggle.api.kaggle_api_extended import KaggleApi
+
 import ramphy as rh
 from ramphy import ramp_setup as rs
-import subprocess
 
 
 @rh.actions.ramp_action
@@ -63,24 +62,35 @@ def submit_llm_feature_rejector(
         f_out.write(dp_code)
 
 
-def execute_script(script_path: str | Path, script_args: Dict) -> bool:
+def execute_script(script_path: str | Path, env_args: Dict, script_args: Dict, hydra_args: Dict) -> bool:
     """executes the required python script
 
     Args:
         script_path (str | Path): _description_
+        env_args (Dict): _description_
         script_args (Dict): _description_
+        hydra_args (Dict): _description_
 
     Returns:
-        bool: True if the script finished, False otherwise
+        bool: True if terminated properly, False otherwise
     """
     # Ensure script_path is a Path object
     script_path = str(script_path)
 
+    # Add environment args
+    cmd = []
+    for key, value in env_args.items():
+        cmd.append(f"{key}={value} ")
+
     # Construct the command to run the script with its arguments
-    cmd = ["python", script_path]
+    cmd = cmd + ["python", script_path]
     for key, value in script_args.items():
         cmd.append(f"--{key}")
         cmd.append(str(value))
+
+    # Add any arguments for hydra (these are handled differently than script)
+    for key, value in hydra_args.items():
+        cmd.append(f"{key}={value} ")
 
     try:
         # Run the script
@@ -312,10 +322,11 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         assert file_path.exists(), "No blended test data found."
         message = f"Blended {Path(ramp_kit_dir).name}"
-        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
-    else:
-        if "_best_0_" in submission:
-            submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
+    elif "_best_0_" in submission:
+        submission = find_best(submission=submission, ramp_kit_dir=ramp_kit_dir)
 
         if message is None:
             message = submission
@@ -323,7 +334,18 @@ def kaggle_submit(
         file_path = Path(ramp_kit_dir) / "submissions" / submission / "training_output" / "submission_bagged_test.csv"
         assert Path(ramp_kit_dir) / "submissions" / submission, f"Submission {submission} does not exists."
         assert file_path.exists(), f"File {file_path} does not exists. Sure that the submission has been trained?"
-        submission_status = kaggle_api.competition_submit(file_name=file_path, message=message, competition=competition)
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
+    else:  # submission is a path
+        if message is None:
+            message = ''
+
+        file_path = Path(submission)
+
+        submission_status = kaggle_api.competition_submit(
+            file_name=file_path, message=message, competition=competition
+        )
 
     action_output["kaggle_submission_status"] = submission_status
     action_output["kaggle_submission_message"] = message
