@@ -44,13 +44,14 @@ else:
     BAGGING_FREQ = None
 DROP_RATE = float(drop_rate)
 
+
 class Regressor(BaseEstimator):
     def __init__(self, metadata):
         self.metadata = metadata
         score_name = metadata["score_name"]
         if score_name in ["mse", "rmse", "rmsle", "r2"]:
             self.objective = "mse"
-        elif score_name == "mae":
+        elif score_name in ["mae", "medae"]:
             self.objective = "mae"
         elif score_name == "mape":
             self.objective = "mape"

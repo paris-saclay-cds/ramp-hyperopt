@@ -37,7 +37,7 @@ class Regressor(BaseEstimator):
             self.objective = "reg:squarederror"
         elif score_name in ["rmsle"]:
             self.objective = "reg:squaredlogerror"
-        elif score_name == "mae":
+        elif score_name in ["mae", "medae"]:
             self.objective = "reg:absoluteerror"
         else:
             raise ValueError(f"Unknown score_name {score_name}")
