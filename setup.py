@@ -58,7 +58,9 @@ setup(
         'console_scripts': [
             'ramp-hyperopt = ramphy.cli.hyperopt:start',
             'ramp-setup = ramphy.cli.setup:start',
+            'ramp-download-leaderboards = ramphy.cli.download_leaderboards:start',
             'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
+            'ramp-update-results = ramphy.cli.update_results:start',
         ]
     }
 )
