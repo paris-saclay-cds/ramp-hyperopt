@@ -13,6 +13,7 @@ score_name_type_map = {
     'mae' : rw.score_types.MAE,
     'r2' : rw.score_types.R2,
     'rmsle': rw.score_types.RMSLE,
+    'medae': rw.score_types.MedAE,
 }
 
 def load_template(package, template_path) -> str:
