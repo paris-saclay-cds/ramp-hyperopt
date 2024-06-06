@@ -36,3 +36,37 @@ def pangu_setup_kit(
 
     result = execute_script(script_path=script_path, env_args=env_args, hydra_args=hydra_args, script_args={})
     return {"correctly_executed": result}
+
+
+@rh.actions.ramp_action
+def llm_drop_feature(
+    pangu_root: str | Path, output_path: str | Path, kit_path: str | Path, llm: str = "fschat/llama-3-8B-Instruct"
+) -> Dict:
+    """Asks the LLM which feature to drop
+
+    Args:
+        pangu_root (str | Path): _description_
+        output_path (str | Path): _description_
+        kit_path (str | Path): _description_
+        llm (str, optional): _description_. Defaults to "fschat/llama-3-8B-Instruct".
+
+    Returns:
+        Dict: execution of the script
+    """
+    env_args = {"HYDRA_FULL_ERROR": 1, "PANGU_DEBUG": 1}
+    kit_path = Path(kit_path)
+    challenge_name = kit_path.name
+
+    script_path = Path(pangu_root) / "src" / "pangu" / "start.py"
+    hydra_args = {
+        "task": "ramp",
+        "llm@agent.llm": llm,
+        "method": "ramp-fe-llm",
+        "max_episodes": 1,
+        "task.task_id": challenge_name,
+        "task.ramp_kit_dir": kit_path,
+        "task.llm_output_path": output_path,
+    }
+
+    result = execute_script(script_path=script_path, env_args=env_args, hydra_args=hydra_args, script_args={})
+    return {"correctly_executed": result}
