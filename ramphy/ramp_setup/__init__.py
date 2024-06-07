@@ -13,7 +13,7 @@ from .workflow_elements.tabular_data_preprocessors.base_data_preprocessor import
 from .workflow_elements.tabular_data_preprocessors.transformer_base_preprocessor import TransformerBaseDataPreprocessor
 from .utils import score_name_type_map
 from . import actions
-from . import pangu_actions
+#from . import pangu_actions
 
 __all__ = [
     "score_name_type_map",
