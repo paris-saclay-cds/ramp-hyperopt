@@ -1,5 +1,5 @@
-from .setup_scripts.tabular_regression import (
-    tabular_regression_setup,
+from .setup_scripts.tabular import (
+    setup,
     tabular_regression_columnwise_last_submit,
     tabular_regression_submit,
     tabular_num_col_imputers_submit,
@@ -16,7 +16,7 @@ from . import actions
 
 __all__ = [
     "score_name_type_map",
-    "tabular_regression_setup",
+    "setup",
     "tabular_regression_columnwise_last_submit",
     "tabular_regression_submit",
     "tabular_data_preprocessors_submit",

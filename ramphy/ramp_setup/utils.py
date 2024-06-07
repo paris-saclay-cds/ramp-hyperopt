@@ -9,12 +9,17 @@ except ImportError:
     import importlib_resources as impresources
 
 score_name_type_map = {
+    # regression
     'rmse' : rw.score_types.RMSE,
     'mae' : rw.score_types.MAE,
     'r2' : rw.score_types.R2,
     'rmsle': rw.score_types.RMSLE,
     'medae': rw.score_types.MedAE,
     'smape': rw.score_types.SMAPE,
+    # classification
+    'auc': rw.score_types.ROCAUC,
+    'ngini': rw.score_types.NormalizedGini,
+    'accuracy': rw.score_types.Accuracy,
 }
 
 def load_template(package, template_path) -> str:
