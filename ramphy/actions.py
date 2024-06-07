@@ -39,7 +39,7 @@ class RampAction():
         self.kwargs = kwargs
        
     @property
-    def run_time(self):
+    def runtime(self):
         return self.stop_time - self.start_time
 
     def execute(self):
@@ -267,6 +267,7 @@ def hyperopt(
             existing_submissions = existing_submissions + created_submissions
         except Exception as e:
             exception = e
+            print(e)
 #            raise e
             top_hyperopt_dict = select_top_hyperopt(
                 ramp_kit_dir=ramp_kit_dir,
@@ -305,6 +306,12 @@ def hyperopt(
             r["mean_score"] = min(r["mean_scores"].values())
         else:
             r["mean_score"] = max(r["mean_scores"].values())
+#    ray_trash_folders = glob.glob("/tmp/ray/*")
+#    for folder in ray_trash_folders:
+#        shutil.rmtree(folder)
+#    ray_trash_folders = glob.glob(Path.home() / "ray_results")
+#    for folder in ray_trash_folders:
+#        shutil.rmtree(folder)
     return r
 
 @ramp_action
@@ -460,6 +467,9 @@ def blend(
             output_path = ramp_kit_dir / "submissions" / "training_output"
         else:
             output_path = Path(output_path)
+        bag_ranks = False
+        if problem.score_types[0].name in ["auc", "ngini"]:
+            bag_ranks=True,
         rw.utils.testing.blend_submissions(
             submissions,
             ramp_kit_dir=ramp_kit_dir,
@@ -468,6 +478,7 @@ def blend(
             save_output=True,
             output_path=str(output_path),
             fold_idxs=fold_idxs,
+            bag_ranks=bag_ranks,
         )
         r = {}
         bagged_f_name = output_path / "bagged_scores_combined.csv"

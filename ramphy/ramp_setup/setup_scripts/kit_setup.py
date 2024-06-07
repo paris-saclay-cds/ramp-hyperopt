@@ -41,7 +41,7 @@ def kit_setup(
 
     if prediction_type == "regression" and len(input_types) == 1 and "tabular" in input_types:
         # Setup the challenge kit
-        rs.tabular_regression_setup(
+        rs.setup(
             download_dir=download_dir,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,

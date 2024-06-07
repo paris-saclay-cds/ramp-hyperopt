@@ -934,6 +934,7 @@ def run_hyperopt(
     if n_cpu_per_run is None:
         n_cpu_per_run = os.cpu_count() - 1
 
+#    ray.init(_temp_dir="/nas/tmp/")
     if n_gpu_per_run is None:
         n_gpu_per_run = len(ray.get_gpu_ids())  # Get the number of GPUs available
     hyperparameter_experiment = init_hyperopt(

@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.base import BaseEstimator
-from xgboost import XGBRegressor
+import xgboost as xb
 from ramphy import Hyperparameter
 
 # RAMP START HYPERPARAMETERS
@@ -37,7 +37,7 @@ class Regressor(BaseEstimator):
             self.objective = "reg:squarederror"
         elif score_name in ["rmsle"]:
             self.objective = "reg:squaredlogerror"
-        elif score_name == "mae":
+        elif score_name in ["mae", "medae", "smape"]:
             self.objective = "reg:absoluteerror"
         else:
             raise ValueError(f"Unknown score_name {score_name}")
@@ -45,7 +45,7 @@ class Regressor(BaseEstimator):
     def fit(self, X, y):
         if self.metadata["score_name"] == "rmsle":
             y = np.log(y)
-        self.reg = XGBRegressor(
+        self.reg = xb.XGBRegressor(
             n_estimators=N_ESTIMATORS,
             max_depth=MAX_DEPTH,
             learning_rate=LEARNING_RATE,
