@@ -122,11 +122,18 @@ def main(
         print(f'Blended submissions: {blended_submissions}')
     else:
         for submission in submissions:
-            rh.ramp_setup.setup_scripts.tabular_regression.tabular_regression_columnwise_first_submit(         
-                ramp_kit_dir = ramp_kit_dir,
-                submission = submission,
-                regressor = submission,
-            )                                                   
+            if "regression" in metadata["prediction_type"]:
+                rh.ramp_setup.setup_scripts.tabular.tabular_regression_columnwise_first_submit(         
+                    ramp_kit_dir = ramp_kit_dir,
+                    submission = submission,
+                    regressor = submission,
+                )
+            elif "classification" in metadata["prediction_type"]:
+                rh.ramp_setup.setup_scripts.tabular.tabular_classification_columnwise_first_submit(         
+                    ramp_kit_dir = ramp_kit_dir,
+                    submission = submission,
+                    classifier = submission,
+                )
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
         #Dictionary of submissions: list of dictionary of run times and scores
         blended_submissions = set()    
@@ -156,10 +163,14 @@ def main(
         print(f'selected submission : {submission}')
     #    input("Press Enter to continue...")
         n_trials = n_trials_per_round
+        if "regression" in metadata["prediction_type"]:
+            workflow_element_names = ["regressor"]
+        elif "classification" in metadata["prediction_type"]:
+            workflow_element_names = ["classifier"]
         rh.actions.hyperopt(
             ramp_kit_dir = ramp_kit_dir,
             submission = submission,
-            workflow_element_names = ['regressor'],
+            workflow_element_names = workflow_element_names,
             n_trials=n_trials,
             fold_idxs=range(900, 903),
             resume=True,
