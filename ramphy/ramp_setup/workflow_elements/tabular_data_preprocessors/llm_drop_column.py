@@ -1,8 +1,9 @@
+import json
 import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Tuple
-import json
+
 import numpy as np
 import pandas as pd
 import ramphy.ramp_setup as rs
@@ -39,6 +40,15 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_train = X_train.drop(self.drop_feats, axis=1)
         X_test = X_test.drop(self.drop_feats, axis=1)
 
-        metadata = deepcopy(metadata)  # TODO purge metdata
-        metadata["data_description"]["feature_types"].pop(self.drop_feats)
+        # Purge metadata
+        metadata = deepcopy(metadata)
+        metadata_elements = ["feature_types", "feature_values", "missing_data_count"]
+        for feat in self.drop_feats:
+            for m_el in metadata_elements:
+                try:
+                    metadata["data_description"][m_el].pop(feat)
+                except KeyError as e:
+                    print(f"Feature {feat} not in {m_el}")
+                    continue
+
         return X_train, y_train, X_test, metadata

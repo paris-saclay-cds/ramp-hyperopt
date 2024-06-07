@@ -1,10 +1,8 @@
 from pathlib import Path
 from typing import Dict
 
-from actions import execute_script
-
 import ramphy as rh
-from ramphy import ramp_setup as rs
+from ramphy.ramp_setup.actions import execute_script
 
 
 @rh.actions.ramp_action
