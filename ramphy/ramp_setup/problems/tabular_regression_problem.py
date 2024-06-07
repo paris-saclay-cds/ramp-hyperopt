@@ -9,9 +9,10 @@ score_name = "{score_name}"
 target_cols = {data_description[target_cols]}
 title = "{title}"
 id_col = "{id_col}"
+prediction_type = "{prediction_type}"
 # TEMPLATE INPUTS END
 
-problem_title = f"{{title}} tabular regression"
+problem_title = f"{{title}} tabular {{prediction_type}}"
 Predictions = rw.prediction_types.make_regression(
     label_names=target_cols)
 workflow = rw.workflows.TabularRegressor()
@@ -43,7 +44,6 @@ def get_metadata(path=".", data_label=None) -> dict:
         data_path = Path(path) / "data"
     else:
         data_path = Path(path) / "data" / data_label
-#    metadata = load_metadata_from_json(load_path=data_path, as_dict=False)
     metadata = json.load(open(data_path / "metadata.json"))
     return metadata
 
