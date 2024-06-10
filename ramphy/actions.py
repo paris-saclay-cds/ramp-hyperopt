@@ -469,7 +469,7 @@ def blend(
             output_path = Path(output_path)
         bag_ranks = False
         if problem.score_types[0].name in ["auc", "ngini"]:
-            bag_ranks=True,
+            bag_ranks=True
         rw.utils.testing.blend_submissions(
             submissions,
             ramp_kit_dir=ramp_kit_dir,
