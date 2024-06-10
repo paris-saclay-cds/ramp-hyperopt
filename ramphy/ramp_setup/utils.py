@@ -20,6 +20,7 @@ score_name_type_map = {
     'auc': rw.score_types.ROCAUC,
     'ngini': rw.score_types.NormalizedGini,
     'accuracy': rw.score_types.Accuracy,
+    'nll': rw.score_types.NegativeLogLikelihood,
 }
 
 def load_template(package, template_path) -> str:

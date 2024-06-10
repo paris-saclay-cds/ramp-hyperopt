@@ -71,7 +71,10 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     for target_col in target_cols:
         target_values = target_value_dict[target_col]
         y_pred_block = y_pred[:, first_col_index:first_col_index + len(target_values)]
-        if score_name in ['ngini', 'auc']:
+        if score_name in ['nll'] and len(target_values) > 2:
+            for tv_i, tv in enumerate(target_values):
+                df[f"{{target_col}}_{{tv}}"] = y_pred_block[:, tv_i]
+        elif score_name in ['ngini', 'auc', 'nll']:
             # positive_target_value needed in metadata for auc-type scores
             positive_value_index = target_values.index(positive_target_values[target_col])
             df[target_col] = y_pred_block[:, positive_value_index]
