@@ -107,7 +107,8 @@ def setup(
     np.random.seed(43)
     if prediction_type == "regression":
         for target_col in target_cols:
-            test_data[target_col] = np.random.normal(train_data[target_col].mean(), train_data[target_col].std())
+            test_data[target_col] = np.random.normal(
+                train_data[target_col].mean(), train_data[target_col].std(), size=len(test_data))
     elif "classification" in prediction_type:
         for target_col in target_cols:
             target_values = list(train_data[target_col].unique())
