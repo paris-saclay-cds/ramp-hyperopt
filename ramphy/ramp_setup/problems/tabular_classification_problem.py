@@ -28,9 +28,9 @@ workflow = rw.workflows.TabularClassifier()
 
 score_types = [
     rw.score_types.Combined(
-        name=score_name,
-        score_types=[rs.score_name_type_map[score_name](name=score_name, precision=4)] * n_targets,
-        weights=[1 / n_targets] * n_targets, precision=4),
+            name=score_name,
+            score_types=[rs.score_name_type_map[score_name](name=score_name, precision=4)] * n_targets,
+            weights=[1 / n_targets] * n_targets, precision=4),
 ]
 
 get_cv = rw.cvs.GrowingFolds().get_cv
@@ -64,9 +64,7 @@ def get_metadata(path=".", data_label=None) -> dict:
 def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     if "test" not in suffix:
         return  # we don't care about saving the training predictions
-    sample_df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
-    df = pd.DataFrame()
-    df[id_col] = sample_df[id_col]
+    df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
     first_col_index = 0
     for target_col in target_cols:
         target_values = target_value_dict[target_col]
