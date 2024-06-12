@@ -21,6 +21,7 @@ score_name_type_map = {
     'ngini': rw.score_types.NormalizedGini,
     'accuracy': rw.score_types.Accuracy,
     'nll': rw.score_types.NegativeLogLikelihood,
+    'f1-micro': rw.score_types.F1Micro,
 }
 
 def load_template(package, template_path) -> str:
