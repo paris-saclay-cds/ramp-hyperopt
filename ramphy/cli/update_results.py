@@ -61,7 +61,7 @@ def main(
                 pass
         available_phases = leaderboard_scores.keys()
         print(f"Available leaderboards are {available_phases}")
-        n_kaggle_files = 5 * len(available_phases)
+        n_kaggle_files = 5 * len(available_phases)  # growing folds, last blend, and three best models
         kaggle_file_counter = 0
     
         kaggle_submissions_path = Path(ramp_kit_dir) / "kaggle_submissions"
@@ -147,6 +147,7 @@ def main(
         results_summary_df.loc[row_i, "runtime_growing_folds"] = pd.to_timedelta(
             np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
                       and ra.start_time < growing_folds_stop_time]).sum())
+        # growing folds done but not last blend
         if failure_count == 1:
             continue
         # in last blend training time, we also need to take into consideration of training time of models that occur during the growing fold iteration
@@ -162,7 +163,11 @@ def main(
             last_kaggle_actions = [ra for ra in kaggle_actions if
                                    ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name]
             if len(last_kaggle_actions) == 0:
-                results_summary_df.loc[row_i, "run_finished"] = 0
+                # if contributivity is zero, it is normal not having the kaggle action
+                if results_summary_df.loc[row_i, f"contributivity_last_blend_{submission}"] != 0:
+                    results_summary_df.loc[row_i, "run_finished"] = 0
+                else:
+                    n_kaggle_files -= len(available_phases)
                 continue
             last_kaggle_action = last_kaggle_actions[0]
             select_top_hyperopt_action = [ra for ra in select_top_hyperopt_actions if ra.start_time <= last_kaggle_action.start_time][-1]
