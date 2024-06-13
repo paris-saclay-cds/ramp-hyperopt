@@ -22,6 +22,7 @@ score_name_type_map = {
     'accuracy': rw.score_types.Accuracy,
     'nll': rw.score_types.NegativeLogLikelihood,
     'f1-micro': rw.score_types.F1Micro,
+    'kappa': rw.score_types.Kappa,
 }
 
 def load_template(package, template_path) -> str:
