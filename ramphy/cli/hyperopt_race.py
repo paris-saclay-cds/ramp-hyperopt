@@ -60,8 +60,7 @@ def main(
 
     submissions = ['lgbm', 'xgboost', 'catboost']
     n_rounds = 100
-    n_trials_per_round = 15  # 3 folds x 5 trials
-    # when selecting the top submissions within n_sigma from the best, top_n_for_mean is used to compute
+    n_trials_per_round = 15  # 3 folds x 5 trials    # when selecting the top submissions within n_sigma from the best, top_n_for_mean is used to compute
     # the best and sigma ((average of top_n_for_mean best)
     top_n_for_mean = 10
     n_sigma = 1
@@ -75,6 +74,7 @@ def main(
     with open(Path(ramp_kit_dir) / "data" / "metadata.json", "r") as f:
         metadata = json.load(f)
     kaggle_submissions_path = Path(ramp_kit_dir) / "kaggle_submissions"
+    start_round = 0
 
     action_stats = {submission: [] for submission in submissions}
     improvement_speed_df = pd.DataFrame(columns=["round"] + submissions)
@@ -101,7 +101,7 @@ def main(
             ramp_program.append(rh.actions.load_ramp_action(action_f_name))
         blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
         hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
-        n_rounds -= len(hyperopt_actions)
+        start_round = len(hyperopt_actions)
         print(f"Recovering {len(hyperopt_actions)} hyperopt and blend actions...")
         blend_action_idx = 0
         for hyperopt_action in hyperopt_actions:
@@ -138,7 +138,7 @@ def main(
         #Dictionary of submissions: list of dictionary of run times and scores
         blended_submissions = set()    
     
-    for round_idx in range(n_rounds):
+    for round_idx in range(start_round, n_rounds):
         # We'll choose the submission that improves the results the fastest
         improvement_speeds = {}
         for submission in submissions:
@@ -284,19 +284,21 @@ def main(
             ramp_kit_dir = ramp_kit_dir,
             submission = submission,
         )
-        best_submission = rh.actions.select_top_hyperopt(
+        best_submissions = rh.actions.select_top_hyperopt(
             ramp_kit_dir = ramp_kit_dir,
             submission = submission,
             fold_idxs = range(900, 900 + n_folds),
             top_n = 1,
-        )["selected_submissions"][0]
-        submission_source_f_name = Path(ramp_kit_dir) / "submissions" / best_submission / "training_output" / "submission_bagged_test.csv"
-        submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_best_{submission}.csv"
-        kaggle_submit_file(
-            submission_source_f_name = submission_source_f_name,
-            submission_target_f_name = submission_target_f_name,
-            ramp_kit_dir = ramp_kit_dir,
-        )
+        )["selected_submissions"]
+        if len(best_submissions) > 0:
+            best_submission = best_submissions[0]
+            submission_source_f_name = Path(ramp_kit_dir) / "submissions" / best_submission / "training_output" / "submission_bagged_test.csv"
+            submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_best_{submission}.csv"
+            kaggle_submit_file(
+                submission_source_f_name = submission_source_f_name,
+                submission_target_f_name = submission_target_f_name,
+                ramp_kit_dir = ramp_kit_dir,
+            )
 
 def start():
     main()

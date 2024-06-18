@@ -28,9 +28,9 @@ workflow = rw.workflows.TabularClassifier()
 
 score_types = [
     rw.score_types.Combined(
-        name=score_name,
-        score_types=[rs.score_name_type_map[score_name](name=score_name, precision=4)] * n_targets,
-        weights=[1 / n_targets] * n_targets, precision=4),
+            name=score_name,
+            score_types=[rs.score_name_type_map[score_name](name=score_name, precision=4)] * n_targets,
+            weights=[1 / n_targets] * n_targets, precision=4),
 ]
 
 get_cv = rw.cvs.GrowingFolds().get_cv
@@ -64,14 +64,15 @@ def get_metadata(path=".", data_label=None) -> dict:
 def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     if "test" not in suffix:
         return  # we don't care about saving the training predictions
-    sample_df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
-    df = pd.DataFrame()
-    df[id_col] = sample_df[id_col]
+    df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
     first_col_index = 0
     for target_col in target_cols:
         target_values = target_value_dict[target_col]
         y_pred_block = y_pred[:, first_col_index:first_col_index + len(target_values)]
-        if score_name in ['ngini', 'auc']:
+        if score_name in ['nll'] and len(target_values) > 2:
+            for tv_i, tv in enumerate(target_values):
+                df[f"{{target_col}}_{{tv}}"] = y_pred_block[:, tv_i]
+        elif score_name in ['ngini', 'auc', 'nll']:
             # positive_target_value needed in metadata for auc-type scores
             positive_value_index = target_values.index(positive_target_values[target_col])
             df[target_col] = y_pred_block[:, positive_value_index]
