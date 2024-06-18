@@ -36,7 +36,6 @@ def pangu_setup_kit(
     return {"correctly_executed": result}
 
 
-@rh.actions.ramp_action
 def llm_drop_feature(
     pangu_root: str | Path, output_path: str | Path, kit_path: str | Path, llm: str = "fschat/llama-3-8B-Instruct"
 ) -> Dict:

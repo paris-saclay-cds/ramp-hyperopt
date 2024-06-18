@@ -1,7 +1,9 @@
 import glob
+import re
 import rampwf as rw
 from pathlib import Path
 from typing import Tuple, Optional
+
 try:
     from importlib import resources as impresources
 except ImportError:
@@ -10,20 +12,21 @@ except ImportError:
 
 score_name_type_map = {
     # regression
-    'rmse' : rw.score_types.RMSE,
-    'mae' : rw.score_types.MAE,
-    'r2' : rw.score_types.R2,
-    'rmsle': rw.score_types.RMSLE,
-    'medae': rw.score_types.MedAE,
-    'smape': rw.score_types.SMAPE,
+    "rmse": rw.score_types.RMSE,
+    "mae": rw.score_types.MAE,
+    "r2": rw.score_types.R2,
+    "rmsle": rw.score_types.RMSLE,
+    "medae": rw.score_types.MedAE,
+    "smape": rw.score_types.SMAPE,
     # classification
-    'auc': rw.score_types.ROCAUC,
-    'ngini': rw.score_types.NormalizedGini,
-    'accuracy': rw.score_types.Accuracy,
-    'nll': rw.score_types.NegativeLogLikelihood,
-    'f1-micro': rw.score_types.F1Micro,
-    'kappa': rw.score_types.Kappa,
+    "auc": rw.score_types.ROCAUC,
+    "ngini": rw.score_types.NormalizedGini,
+    "accuracy": rw.score_types.Accuracy,
+    "nll": rw.score_types.NegativeLogLikelihood,
+    "f1-micro": rw.score_types.F1Micro,
+    "kappa": rw.score_types.Kappa,
 }
+
 
 def load_template(package, template_path) -> str:
     """Loads a template from the package
@@ -45,12 +48,28 @@ def load_template(package, template_path) -> str:
         template_code = impresources.read_text(package / template_path)
     return template_code
 
+
+def format_template(template, parameters_dict):
+    """This function formats the template by replacing the elements from the parameters_dict
+
+    Args:
+        template (_type_): _description_
+        parameters_dict (_type_): _description_
+    """
+
+    def replace_placeholders(match):
+        key = match.group(1)
+        return str(parameters_dict.get(key, match.group(0)))
+
+    filled_template = re.sub(r"\{(\w+)\}", replace_placeholders, template)
+    return filled_template
+
+
 def num_data_preprocessors(submission, ramp_kit_dir):
     submission_path = ramp_kit_dir / "submissions" / submission
     dp_idx = 0
     while True:
-        submissions_f_names = glob.glob(
-            f'{submission_path}/data_preprocessor_{dp_idx}_*.py')
+        submissions_f_names = glob.glob(f"{submission_path}/data_preprocessor_{dp_idx}_*.py")
         if len(submissions_f_names) == 0:
             break
         dp_idx += 1
