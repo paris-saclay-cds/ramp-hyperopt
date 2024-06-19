@@ -495,7 +495,7 @@ def submit_hybrid(
     new_submission: str,
     parent_submissions: Dict[str, Dict],
     ramp_data_dir: Optional[str] = None,
-) -> Dict:
+) -> None:
     """Combines workflow elements coming from different submissions.
 
     Inheriting workflow elements from parent submissions.
@@ -507,7 +507,7 @@ def submit_hybrid(
     new_submission : str
         The name of the new submission to be submitted.
     parent_submissions : dict
-        A dictionary of elements parent_submission: workflow_element.
+        A dictionary of elements workflow_element: {parent_submission: element_name}.
     ramp_data_dir : str, default=None.
         Alternative ramp_kit_dir for using another data set. If None,
         set to ramp_kit_dir.
@@ -558,6 +558,7 @@ def submit_hybrid(
             to_file = Path(ramp_kit_dir) / "submissions" / new_submission / f"{new_name}.py"
             shutil.copy(from_file, to_file)
             print(f"Copying {from_file} to {to_file}")
+
 
 def update_hyperopt_score_summary(
     ramp_kit_dir: str,

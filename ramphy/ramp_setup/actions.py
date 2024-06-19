@@ -34,12 +34,12 @@ def execute_script(script_path: str | Path, env_args: Dict, script_args: Dict, h
     script_path = str(script_path)
 
     # Add environment args
-    cmd = []
-    for key, value in env_args.items():
-        cmd.append(f"{key}={value} ")
+    env = os.environ.copy()
+    for env_variable in env_args:
+        env[env_variable] = str(env_args[env_variable])
 
     # Construct the command to run the script with its arguments
-    cmd = cmd + ["python", script_path]
+    cmd = ["python", script_path]
     for key, value in script_args.items():
         cmd.append(f"--{key}")
         cmd.append(str(value))
@@ -48,22 +48,12 @@ def execute_script(script_path: str | Path, env_args: Dict, script_args: Dict, h
     for key, value in hydra_args.items():
         cmd.append(f"{key}={value} ")
 
-    try:
-        # Run the script
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        # Optionally, you can print or log the output
-        print(result.stdout)
-        print(result.stderr)
-        return True
-    except subprocess.CalledProcessError as e:
-        # Handle errors in the script execution
-        print(f"Script failed with exit code {e.returncode}")
-        print(e.output)
-        return False
-    except Exception as e:
-        # Handle other potential exceptions
-        print(f"An error occurred: {e}")
-        return False
+    # Run the script
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
+    # Optionally, you can print or log the output
+    print(result.stdout)
+    print(result.stderr)
+    return True
 
 
 def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
