@@ -34,10 +34,11 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             # We still limit the number of trials we have
             trials = 0
             while not dropped_features_path.exists() and trials < MAX_LLM_TRIALS:
+                trials += 1
+                print(f"Trial {{trials}} for LLM feature drop.")
                 rs.pangu_actions.llm_drop_feature(
                     pangu_root=os.environ["PANGU_PATH"], output_path=llm_workspace_path, kit_path=ramp_kit_dir, llm=LLM
                 )
-                trials += 1
 
             assert (
                 llm_workspace_path / "dropped_features.json"
