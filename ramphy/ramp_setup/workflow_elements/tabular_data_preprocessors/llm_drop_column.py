@@ -21,29 +21,42 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         if "PANGU_PATH" not in os.environ:
             raise ValueError("You should set the PANGU_PATH environment variable.")
 
-        ramp_kit_dir = Path(__file__).parent.parent
-        llm_output_path = ramp_kit_dir / "llm_output"
+        ramp_kit_dir = Path(__file__).parent.parent.parent
+        submission_dir = Path(__file__).parent
+        llm_workspace_path = submission_dir / "llm_workspace"
 
-        if not (llm_output_path / "dropped_features.json").exists():
+        if not (llm_workspace_path / "dropped_features.json").exists():
             rs.pangu_actions.llm_drop_feature(
-                pangu_root=os.environ["PANGU_PATH"], output_path=llm_output_path, kit_path=ramp_kit_dir, llm=LLM
+                pangu_root=os.environ["PANGU_PATH"], output_path=llm_workspace_path, kit_path=ramp_kit_dir, llm=LLM
             )
+            assert (
+                llm_workspace_path / "dropped_features.json"
+            ).exists(), "Could not create the droppped_features.json. Maybe Pangu failed."
         else:
             print(
-                f"We already have a suggestion of dropped features at {(llm_output_path / 'dropped_features.json')}. \
+                f"We already have a suggestion of dropped features at {(llm_workspace_path / 'dropped_features.json')}. \
                 Not asking the LLM again. If you want new ones, remove the file."
             )
 
-        with open(llm_output_path / "dropped_features.json", "r") as f:
+        with open(llm_workspace_path / "dropped_features.json", "r") as f:
             self.drop_feats = json.load(f)["features_to_drop"]
 
-        X_train = X_train.drop(self.drop_feats, axis=1)
-        X_test = X_test.drop(self.drop_feats, axis=1)
+        # Find columns to drop
+        # ---------------------------
+        # We do this because of the categorical encoders before
+        data_columns = X_train.columns
+        columns_to_drop = []
+        for feat in self.drop_feats:
+            columns_to_drop += [s for s in data_columns if s.startswith(feat)]
+        # ---------------------------
+
+        X_train = X_train.drop(columns_to_drop, axis=1)
+        X_test = X_test.drop(columns_to_drop, axis=1)
 
         # Purge metadata
         metadata = deepcopy(metadata)
         metadata_elements = ["feature_types", "feature_values", "missing_data_count"]
-        for feat in self.drop_feats:
+        for feat in self.drop_feats + columns_to_drop:  # So we are sure to remove everything
             for m_el in metadata_elements:
                 try:
                     metadata["data_description"][m_el].pop(feat)
