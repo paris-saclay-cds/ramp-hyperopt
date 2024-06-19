@@ -10,8 +10,10 @@ import ramphy.ramp_setup as rs
 from ramphy import Hyperparameter
 
 llm = Hyperparameter(dtype="str", default="fschat/llama-3-8B-Instruct", values=["fschat/llama-3-8B-Instruct"])
+max_llm_trials = Hyperparameter(dtype="int", default=5, values=[1, 2, 5, 10])
 
 LLM = str(llm)
+MAX_LLM_TRIALS = int(max_llm_trials)
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
@@ -25,20 +27,28 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         submission_dir = Path(__file__).parent
         llm_workspace_path = submission_dir / "llm_workspace"
 
-        if not (llm_workspace_path / "dropped_features.json").exists():
-            rs.pangu_actions.llm_drop_feature(
-                pangu_root=os.environ["PANGU_PATH"], output_path=llm_workspace_path, kit_path=ramp_kit_dir, llm=LLM
-            )
+        dropped_features_path = llm_workspace_path / "dropped_features.json"
+
+        if not dropped_features_path.exists():
+            # We do this because sometimes the LLM fails to generate the file, and relaunching the script makes it work.
+            # We still limit the number of trials we have
+            trials = 0
+            while not dropped_features_path.exists() and trials < MAX_LLM_TRIALS:
+                rs.pangu_actions.llm_drop_feature(
+                    pangu_root=os.environ["PANGU_PATH"], output_path=llm_workspace_path, kit_path=ramp_kit_dir, llm=LLM
+                )
+                trials += 1
+
             assert (
                 llm_workspace_path / "dropped_features.json"
-            ).exists(), "Could not create the droppped_features.json. Maybe Pangu failed."
+            ).exists(), f"Could not create the droppped_features.json after {MAX_LLM_TRIALS} trials."
         else:
             print(
-                f"We already have a suggestion of dropped features at {(llm_workspace_path / 'dropped_features.json')}. \
+                f"We already have a suggestion of dropped features at {dropped_features_path}. \
                 Not asking the LLM again. If you want new ones, remove the file."
             )
 
-        with open(llm_workspace_path / "dropped_features.json", "r") as f:
+        with open(dropped_features_path, "r") as f:
             self.drop_feats = json.load(f)["features_to_drop"]
 
         # Find columns to drop
