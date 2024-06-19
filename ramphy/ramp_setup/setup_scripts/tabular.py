@@ -62,7 +62,7 @@ def setup(
     test_data = test_data.rename(columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
     feature_types = metadata["data_description"]["feature_types"] = new_feature_types
 
-    problem_code = rs.utils.format_template(template=problem_code, parameters_dict=metadata)
+    problem_code = problem_code.format_map(metadata)
     with open(problem_f_name, "w") as f_out:
         f_out.write(problem_code)
     (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
@@ -143,7 +143,7 @@ def tabular_regression_submit(
     # ---------------------------
     regressor_template_path = Path("workflow_elements") / "tabular_regressors" / f"{regressor}.py"
     regressor_code = rs.utils.load_template(package=rs, template_path=regressor_template_path)
-    regressor_code = rs.utils.format_template(template=regressor_code, parameters_dict=metadata)
+    regressor_code = regressor_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "regressor.py", "w") as f_out:
         f_out.write(regressor_code)
     # ---------------------------
@@ -152,7 +152,7 @@ def tabular_regression_submit(
     # ---------------------------
     fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f"{feature_extractor}.py"
     fe_code = rs.utils.load_template(package=rs, template_path=fe_template_path)
-    fe_code = rs.utils.format_template(template=fe_code, parameters_dict=metadata)
+    fe_code = fe_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
         f_out.write(fe_code)
 
@@ -176,7 +176,7 @@ def tabular_classification_submit(
     # ---------------------------
     classifier_template_path = Path("workflow_elements") / "tabular_classifiers" / f"{classifier}.py"
     classifier_code = rs.utils.load_template(package=rs, template_path=classifier_template_path)
-    classifier_code = rs.utils.format_template(template=classifier_code, parameters_dict=metadata)
+    classifier_code = classifier_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "classifier.py", "w") as f_out:
         f_out.write(classifier_code)
     # ---------------------------
@@ -185,7 +185,7 @@ def tabular_classification_submit(
     # ---------------------------
     fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f"{feature_extractor}.py"
     fe_code = rs.utils.load_template(package=rs, template_path=fe_template_path)
-    fe_code = rs.utils.format_template(template=fe_code, parameters_dict=metadata)
+    fe_code = fe_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
         f_out.write(fe_code)
 
@@ -214,7 +214,7 @@ def tabular_data_preprocessors_submit(
     for dp in data_preprocessors:
         dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / f"{dp}.py"
         dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
-        dp_code = rs.utils.format_template(template=dp_code, parameters_dict=metadata)
+        dp_code = dp_code.format_map(metadata)
         with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{dp}.py", "w") as f_out:
             f_out.write(dp_code)
         dp_idx += 1
@@ -243,9 +243,7 @@ def tabular_cat_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = rs.utils.format_template(
-                template=dp_code, parameters_dict=metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
                 ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_imputing.py", "w"
             ) as f_out:
@@ -276,9 +274,7 @@ def tabular_num_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = rs.utils.format_template(
-                template=dp_code, parameters_dict=metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
                 ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_num_col_imputing.py", "w"
             ) as f_out:
@@ -309,9 +305,7 @@ def tabular_cat_col_encoders_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat":
-            dp_code_formatted = rs.utils.format_template(
-                template=dp_code, parameters_dict=metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
                 ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_encoding.py", "w"
             ) as f_out:
@@ -342,9 +336,7 @@ def tabular_text_col_encoders_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "text":
-            dp_code_formatted = rs.utils.format_template(
-                template=dp_code, parameters_dict=metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
                 ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_text_col_encoding.py", "w"
             ) as f_out:
@@ -375,9 +367,7 @@ def tabular_date_col_encoder_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "date":
-            dp_code_formatted = rs.utils.format_template(
-                template=dp_code, parameters_dict=metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
                 ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_date_col_encoding.py",
                 "w",

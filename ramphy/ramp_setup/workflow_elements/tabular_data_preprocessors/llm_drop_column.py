@@ -41,10 +41,10 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
             assert (
                 llm_workspace_path / "dropped_features.json"
-            ).exists(), f"Could not create the droppped_features.json after {MAX_LLM_TRIALS} trials."
+            ).exists(), f"Could not create the droppped_features.json after {{MAX_LLM_TRIALS}} trials."
         else:
             print(
-                f"We already have a suggestion of dropped features at {dropped_features_path}. \
+                f"We already have a suggestion of dropped features at {{dropped_features_path}}. \
                 Not asking the LLM again. If you want new ones, remove the file."
             )
 
@@ -71,7 +71,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 try:
                     metadata["data_description"][m_el].pop(feat)
                 except KeyError as e:
-                    print(f"Feature {feat} not in {m_el}")
+                    print(f"Feature {{feat}} not in {{m_el}}")
                     continue
 
         return X_train, y_train, X_test, metadata

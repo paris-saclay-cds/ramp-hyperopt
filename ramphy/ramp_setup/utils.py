@@ -49,22 +49,6 @@ def load_template(package, template_path) -> str:
     return template_code
 
 
-def format_template(template, parameters_dict):
-    """This function formats the template by replacing the elements from the parameters_dict
-
-    Args:
-        template (_type_): _description_
-        parameters_dict (_type_): _description_
-    """
-
-    def replace_placeholders(match):
-        key = match.group(1)
-        return str(parameters_dict.get(key, match.group(0)))
-
-    filled_template = re.sub(r"\{(\w+)\}", replace_placeholders, template)
-    return filled_template
-
-
 def num_data_preprocessors(submission, ramp_kit_dir):
     submission_path = ramp_kit_dir / "submissions" / submission
     dp_idx = 0
