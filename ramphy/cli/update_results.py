@@ -103,7 +103,7 @@ def main(
 
         failure_count = 0
         for blend_type in ["growing_folds", "last_blend"]:
-            submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(2)}.csv"
+            submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(3)}.csv"
             last_kaggle_actions = [ra for ra in kaggle_actions if
                                    ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name]
             if len(last_kaggle_actions) == 0:
