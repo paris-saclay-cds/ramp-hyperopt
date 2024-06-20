@@ -75,12 +75,16 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 X_transformed = X_transformed.toarray()
             X_train = X_train.drop(columns=[self.col])
             X_train[new_columns] = X_transformed
+            for col in new_columns:
+                X_train[col] = pd.to_numeric(X_train[col], downcast="integer")
     
             X_transformed = transformer.transform(X_test[[self.col]])
             if hasattr(X_transformed, "toarray"):
                 X_transformed = X_transformed.toarray()
             X_test = X_test.drop(columns=[self.col])
             X_test[new_columns] = X_transformed
+            for col in new_columns:
+                X_test[col] = pd.to_numeric(X_test[col], downcast="integer")
     
             metadata["data_description"]["feature_types"].pop(self.col)
             for col in new_columns:

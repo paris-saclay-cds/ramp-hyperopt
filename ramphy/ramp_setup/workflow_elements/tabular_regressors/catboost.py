@@ -1,5 +1,6 @@
 import numpy as np
 import catboost as cb
+from _catboost import CatBoostError
 from sklearn.base import BaseEstimator
 from ramphy import Hyperparameter
 
@@ -63,6 +64,42 @@ class Regressor(BaseEstimator):
             min_data_in_leaf=MIN_DATA_IN_LEAF,
             bootstrap_type=BOOTSTRAP_TYPE,
             random_strength=RANDOM_STRENGTH,
+            loss_function=self.objective,
+            verbose=False,
+        )
+        try:
+            self.reg.fit(X, y)
+            return
+        except CatBoostError:
+            # Catching mysterious _catboost.CatBoostError:
+            # /src/catboost/catboost/private/libs/lapack/linear_system.cpp:31:
+            # System of linear equations is not positive definite
+            for i in range(2, 10):
+                print(f"Catboost crashed, attempt no {{i}}")
+                try:
+                    self.reg = cb.CatBoostRegressor(
+                        cat_features=self.cat_features,
+                        iterations=ITERATIONS,
+                        learning_rate=LEARNING_RATE,
+                        depth=DEPTH,
+                        l2_leaf_reg=L2_LEAF_REG,
+                        border_count=BORDER_COUNT,
+                        bagging_temperature=BAGGING_TEMPERATURE,
+                        grow_policy=GROW_POLICY,
+                        min_data_in_leaf=MIN_DATA_IN_LEAF,
+                        bootstrap_type=BOOTSTRAP_TYPE,
+                        random_strength=RANDOM_STRENGTH,
+                        loss_function=self.objective,
+                        verbose=False,
+                        random_seed=i,
+                    )
+                    self.reg.fit(X, y)
+                    return
+                except CatBoostError:
+                    pass
+        print("Falling back to default")
+        self.reg = cb.CatBoostRegressor(
+            cat_features=self.cat_features,
             loss_function=self.objective,
             verbose=False,
         )
