@@ -249,7 +249,7 @@ def main(
             fold_idxs = range(900, stop_fold_idx),
         )
         submission_source_f_name = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-        submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_growing_folds_{str(stop_fold_idx).zfill(2)}.csv"
+        submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_growing_folds_{str(stop_fold_idx).zfill(3)}.csv"
         kaggle_submit_file(
             submission_source_f_name = submission_source_f_name,
             submission_target_f_name = submission_target_f_name,
@@ -271,7 +271,7 @@ def main(
             fold_idxs = range(900, stop_fold_idx),
         )
         submission_source_f_name = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-        submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(2)}.csv"
+        submission_target_f_name = kaggle_submissions_path / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}.csv"
         kaggle_submit_file(
             submission_source_f_name = submission_source_f_name,
             submission_target_f_name = submission_target_f_name,
