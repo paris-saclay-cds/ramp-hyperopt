@@ -8,19 +8,21 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.system("proxy")
 
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import ramphy.ramp_setup as rs
-from llm2vec import LLM2Vec
 import torch
+from llm2vec import LLM2Vec
 from peft.peft_model import PeftModel
 from ramphy import Hyperparameter
+from sklearn.impute import SimpleImputer
 from transformers import AutoConfig
 from transformers import AutoModel
 from transformers import AutoTokenizer
 
+# RAMP START HYPERPARAMETERS
 peft_model = Hyperparameter(
     dtype="str", default="mntp-supervised", values=["mntp-supervised", "mntp-unsup-simcse", "mntp"]
 )
@@ -30,8 +32,17 @@ pooling_mode = Hyperparameter(
     values=["mean", "eos_token", "weighted_mean", "bos_token"],
 )
 # positional is an experimental one that I am testing
+# TODO think about implementing positional that takes the top N
+# TODO think about implementing the encoding of all the cols at once other than separately
 encoding_mode = Hyperparameter(dtype="str", default="positional", values=["full", "positional"])
+impute_strategy_num = Hyperparameter(
+    dtype="str", default="mean", values=["mean", "median", "most_frequent", "constant"]
+)
+fill_value_num = Hyperparameter(dtype="float", default=-1.0, values=[-1.0, 0.0])
+# RAMP END HYPERPARAMETERS
 
+IMPUTE_STRATEGY_NUM = str(impute_strategy_num)
+FILL_VALUE_NUM = float(fill_value_num)
 PEFT_MODEL = str(peft_model)
 POOLING_MODE = str(pooling_mode)
 ENCODING_MODE = str(encoding_mode)
@@ -57,7 +68,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         )
         self.model = self.model.merge_and_unload()
         self.model = PeftModel.from_pretrained(
-            self.model, f"McGill-NLP/LLM2Vec-Sheared-LLaMA-{PEFT_MODEL}", device_map=device_map
+            self.model, f"McGill-NLP/LLM2Vec-Sheared-LLaMA-{{PEFT_MODEL}}", device_map=device_map
         )
         self.l2v = LLM2Vec(self.model, self.tokenizer, pooling_mode=POOLING_MODE, max_length=512)
 
@@ -72,18 +83,23 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 text_columns.append(feature)
 
         # Encode columns
-        new_feature_names = {}
+        new_feature_names = {{}}  # Needed for metadata update
+        all_new_features = []  # Needed for imputing
         for feature in text_columns:
             encoded_columns = self.encode_column(column_name=feature, dataset=X_train)
-            X_train = pd.concat([X_train, encoded_columns], ignore_index=True)
+            X_train = pd.concat([X_train, encoded_columns])
             new_feature_names[feature] = list(encoded_columns.columns)
+            all_new_features += new_feature_names[feature]
 
             encoded_columns = self.encode_column(column_name=feature, dataset=X_test)
-            X_test = pd.concat([X_test, encoded_columns], ignore_index=True)
+            X_test = pd.concat([X_test, encoded_columns])
 
         # Drop text columns from datasets
         X_train.drop(columns=text_columns)
         X_test.drop(columns=text_columns)
+
+        for new_col in all_new_features:
+            X_train, X_test = self.impute(col_name=new_col, X_train=X_train, X_test=X_test)
 
         # Update metadata
         metadata = deepcopy(metadata)
@@ -108,6 +124,23 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
         return X_train, y_train, X_test, metadata
 
+    def impute(self, col_name: str, X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Imputes the missing values in the column
+
+        Args:
+            col_name (str): _description_
+            X_train (pd.DataFrame): _description_
+            X_test (pd.DataFrame): _description_
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: _description_
+        """
+        imputer = SimpleImputer(strategy=IMPUTE_STRATEGY_NUM, fill_value=FILL_VALUE_NUM)
+        imputer.fit(pd.concat([X_train, X_test])[[col_name]])
+        X_train[[col_name]] = imputer.transform(X_train[[col_name]])
+        X_test[[col_name]] = imputer.transform(X_test[[col_name]])
+        return X_train, X_test
+
     def encode_column(self, column_name: str, dataset: pd.DataFrame) -> pd.DataFrame:
         """This function encodes the given column from the given dataset.
 
@@ -118,14 +151,16 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         Returns:
             pd.DataFrame: The dataframe of the encoded columns
         """
-        instruction = f"Given the text feature named {column_name} of a tabular dataset, extract the corresponding value in the given example."
-        values = dataset[column_name].values
+        instruction = f"Given the text feature named {{column_name}} of a tabular dataset, extract the corresponding value in the given example."
+        column = dataset[column_name].dropna()  # We do this and with the idx as well so we only encode the values
+        values = column.values
+        indexes = column.index
 
-        queries = [[instruction, f"{column_name}: {val}"] for val in values]
+        queries = [[instruction, f"{{column_name}}: {{val}}"] for val in values]
         raw_encoding = np.array(self.l2v.encode(queries, convert_to_numpy=True))
         encoding = self.postprocess_encoding(raw_encoding)
-        new_col_names = [f"{column_name}_{idx}" for idx in range(encoding.shape[1])]
-        encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names)
+        new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
+        encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names, index=indexes)
         return encoded_columns
 
     def postprocess_encoding(self, raw_encoding: np.ndarray) -> np.ndarray:
@@ -144,4 +179,4 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             encoding = np.array([max_values, normalized_idx]).swapaxes(1, 0)
             return encoding
         else:
-            raise ValueError(f"Encoding {ENCODING_MODE} not implemented")
+            raise ValueError(f"Encoding {{ENCODING_MODE}} not implemented")
