@@ -433,7 +433,7 @@ def tabular_encoder_imputer_submit(
 
 
 @ramp_action
-def tabular_regression_columnwise_first_submit(
+def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = "xgboost",
     feature_extractor: str = "empty",
@@ -443,6 +443,7 @@ def tabular_regression_columnwise_first_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -481,6 +482,7 @@ def tabular_regression_columnwise_first_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -488,7 +490,7 @@ def tabular_regression_columnwise_first_submit(
 
 
 @ramp_action
-def tabular_regression_columnwise_last_submit(
+def tabular_regression_columnwise_first_submit(
     submission: str | Path,
     regressor: str = "xgboost",
     feature_extractor: str = "empty",
@@ -498,6 +500,7 @@ def tabular_regression_columnwise_last_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -529,6 +532,7 @@ def tabular_regression_columnwise_last_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -552,6 +556,7 @@ def tabular_classification_columnwise_last_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -590,6 +595,7 @@ def tabular_classification_columnwise_last_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -607,6 +613,7 @@ def tabular_classification_columnwise_first_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -638,6 +645,7 @@ def tabular_classification_columnwise_first_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
