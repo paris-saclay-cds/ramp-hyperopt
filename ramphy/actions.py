@@ -107,6 +107,13 @@ def load_contributivities(ramp_kit_dir):
     ).astype(int)
     return contributivites_df
 
+def load_contributivities_bagged_then_blended(ramp_kit_dir):
+    contributivites_df = pd.read_csv(
+        f"{ramp_kit_dir}/submissions/training_output/contributivities_bagged_then_blended.csv"
+    )
+    contributivites_df = contributivites_df.set_index("submission")
+    return contributivites_df
+
 def _mean_score(submission, fold_idxs, score_type, ramp_kit_dir):
     foldwise_scores = []
     for fold_idx in fold_idxs:
@@ -474,7 +481,6 @@ def blend(
             submissions,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
-            ramp_submission_dir=str(Path(ramp_kit_dir) / "submissions"),
             save_output=True,
             output_path=str(output_path),
             fold_idxs=fold_idxs,
@@ -488,6 +494,65 @@ def blend(
         return r
     else:
         return {}
+
+@ramp_action
+def bag_then_blend(
+    ramp_kit_dir: str,
+    submissions: List[str],
+    fold_idxs: Optional[Sequence[int]] = None,
+    output_path: Optional[str] = None,
+    ramp_data_dir: Optional[str] = None,
+) -> Dict:
+    """Bag-then-blending action.
+
+    Bags the blends a list of submissions.
+
+    Parameters
+    ----------
+    ramp_kit_dir : str
+        The directory of the ramp-kit.
+    submissions : list of str
+        The name of the submissions to be blended.
+    fold_idxs : list of int, default=None
+        Fold indices to blend.
+        If None, we will blend all folds.
+    output_path : str, default=None.
+        The folder where bagged_then_blended_scores.csv and 
+        submission_bagged_then_blended_scores_test.csv are saved. If None, defaults
+        to <ramp_kit_dir>/submissions/training_output.
+    ramp_data_dir : str, default=None.
+        Alternative ramp_kit_dir for using another data set. If None,
+        set to ramp_kit_dir.
+    Returns
+    -------
+    scores : dict
+        A dictionary with a single element "blended_score": float. If submissions = []
+        it returns an empty dictionary.
+    """
+    ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
+    if len(submissions) > 0:
+        problem = rw.utils.assert_read_problem(ramp_kit_dir)
+        if output_path is None:
+            output_path = ramp_kit_dir / "submissions" / "training_output"
+        else:
+            output_path = Path(output_path)
+        rw.utils.testing.bag_then_blend_submissions(
+            submissions,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+            save_output=True,
+            output_path=str(output_path),
+            fold_idxs=fold_idxs,
+        )
+        r = {}
+        scores_df = pd.read_csv(output_path / "bagged_then_blended_scores.csv")
+        r["blended_score"] = scores_df["valid"][0]
+        contributivities_df = load_contributivities_bagged_then_blended(ramp_kit_dir)
+        r["contributivities"] = contributivities_df["contributivity"].to_dict()
+        return r
+    else:
+        return {}
+
 
 # has to be redesigned because of variable number of data preprocessors.
 @ramp_action
