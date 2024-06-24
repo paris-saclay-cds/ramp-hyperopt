@@ -2,6 +2,7 @@ import json
 import click
 from pathlib import Path
 import ramphy as rh
+import ramphy.ramp_setup as rs
 rh.actions.EXECUTE_PLAN = True
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -35,35 +36,12 @@ def main(
     version,
     number,
 ):
-    kit_suffix = f"v{version}_n{number}"
-    ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
-    
-    rh.ramp_setup.setup_scripts.tabular.setup(
-        download_dir = f"{setup_dir}/{ramp_kit}",
-        ramp_kit_dir = ramp_kit_dir,
-    )
-
-    metadata = json.load(open(Path(ramp_kit_dir) / "data" / "metadata.json"))
-
-    if "regression" in metadata["prediction_type"]:
-        rh.ramp_setup.setup_scripts.tabular.tabular_regression_columnwise_last_submit(         
-            ramp_kit_dir = ramp_kit_dir,
-            submission = 'starting_kit',
-            regressor = 'lgbm',
-        )   
-    elif "classification" in metadata["prediction_type"]:
-        rh.ramp_setup.setup_scripts.tabular.tabular_classification_columnwise_last_submit(         
-            ramp_kit_dir = ramp_kit_dir,
-            submission = 'starting_kit',
-            classifier = 'lgbm',
-        )
-                                                                                                       
-    rh.actions.train(                                                                                  
-        ramp_kit_dir = ramp_kit_dir,    
-        submission = 'starting_kit',                                                                       
-        fold_idxs = range(900, 903),                                                                   
-        force_retrain = True,
-    )                                                                                                  
+    rs.scripts.setup.setup(
+        ramp_kit = ramp_kit,
+        setup_dir = setup_dir,
+        version = version,
+        number = number,
+    )    
 
 def start():
     main()
