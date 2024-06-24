@@ -16,12 +16,12 @@ NEW_SUBMISSION_NAME = "lgbm_llm_fe_drop"
 # NEW_SUBMISSION_NAME = "lgbm_hyperopt_best"
 
 
-rs.tabular_regression_columnwise_last_submit(
-    submission="llm_rejector",
-    regressor=regressor,
-    data_preprocessors=["llm_drop_column"],
-    ramp_kit_dir=KIT_PATH,
-)
+# rs.tabular_regression_columnwise_first_submit(
+#     submission="llm_rejector",
+#     regressor=regressor,
+#     data_preprocessors=["llm_drop_column"],
+#     ramp_kit_dir=KIT_PATH,
+# )
 
 rh.submit_hybrid(
     ramp_kit_dir=str(KIT_PATH),
