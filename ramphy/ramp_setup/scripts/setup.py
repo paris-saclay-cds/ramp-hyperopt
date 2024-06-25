@@ -34,11 +34,11 @@ def setup(
         of the same kit.
     """
     kit_suffix = f"v{version}_n{number}"
-    ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
+    ramp_kit_dir = f"{kit_root}/{ramp_kit}_{kit_suffix}"
     
     rs.scripts.tabular.tabular_setup(
         download_dir = f"{setup_root}/{ramp_kit}",
-        ramp_kit_dir = f"{kit_root}/{ramp_kit_dir}",
+        ramp_kit_dir = ramp_kit_dir,
     )
 
     metadata = json.load(open(Path(ramp_kit_dir) / "data" / "metadata.json"))
