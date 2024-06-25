@@ -2,6 +2,8 @@ import json
 import os
 
 os.environ["CURL_CA_BUNDLE"] = ""
+os.environ["HF_HUB_OFFLINE"] = "0"
+os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
 from copy import deepcopy
 from typing import Tuple
