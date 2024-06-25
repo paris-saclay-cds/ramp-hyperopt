@@ -628,7 +628,8 @@ def update_hyperopt_score_summary(
         ramp_data_dir = ramp_data_dir,
         force_reload = True,
     )
-    summary_df.to_csv(summary_fname)
+    if len(summary_df) > 0:
+        summary_df.to_csv(summary_fname)
 
 
 def get_hyperopt_score_summary(

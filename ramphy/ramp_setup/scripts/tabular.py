@@ -13,7 +13,7 @@ from ramphy.actions import ramp_action, RAMP_ACTIONS
 
 
 @ramp_action
-def setup(
+def tabular_setup(
     download_dir: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
