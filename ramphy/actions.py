@@ -109,12 +109,14 @@ def load_contributivities(ramp_kit_dir):
     ).astype(int)
     return contributivites_df
 
+
 def load_contributivities_bagged_then_blended(ramp_kit_dir):
     contributivites_df = pd.read_csv(
         f"{ramp_kit_dir}/submissions/training_output/contributivities_bagged_then_blended.csv"
     )
     contributivites_df = contributivites_df.set_index("submission")
     return contributivites_df
+
 
 def _mean_score(submission, fold_idxs, score_type, ramp_kit_dir):
     foldwise_scores = []
@@ -492,6 +494,7 @@ def blend(
     else:
         return {}
 
+
 @ramp_action
 def bag_then_blend(
     ramp_kit_dir: str,
@@ -514,7 +517,7 @@ def bag_then_blend(
         Fold indices to blend.
         If None, we will blend all folds.
     output_path : str, default=None.
-        The folder where bagged_then_blended_scores.csv and 
+        The folder where bagged_then_blended_scores.csv and
         submission_bagged_then_blended_scores_test.csv are saved. If None, defaults
         to <ramp_kit_dir>/submissions/training_output.
     ramp_data_dir : str, default=None.
@@ -556,7 +559,7 @@ def bag_then_blend(
 def submit_hybrid(
     ramp_kit_dir: str,
     new_submission: str,
-    parent_submissions: Dict[str, Dict],
+    parent_submissions: Dict[str | Tuple[str], str],
     ramp_data_dir: Optional[str] = None,
 ) -> None:
     """Combines workflow elements coming from different submissions.
@@ -570,7 +573,9 @@ def submit_hybrid(
     new_submission : str
         The name of the new submission to be submitted.
     parent_submissions : dict
-        A dictionary of elements workflow_element: {parent_submission: element_name}.
+        A dictionary of elements {workflow_element or tuple of elements: parent_submission}.
+        For the data preprocessors, if you do data_preprocessors: parent_submission, it will copy all
+        the preprocessors of that submission
     ramp_data_dir : str, default=None.
         Alternative ramp_kit_dir for using another data set. If None,
         set to ramp_kit_dir.
@@ -580,45 +585,43 @@ def submit_hybrid(
     if new_submission_dir.exists():
         shutil.rmtree(new_submission_dir)
     new_submission_dir.mkdir(parents=False, exist_ok=True)
-    for element in ["data_preprocessors", "model", "fe"]:
-        if element not in parent_submissions:
-            raise ValueError(f"You should specify the {element}")
 
-    # Copy model
-    parent_model = parent_submissions["model"]
-    for parent in parent_model:
-        wf_element = parent_model[parent]
-        from_file = Path(ramp_kit_dir) / "submissions" / parent / f"{wf_element}.py"
-        to_file = Path(ramp_kit_dir) / "submissions" / new_submission / f"{wf_element}.py"
-        shutil.copy(from_file, to_file)
-        print(f"Copying {from_file} to {to_file}")
+    # Unroll any list
+    # We do it so we respect the order
+    # Note that we take advantage of the fact that since Python3.7 dicts are ordered
+    elements_dict = {}
+    for wf_element in parent_submissions:
+        submission = parent_submissions[wf_element]
+        if isinstance(wf_element, tuple):
+            for element in wf_element:
+                elements_dict[element] = submission
+        # in this case we copy all preprocessors
+        elif wf_element == "data_preprocessors":
+            source_dir = Path(ramp_kit_dir) / "submissions" / submission
+            d_preprocessors = [str(file.name)[:-3] for file in source_dir.glob("data_preprocessor*") if file.is_file()]
+            # Use this to sort them otherwise we'll have 1, 10, 2
+            for i in range(len(d_preprocessors)):
+                dp = [s for s in d_preprocessors if s.startswith(f"data_preprocessor_{i}_")][0]
+                elements_dict[dp] = submission
+        else:
+            elements_dict[wf_element] = submission
 
-    # Copy fe
-    parent_fe = parent_submissions["fe"]
-    for parent in parent_fe:
-        wf_element = parent_fe[parent]
-        from_file = Path(ramp_kit_dir) / "submissions" / parent / f"{wf_element}.py"
-        to_file = Path(ramp_kit_dir) / "submissions" / new_submission / f"{wf_element}.py"
-        shutil.copy(from_file, to_file)
-        print(f"Copying {from_file} to {to_file}")
-
-    # Copy data preprocessors in a way that we keep the order specified in the dict
-    parent_preprocessors = parent_submissions["data_preprocessors"]
+    # Copy elements
     prepr_index = 0
-    # Note that here we take advantage of the fact that dicts are ordered since Python3.7
-    for parent in parent_preprocessors:
-        wf_element_list = parent_preprocessors[parent]
-        # I do this to avoid code repetition, so we always deal with a list
-        if isinstance(wf_element_list, str):
-            wf_element_list = [wf_element_list]
-
-        for wf_element in wf_element_list:
+    for wf_element in elements_dict:
+        parent = elements_dict[wf_element]
+        if "data_preprocessor" in wf_element:
             name = wf_element.split("_")[3:]
             name = "_".join(name)
             new_name = f"data_preprocessor_{prepr_index}_{name}"
             prepr_index += 1
             from_file = Path(ramp_kit_dir) / "submissions" / parent / f"{wf_element}.py"
             to_file = Path(ramp_kit_dir) / "submissions" / new_submission / f"{new_name}.py"
+            shutil.copy(from_file, to_file)
+            print(f"Copying {from_file} to {to_file}")
+        else:
+            from_file = Path(ramp_kit_dir) / "submissions" / parent / f"{wf_element}.py"
+            to_file = Path(ramp_kit_dir) / "submissions" / new_submission / f"{wf_element}.py"
             shutil.copy(from_file, to_file)
             print(f"Copying {from_file} to {to_file}")
 
