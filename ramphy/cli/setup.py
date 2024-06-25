@@ -16,11 +16,17 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="The kit to set up.",
 )
 @click.option(
-    "--setup-dir",
-    default="/nas/ramp-setup-kits",
+    "--setup-root",
+    default="../ramp-setup-kits",
     show_default=True,
     help="The root folder where the kits with original metadata and "
     "train/test files are",
+)
+@click.option(
+    "--kit-root",
+    default="./",
+    show_default=True,
+    help="The root folder where the kits are",
 )
 @click.option(
     "--version",
@@ -32,13 +38,15 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 )
 def main(
     ramp_kit,
-    setup_dir,
+    setup_root,
+    kit_root,
     version,
     number,
 ):
     rs.scripts.setup.setup(
         ramp_kit = ramp_kit,
-        setup_dir = setup_dir,
+        setup_root = setup_root,
+        kit_root = kit_root,
         version = version,
         number = number,
     )    

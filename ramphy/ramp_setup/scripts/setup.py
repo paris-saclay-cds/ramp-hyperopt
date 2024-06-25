@@ -6,7 +6,8 @@ import ramphy as rh
 
 def setup(
     ramp_kit: str,
-    setup_dir: str,
+    setup_root: str,
+    kit_root: str,
     version: str,
     number: str | int,
 ):
@@ -21,9 +22,11 @@ def setup(
     ----------
     ramp_kit : str
         The name of the ramp-kit.
-    setup_dir : str
-        The folder where the ingredients are found is <setup_dir>/<ramp_kit>.
+    setup_root : str
+        The folder where the ingredients are found is <setup_root>/<ramp_kit>.
         Typically contains test, train, and metadata.
+    kit_root : str
+        The folder where kits are found.
     version : str
         The version tag of ramphy and rampwf.
     number : str | int
@@ -31,10 +34,10 @@ def setup(
         of the same kit.
     """
     kit_suffix = f"v{version}_n{number}"
-    ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
+    ramp_kit_dir = f"{kit_root}/{ramp_kit}_{kit_suffix}"
     
-    rs.scripts.tabular.setup(
-        download_dir = f"{setup_dir}/{ramp_kit}",
+    rs.scripts.tabular.tabular_setup(
+        download_dir = f"{setup_root}/{ramp_kit}",
         ramp_kit_dir = ramp_kit_dir,
     )
 

@@ -4,8 +4,7 @@ import pytest
 import shutil
 import hashlib
 import numpy as np
-import ramphy as rh
-import rampwf as rw
+import ramphy.ramp_setup as rs
 from pathlib import Path
 
 PATH = os.path.dirname(__file__)
@@ -14,17 +13,19 @@ PATH = os.path.dirname(__file__)
 def _generate_grid_path_kits():
     grid = []
     for path_kit in sorted(glob.glob(os.path.join(PATH, 'ramp_setup_kits', '*'))):
-        grid.append(os.path.abspath(path_kit))
+        grid.append(Path(path_kit).name)
     return grid
 
 
 @pytest.mark.parametrize(
-    "path_kit",
+    "ramp_kit",
     _generate_grid_path_kits()
 )
-def test_submission(path_kit):
-    ramp_kit_dir = Path(PATH) / 'ramp_kits' / 'test_kit'
-
+def test_submission(ramp_kit):
+    kit_root = Path(PATH) / 'ramp_kits'
+    setup_root = Path(PATH) / 'ramp_setup_kits'
+    ramp_kit_dir = kit_root / f"{ramp_kit}_v0_n0"
+    
     # cleaning up
     if ramp_kit_dir.is_dir():
         shutil.rmtree(ramp_kit_dir)
@@ -33,179 +34,50 @@ def test_submission(path_kit):
     if Path('catboost_info').is_dir():
         shutil.rmtree('catboost_info')
 
-    ramp_kit_dir.mkdir(parents=True, exist_ok=True)
+#    ramp_kit_dir.mkdir(parents=True, exist_ok=True)
 
-    # Setup and starting kit
-    rh.ramp_setup.kit_setup(
-        download_dir = path_kit,
-        ramp_kit_dir = ramp_kit_dir,
-    )
-    rh.actions.train(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'starting_kit',
-        fold_idxs = [400, 401],
-        force_retrain = True,
-    )
+    rs.scripts.setup.setup(
+        ramp_kit = ramp_kit,
+        setup_root = setup_root,
+        kit_root = kit_root,
+        version = "0",
+        number = 0,
+    )    
 
-    # single training
-    rh.ramp_setup.tabular_regression_columnwise_last_submit(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'lgbm',
-        regressor = 'lgbm',
-        feature_extractor = 'empty',
-        data_preprocessors = ['drop_id', 'invalid_col_names'],
-    )
-    
-    rh.actions.train(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'lgbm',
-        fold_idxs = range(900, 903),
-        force_retrain = True,
+    rs.orchestration.hyperopt_race(
+        ramp_kit = ramp_kit,
+        kit_root = kit_root,
+        version = "0",
+        number = 0,
+        resume = False,
+        n_rounds = 1,
+        n_trials_per_round = 3,
+        n_folds_hyperopt = 3,
+        n_folds = 7,
+        base_submissions = ["lgbm", "xgboost", "catboost"],
+        top_n_for_mean = 2,
+        n_sigma = 1.0,    
     )
 
-    rh.ramp_setup.tabular_regression_columnwise_last_submit(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'catboost',
-        regressor = 'catboost',
-        feature_extractor = 'empty',
-        data_preprocessors = ['drop_id', ],
-        cat_col_encode = False,
-    ) 
-    rh.actions.train(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'catboost',
-        fold_idxs = range(900, 903),
-        force_retrain = True,
+    rs.orchestration.hyperopt_race(
+        ramp_kit = ramp_kit,
+        kit_root = kit_root,
+        version = "0",
+        number = 0,
+        resume = True,
+        n_rounds = 1,
+        n_trials_per_round = 3,
+        n_folds_hyperopt = 3,
+        n_folds = 7,
+        base_submissions = ["lgbm", "xgboost", "catboost"],
+        top_n_for_mean = 2,
+        n_sigma = 1.0,    
     )
-
-    rh.ramp_setup.tabular_regression_columnwise_last_submit(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'xgboost',
-        regressor = 'xgboost',
-        feature_extractor = 'empty',
-    ) 
-    rh.actions.train(
-        ramp_kit_dir = ramp_kit_dir,
-        submission = 'xgboost',
-        fold_idxs = range(900, 903),
-        force_retrain = True,
-    )
-
-    # optimization
-    regressors = ['lgbm']
-    n_trials = 9
-    top_n_for_mean = 3
-    n_sigma = 2
-    n_folds = 7
-
-    for regressor in regressors:
-        submission = regressor
-        submissions_f_names = glob.glob(
-            f'{ramp_kit_dir}/submissions/{submission}_best*')
-        problem = rw.utils.assert_read_problem(ramp_kit_dir=ramp_kit_dir)
-        for submission_dir in submissions_f_names:
-            best_submission = submission_dir.split('/')[-1]
-            hyperparameters = rh.parse_all_hyperparameters(
-                submission_dir, problem.workflow
-            )
-            hyper_indices = [h.default_index for h in hyperparameters]
-            hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
-            output_submission_dir =\
-                f'{ramp_kit_dir}/submissions/{submission}_hyperopt_{hyper_hash}'
-            print(f"{submission_dir} -> {output_submission_dir}")
-            shutil.move(submission_dir, output_submission_dir)
-    
-        # hyperopt
-        rh.actions.hyperopt(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            n_trials=n_trials,
-            fold_idxs=range(900, 903),
-            workflow_element_names=['regressor'],
-            resume=True,
-        )
-    
-        # resume
-        rh.actions.hyperopt(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            n_trials=n_trials,
-            fold_idxs=range(900, 903),
-            resume=True,
-        )
-        
-        # subtract_existing - no new trials
-        rh.actions.hyperopt(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            n_trials=n_trials,
-            fold_idxs=range(900, 903),
-            resume=True,
-            subtract_existing=True,
-        )
-        
-        rh.actions.delete_duplicates_hyperopt(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            fold_idxs=range(900, 903),
-        )
-        
-        for stop_fold_idx in range(904, 900 + n_folds + 1):
-            rh.actions.select_top_hyperopt_and_train(
-                ramp_kit_dir=ramp_kit_dir,
-                submission=submission,
-                fold_idxs=range(900, stop_fold_idx),
-                trained_fold_idxs=range(900, stop_fold_idx - 1),
-                top_n=top_n_for_mean, n_sigma=n_sigma,
-            )
-    
-        # This below also blends, so submissions/training_output/submission_combined_bagged_test.csv can be submitted
-        rh.actions.rename_best_hyperopt_submissions(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            fold_idxs=range(900, 900 + n_folds), 
-            top_n=10,
-        )
-        
-        rh.actions.save_hyperopt_score_summary(
-            ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-        )
-        
-        # Training and bagging the best on 8 folds
-        submissions_f_names = glob.glob(
-            f'{ramp_kit_dir}/submissions/{submission}_best_0_*')
-        submissions = [f.split('/')[-1] for f in submissions_f_names]
-        rh.actions.train(
-            ramp_kit_dir=ramp_kit_dir, 
-            submission=submissions[0],
-            fold_idxs=range(900, 908),
-        )
-
-    submissions_f_names = glob.glob(
-        f'{ramp_kit_dir}/submissions/*_best_0_*')
-    submissions = [f.split('/')[-1] for f in submissions_f_names]
-    submissions += ['xgboost', 'catboost']
-    rh.actions.blend(
-        ramp_kit_dir=ramp_kit_dir,
-        submissions=submissions,
-        fold_idxs=range(900, 908),
-    )
-
-    
-    ramp_action = rh.actions.RampAction(
-        module = "ramphy.actions",
-        name = "train",
-        kwargs = {
-            'ramp_kit_dir': ramp_kit_dir,
-            'submission': 'catboost',
-            'fold_idxs': range(900, 903),
-            'force_retrain': True,
-        }
-    )
-    ramp_action.execute()
 
     # cleaning up
-    shutil.rmtree(ramp_kit_dir)
-    shutil.rmtree('cache')
-    shutil.rmtree('catboost_info')
+    if ramp_kit_dir.is_dir():
+        shutil.rmtree(ramp_kit_dir)
+    if Path('cache').is_dir():
+        shutil.rmtree('cache')
+    if Path('catboost_info').is_dir():
+        shutil.rmtree('catboost_info')

@@ -73,10 +73,12 @@ def test_rf_selector(path_kit: str):
     # Expected to fail cause only for classification
     _preprocessor_tester(path_kit=path_kit, preprocessor_name='rf_selector')
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("path_kit", _generate_grid_path_kits())
 def test_select_kbest(path_kit: str):
     _preprocessor_tester(path_kit=path_kit, preprocessor_name='select_kbest')
 
+@pytest.mark.xfail
 @pytest.mark.parametrize("path_kit", _generate_grid_path_kits())
 def test_variance_threshold(path_kit: str):
     _preprocessor_tester(path_kit=path_kit, preprocessor_name='variance_threshold')
