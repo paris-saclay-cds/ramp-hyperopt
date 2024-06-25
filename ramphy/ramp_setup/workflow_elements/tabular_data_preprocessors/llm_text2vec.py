@@ -2,10 +2,6 @@ import json
 import os
 
 os.environ["CURL_CA_BUNDLE"] = ""
-os.environ["HF_HUB_OFFLINE"] = "0"
-os.environ["TRANSFORMERS_OFFLINE"] = "0"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.system("proxy")
 
 from copy import deepcopy
 from typing import Tuple
@@ -51,25 +47,40 @@ ENCODING_MODE = str(encoding_mode)
 class DataPreprocessor(rs.BaseDataPreprocessor):
     def __init__(self):
         device_map = "cuda:0"
-        self.tokenizer = AutoTokenizer.from_pretrained("McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map)
-        self.config = AutoConfig.from_pretrained(
-            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", trust_remote_code=True, device_map=device_map
+        print("Loading tokenizer")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map, local_files_only=True
         )
+        self.config = AutoConfig.from_pretrained(
+            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
+            trust_remote_code=True,
+            device_map=device_map,
+            local_files_only=True,
+        )
+        print("Loading LLM")
         self.model = AutoModel.from_pretrained(
             "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
             trust_remote_code=True,
             config=self.config,
             torch_dtype=torch.bfloat16,
             device_map=device_map,
+            local_files_only=True,
         )
 
+        print("Loading PEFT")
         self.model = PeftModel.from_pretrained(
-            self.model, "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map
+            self.model, "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map, local_files_only=True
         )
-        self.model = self.model.merge_and_unload()
-        self.model = PeftModel.from_pretrained(
-            self.model, f"McGill-NLP/LLM2Vec-Sheared-LLaMA-{{PEFT_MODEL}}", device_map=device_map
-        )
+        if not PEFT_MODEL == "mntp":
+            print("Loading PEFT model 2")
+            self.model = self.model.merge_and_unload()
+            self.model = PeftModel.from_pretrained(
+                self.model,
+                f"McGill-NLP/LLM2Vec-Sheared-LLaMA-{{PEFT_MODEL}}",
+                device_map=device_map,
+                local_files_only=True,
+            )
+        print("Finished Loading")
         self.l2v = LLM2Vec(self.model, self.tokenizer, pooling_mode=POOLING_MODE, max_length=512)
 
     def preprocess(
@@ -82,24 +93,27 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             if feature_types[feature] == "text":
                 text_columns.append(feature)
 
+        print(f"Found the following text columns: {{text_columns}}")
+
         # Encode columns
         new_feature_names = {{}}  # Needed for metadata update
         all_new_features = []  # Needed for imputing
         for feature in text_columns:
+            print(f"Encoding {{feature}}")
             encoded_columns = self.encode_column(column_name=feature, dataset=X_train)
-            X_train = pd.concat([X_train, encoded_columns])
+            X_train = pd.concat([X_train, encoded_columns], axis=1)
             new_feature_names[feature] = list(encoded_columns.columns)
             all_new_features += new_feature_names[feature]
 
             encoded_columns = self.encode_column(column_name=feature, dataset=X_test)
-            X_test = pd.concat([X_test, encoded_columns])
+            X_test = pd.concat([X_test, encoded_columns], axis=1)
 
         # Drop text columns from datasets
-        X_train.drop(columns=text_columns)
-        X_test.drop(columns=text_columns)
+        X_train.drop(columns=text_columns, inplace=True)
+        X_test.drop(columns=text_columns, inplace=True)
 
         for new_col in all_new_features:
-            X_train, X_test = self.impute(col_name=new_col, X_train=X_train, X_test=X_test)
+            X_train, X_test = self.impute_column(col_name=new_col, X_train=X_train, X_test=X_test)
 
         # Update metadata
         metadata = deepcopy(metadata)
@@ -107,11 +121,11 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             try:
                 metadata["data_description"]["feature_values"].pop(feat)
             except KeyError:
-                continue
+                pass
             try:
                 metadata["data_description"]["feature_types"].pop(feat)
             except KeyError:
-                continue
+                pass
             missing_count = None
             if feat in metadata["data_description"]["missing_data_count"]:
                 missing_count = metadata["data_description"]["missing_data_count"][feat]
@@ -124,7 +138,9 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
         return X_train, y_train, X_test, metadata
 
-    def impute(self, col_name: str, X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def impute_column(
+        self, col_name: str, X_train: pd.DataFrame, X_test: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Imputes the missing values in the column
 
         Args:
@@ -157,7 +173,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         indexes = column.index
 
         queries = [[instruction, f"{{column_name}}: {{val}}"] for val in values]
-        raw_encoding = np.array(self.l2v.encode(queries, convert_to_numpy=True))
+        raw_encoding = np.array(self.l2v.encode(queries, convert_to_numpy=True, batch_size=1024, device="cuda"))
         encoding = self.postprocess_encoding(raw_encoding)
         new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
         encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names, index=indexes)
