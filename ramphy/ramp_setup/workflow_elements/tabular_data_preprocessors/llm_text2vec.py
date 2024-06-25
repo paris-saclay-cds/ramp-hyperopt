@@ -5,8 +5,18 @@ os.environ["CURL_CA_BUNDLE"] = ""
 os.environ["HF_HUB_OFFLINE"] = "0"
 os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
+import warnings
 from copy import deepcopy
 from typing import Tuple
+
+from requests.exceptions import RequestsDependencyWarning
+from urllib3.exceptions import InsecureRequestWarning
+
+# Suppress only the InsecureRequestWarning
+warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+
+# Suppress only the RequestsDependencyWarning
+warnings.filterwarnings("ignore", category=RequestsDependencyWarning, message=".*urllib3.*")
 
 import numpy as np
 import pandas as pd
@@ -21,10 +31,10 @@ from transformers import AutoModel
 from transformers import AutoTokenizer
 
 # RAMP START HYPERPARAMETERS
-peft_model = Hyperparameter(
+peft_model_llm2vec = Hyperparameter(
     dtype="str", default="mntp-supervised", values=["mntp-supervised", "mntp-unsup-simcse", "mntp"]
 )
-pooling_mode = Hyperparameter(
+pooling_mode_llm2vec = Hyperparameter(
     dtype="str",
     default="mean",
     values=["mean", "eos_token", "weighted_mean", "bos_token"],
@@ -32,18 +42,18 @@ pooling_mode = Hyperparameter(
 # positional is an experimental one that I am testing
 # TODO think about implementing positional that takes the top N
 # TODO think about implementing the encoding of all the cols at once other than separately
-encoding_mode = Hyperparameter(dtype="str", default="positional", values=["full", "positional"])
-impute_strategy_num = Hyperparameter(
+encoding_mode_llm2vec = Hyperparameter(dtype="str", default="positional", values=["full", "positional"])
+impute_strategy_num_llm2vec = Hyperparameter(
     dtype="str", default="mean", values=["mean", "median", "most_frequent", "constant"]
 )
-fill_value_num = Hyperparameter(dtype="float", default=-1.0, values=[-1.0, 0.0])
+fill_value_num_llm2vec = Hyperparameter(dtype="float", default=-1.0, values=[-1.0, 0.0])
 # RAMP END HYPERPARAMETERS
 
-IMPUTE_STRATEGY_NUM = str(impute_strategy_num)
-FILL_VALUE_NUM = float(fill_value_num)
-PEFT_MODEL = str(peft_model)
-POOLING_MODE = str(pooling_mode)
-ENCODING_MODE = str(encoding_mode)
+IMPUTE_STRATEGY_NUM = str(impute_strategy_num_llm2vec)
+FILL_VALUE_NUM = float(fill_value_num_llm2vec)
+PEFT_MODEL = str(peft_model_llm2vec)
+POOLING_MODE = str(pooling_mode_llm2vec)
+ENCODING_MODE = str(encoding_mode_llm2vec)
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
