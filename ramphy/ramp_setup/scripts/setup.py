@@ -54,7 +54,7 @@ def setup(
             ramp_kit_dir=ramp_kit_dir,
             submission="starting_kit",
             classifier="lgbm",
-            data_preprocessors=["llm_text2vec"],
+            data_preprocessors=["llm_text2vec"], # TODO might add a way to tell this through a flag.
             text_col_encode=False,
         )
 
