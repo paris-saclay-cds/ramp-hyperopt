@@ -1,3 +1,4 @@
+from . import utils
 from .scripts import orchestration
 from .scripts.setup import setup
 from .scripts.tabular import tabular_cat_col_encoders_submit
@@ -10,6 +11,7 @@ from .scripts.tabular import tabular_regression_columnwise_first_submit
 from .scripts.tabular import tabular_regression_columnwise_last_submit
 from .scripts.tabular import tabular_regression_submit
 from .scripts.tabular import tabular_setup
+from .utils import score_name_type_map
 from .workflow_elements.tabular_data_preprocessors.base_data_preprocessor import BaseDataPreprocessor
 from .workflow_elements.tabular_data_preprocessors.transformer_base_preprocessor import TransformerBaseDataPreprocessor
 
@@ -26,4 +28,6 @@ __all__ = [
     "tabular_classification_columnwise_last_submit",
     "tabular_classification_columnwise_first_submit",
     "setup",
+    "utils",
+    "score_name_type_map",
 ]
