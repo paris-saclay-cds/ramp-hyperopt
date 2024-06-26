@@ -268,8 +268,8 @@ def hyperopt(
                 resume=resume,
                 max_concurrent_runs=1,
                 n_cpu_per_run=None,
-                n_gpu_per_run=0,
-                verbose=3,
+                n_gpu_per_run=4,
+                verbose=1,
             )
             n_trained_submissions = len(created_submissions)
             existing_submissions = existing_submissions + created_submissions
