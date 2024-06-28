@@ -14,7 +14,7 @@ import functools
 import importlib
 
 from typing import Sequence, Optional, List, Tuple, Dict
-
+import torch
 import numpy as np
 import pandas as pd
 import rampwf as rw
@@ -268,7 +268,7 @@ def hyperopt(
                 resume=resume,
                 max_concurrent_runs=1,
                 n_cpu_per_run=None,
-                n_gpu_per_run=4,
+                n_gpu_per_run=torch.cuda.device_count(),
                 verbose=1,
             )
             n_trained_submissions = len(created_submissions)

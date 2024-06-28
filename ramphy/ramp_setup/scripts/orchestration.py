@@ -85,6 +85,7 @@ def run_race(
             workflow_element_names = ["regressor"]
         elif "classification" in metadata["prediction_type"]:
             workflow_element_names = ["classifier"]
+        workflow_element_names = None
         rh.actions.hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,

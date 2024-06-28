@@ -1,3 +1,4 @@
+from . import actions
 from . import utils
 from .scripts import orchestration
 from .scripts.setup import setup
@@ -30,4 +31,5 @@ __all__ = [
     "setup",
     "utils",
     "score_name_type_map",
+    "actions",
 ]
