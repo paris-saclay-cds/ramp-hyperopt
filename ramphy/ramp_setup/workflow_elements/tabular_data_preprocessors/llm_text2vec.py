@@ -42,7 +42,7 @@ pooling_mode_llm2vec = Hyperparameter(
 # positional is an experimental one that I am testing
 # TODO think about implementing positional that takes the top N
 # TODO think about implementing the encoding of all the cols at once other than separately
-encoding_mode_llm2vec = Hyperparameter(dtype="str", default="positional", values=["full", "positional"])
+encoding_mode_llm2vec = Hyperparameter(dtype="str", default="positional", values=["positional"])
 impute_strategy_num_llm2vec = Hyperparameter(
     dtype="str", default="mean", values=["mean", "median", "most_frequent", "constant"]
 )
@@ -58,6 +58,9 @@ ENCODING_MODE = str(encoding_mode_llm2vec)
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
     def __init__(self):
+        self.to_cache = True
+
+    def load_llm(self):
         device_map = "cuda:0"
         print("Loading tokenizer")
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -98,6 +101,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
+        self.load_llm()  # Load it here so we don't load it when caching
         # Find text columns
         feature_types = metadata["data_description"]["feature_types"]
         text_columns = []
