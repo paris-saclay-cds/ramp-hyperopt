@@ -7,7 +7,7 @@ os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
 import warnings
 from copy import deepcopy
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 from requests.exceptions import RequestsDependencyWarning
 from urllib3.exceptions import InsecureRequestWarning
@@ -23,12 +23,13 @@ import pandas as pd
 import ramphy.ramp_setup as rs
 import torch
 from ramphy import Hyperparameter
+from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 from transformers import AutoConfig
 from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 # RAMP START HYPERPARAMETERS
 encoding_mode_llama2vec = Hyperparameter(dtype="str", default="pos_max", values=["pos_max", "extremes", "pca"])
@@ -59,7 +60,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
         print("Loading tokenizer")
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True, padding_side="left")
-        self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        self.tokenizer.add_special_tokens({{"pad_token": "<pad>"}})
         print("Loading model")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id, local_files_only=True, torch_dtype=torch.float16, device_map="auto"
@@ -148,8 +149,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         instruction = f"Given the text feature named {{column_name}} of a tabular dataset, extract the corresponding value in the given example."
         queries = [
             [
-                {"role": "system", "content": instruction},
-                {"role": "user", "content": f"The value of {{column_name}} is {{val}}"},
+                {{"role": "system", "content": instruction}},
+                {{"role": "user", "content": f"The value of {{column_name}} is {{val}}"}},
             ]
             for val in values
         ]
@@ -158,7 +159,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         )
 
         raw_encoding = []
-        for batch_idx in range(0, len(input_ids), batch_size):
+        for batch_idx in tqdm(range(0, len(input_ids), batch_size), desc="Batch idx"):
             with torch.no_grad():
                 out = self.model(input_ids[batch_idx : batch_idx + batch_size].cuda())
 
@@ -171,7 +172,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         input_ids = self.tokenizer.batch_encode_plus(queries, return_tensors="pt", padding=True, truncation=False)
 
         raw_encoding = []
-        for batch_idx in range(0, len(input_ids), batch_size):
+        for batch_idx in tqdm(range(0, len(input_ids), batch_size), desc="Batch idx"):
             batch = input_ids[batch_idx : batch_idx + batch_size]
 
             with torch.no_grad():
@@ -195,7 +196,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         values = column.values
         indexes = column.index
 
-        batch_size = 512
+        batch_size = 256
         if MODEL_TYPE == "chat":
             raw_encoding = self.chat_encoding(values=values, column_name=column_name, batch_size=batch_size)
         elif MODEL_TYPE == "classic":
