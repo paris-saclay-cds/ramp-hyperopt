@@ -13,6 +13,8 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 from typing import Optional
 
 
+LLM_T2V = ['llm_text2vec']
+
 def last_action(ramp_kit_dir, name):
     """Last action of a given action name."""
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
@@ -85,7 +87,7 @@ def run_race(
             workflow_element_names = ["regressor"]
         elif "classification" in metadata["prediction_type"]:
             workflow_element_names = ["classifier"]
-        workflow_element_names = None
+        workflow_element_names += LLM_T2V
         rh.actions.hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
@@ -432,7 +434,7 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
-                    data_preprocessors=["llm_text2vec"],  # TODO might add a way to tell this through a flag.
+                    data_preprocessors=LLM_T2V,  # TODO might add a way to tell this through a flag.
                     text_col_encode=False,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
