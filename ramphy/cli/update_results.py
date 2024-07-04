@@ -9,17 +9,20 @@ import ramphy as rh
 from pathlib import Path
 from kaggle.api.kaggle_api_extended import KaggleApi
 from kaggle.rest import ApiException
+
 rh.actions.EXECUTE_PLAN = True
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
 # flake8: noqa: E501
 
-def kaggle_select(kaggle_api, suffix, id):
-    f_name = kaggle_api.string(getattr(id, "fileName"))
-    select = f_name[5:5 + len(suffix)] == suffix
-    select = select and kaggle_api.string(getattr(id, "publicScore")) != ''
+
+def kaggle_select(kaggle_api, suffix, sub_id):
+    f_name = kaggle_api.string(getattr(sub_id, "fileName"))
+    select = f_name[5 : 5 + len(suffix)] == suffix
+    select = select and kaggle_api.string(getattr(sub_id, "publicScore")) != ""
     return select
+
 
 def kaggle_prank(score, leaderboard_scores, problem):
     if problem.score_types[0].is_lower_the_better:
@@ -29,8 +32,7 @@ def kaggle_prank(score, leaderboard_scores, problem):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-def main(
-):
+def main():
     stop_fold_idx = 931
     kaggle_api = KaggleApi()
     kaggle_api.authenticate()
@@ -42,7 +44,7 @@ def main(
             results_summary_df[col] = results_summary_df[col].astype("int64")
         if col[:7] == "runtime":
             results_summary_df[col] = results_summary_df[col].astype("timedelta64[ns]")
-    #for row_i, row in results_summary_df.loc[[4]].iterrows():
+    # for row_i, row in results_summary_df.loc[[4]].iterrows():
     for row_i, row in results_summary_df.iterrows():
         kit_suffix = f"v{row['version']}_n{row['number']}"
         ramp_kit_dir = f"{row['ramp_kit']}_{kit_suffix}"
@@ -63,39 +65,49 @@ def main(
         print(f"Available leaderboards are {available_phases}")
         n_kaggle_files = 5 * len(available_phases)  # growing folds, last blend, and three best models
         kaggle_file_counter = 0
-    
+
         kaggle_submissions_path = Path(ramp_kit_dir) / "kaggle_submissions"
-        action_f_names = glob.glob(f'{ramp_kit_dir}/actions/*')
+        action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
         action_f_names.sort()
         ramp_program = []
         for action_f_name in action_f_names:
             f_name = Path(action_f_name).name
             ramp_program.append(rh.actions.load_ramp_action(action_f_name))
-        
+
         hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
         blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
         train_actions = [ra for ra in ramp_program if ra.name == "train"]
         kaggle_actions = [ra for ra in ramp_program if ra.name == "kaggle_submit_file"]
         select_top_hyperopt_actions = [ra for ra in ramp_program if ra.name == "select_top_hyperopt"]
-    
+
         if len(hyperopt_actions) == 0:
             continue
         results_summary_df.loc[row_i, "runtime_hyperopt"] = pd.to_timedelta(
-            np.array([ra.runtime for ra in hyperopt_actions]).sum())
+            np.array([ra.runtime for ra in hyperopt_actions]).sum()
+        )
         growing_folds_start_time = max([ra.stop_time for ra in hyperopt_actions])
-        
+
         results_summary_df.loc[row_i, "run_finished"] = 1
 
-        try:            
+        try:
             kaggle_submission_ids = kaggle_api.competition_submissions(competition=metadata["kaggle_name"])
             kaggle_scores = {}
             for phase in available_phases:
-                kaggle_scores[phase] = [kaggle_api.string(getattr(id, f"{phase}Score")) for id in kaggle_submission_ids
-                                        if kaggle_select(kaggle_api, kit_suffix, id)]
-            kaggle_action_times = [kaggle_api.string(getattr(id, "description")) for id in kaggle_submission_ids
-                                   if kaggle_select(kaggle_api, kit_suffix, id)]
-            kaggle_file_names = [kaggle_api.string(getattr(id, "fileName")) for id in kaggle_submission_ids
-                                 if kaggle_select(kaggle_api, kit_suffix, id)]
+                kaggle_scores[phase] = [
+                    kaggle_api.string(getattr(ii, f"{phase}Score"))
+                    for ii in kaggle_submission_ids
+                    if kaggle_select(kaggle_api, kit_suffix, ii)
+                ]
+            kaggle_action_times = [
+                kaggle_api.string(getattr(ii, "description"))
+                for ii in kaggle_submission_ids
+                if kaggle_select(kaggle_api, kit_suffix, ii)
+            ]
+            kaggle_file_names = [
+                kaggle_api.string(getattr(ii, "fileName"))
+                for ii in kaggle_submission_ids
+                if kaggle_select(kaggle_api, kit_suffix, ii)
+            ]
         except:
             pass
         available_phases = kaggle_scores.keys()
@@ -104,8 +116,11 @@ def main(
         failure_count = 0
         for blend_type in ["growing_folds", "last_blend"]:
             submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(3)}.csv"
-            last_kaggle_actions = [ra for ra in kaggle_actions if
-                                   ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name]
+            last_kaggle_actions = [
+                ra
+                for ra in kaggle_actions
+                if str(kaggle_submissions_path / submission_file_name) in str(ra.kwargs["submission_target_f_name"])
+            ]
             if len(last_kaggle_actions) == 0:
                 results_summary_df.loc[row_i, "run_finished"] = 0
                 failure_count += 1
@@ -118,9 +133,10 @@ def main(
             blend_action = [ra for ra in blend_actions if ra.start_time <= last_kaggle_action.start_time][-1]
             results_summary_df.loc[row_i, f"valid_{blend_type}"] = blend_action.blended_score
             for submission in ["lgbm", "xgboost", "catboost"]:
-                results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] =\
-                    np.array([c for s, c in blend_action.contributivities.items() if s[:len(submission)] == submission]).sum()
-    
+                results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] = np.array(
+                    [c for s, c in blend_action.contributivities.items() if s[: len(submission)] == submission]
+                ).sum()
+
             if submission_file_name not in kaggle_file_names:
                 # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
                 print(f"Submitting {submission_file_name}")
@@ -129,7 +145,7 @@ def main(
                         kaggle_api.competition_submit(
                             file_name=kaggle_submissions_path / submission_file_name,
                             message=last_kaggle_action.start_time,
-                            competition=metadata["kaggle_name"]
+                            competition=metadata["kaggle_name"],
                         )
                     except ApiException as e:
                         print(e)
@@ -140,28 +156,51 @@ def main(
                     score = float(kaggle_scores[phase][sub_idx])
                     results_summary_df.loc[row_i, f"kaggle_{phase}_{blend_type}"] = score
                     results_summary_df.loc[row_i, f"kaggle_{phase}_prank_{blend_type}"] = kaggle_prank(
-                        score, leaderboard_scores[phase], problem)
+                        score, leaderboard_scores[phase], problem
+                    )
                     kaggle_file_counter += 1
         if failure_count == 2:
+            print("MULTIPLE FAILS FOUND")
             continue
         results_summary_df.loc[row_i, "runtime_growing_folds"] = pd.to_timedelta(
-            np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
-                      and ra.start_time < growing_folds_stop_time]).sum())
+            np.array(
+                [
+                    ra.runtime
+                    for ra in train_actions
+                    if ra.start_time > growing_folds_start_time and ra.start_time < growing_folds_stop_time
+                ]
+            ).sum()
+        )
         # growing folds done but not last blend
         if failure_count == 1:
             continue
         # in last blend training time, we also need to take into consideration of training time of models that occur during the growing fold iteration
         results_summary_df.loc[row_i, "runtime_last_blend"] = pd.to_timedelta(
-            np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
-                      and ra.start_time < last_blend_stop_time and ra.kwargs["submission"] in blend_action.kwargs["submissions"]]).sum())
+            np.array(
+                [
+                    ra.runtime
+                    for ra in train_actions
+                    if ra.start_time > growing_folds_start_time
+                    and ra.start_time < last_blend_stop_time
+                    and ra.kwargs["submission"] in blend_action.kwargs["submissions"]
+                ]
+            ).sum()
+        )
         for submission in ["lgbm", "xgboost", "catboost"]:
             submission_file_name = f"auto_{kit_suffix}_best_{submission}.csv"
-            submission_hyperopt_actions = [ra.runtime for ra in hyperopt_actions if ra.kwargs["submission"] == submission]
-            results_summary_df.loc[row_i, f"runtime_hyperopt_{submission}"] = pd.to_timedelta(np.array(submission_hyperopt_actions).sum())
+            submission_hyperopt_actions = [
+                ra.runtime for ra in hyperopt_actions if ra.kwargs["submission"] == submission
+            ]
+            results_summary_df.loc[row_i, f"runtime_hyperopt_{submission}"] = pd.to_timedelta(
+                np.array(submission_hyperopt_actions).sum()
+            )
             results_summary_df.loc[row_i, f"rounds_hyperopt_{submission}"] = len(submission_hyperopt_actions)
-    
-            last_kaggle_actions = [ra for ra in kaggle_actions if
-                                   ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name]
+
+            last_kaggle_actions = [
+                ra
+                for ra in kaggle_actions
+                if ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name
+            ]
             if len(last_kaggle_actions) == 0:
                 # if contributivity is zero, it is normal not having the kaggle action
                 if results_summary_df.loc[row_i, f"contributivity_last_blend_{submission}"] != 0:
@@ -170,10 +209,18 @@ def main(
                     n_kaggle_files -= len(available_phases)
                 continue
             last_kaggle_action = last_kaggle_actions[0]
-            select_top_hyperopt_action = [ra for ra in select_top_hyperopt_actions if ra.start_time <= last_kaggle_action.start_time][-1]
-            train_action = [ra for ra in train_actions if ra.kwargs["submission"] == select_top_hyperopt_action.selected_submissions[0]][-1]
+            select_top_hyperopt_action = [
+                ra for ra in select_top_hyperopt_actions if ra.start_time <= last_kaggle_action.start_time
+            ][-1]
+            train_action = [
+                ra
+                for ra in train_actions
+                if ra.kwargs["submission"] == select_top_hyperopt_action.selected_submissions[0]
+            ][-1]
             for scoring_type in ["mean", "bagged"]:
-                results_summary_df.loc[row_i, f"valid_{scoring_type}_{submission}"] = train_action.__dict__[f"{scoring_type}_score"]
+                results_summary_df.loc[row_i, f"valid_{scoring_type}_{submission}"] = train_action.__dict__[
+                    f"{scoring_type}_score"
+                ]
 
             if submission_file_name not in kaggle_file_names:
                 # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
@@ -183,7 +230,7 @@ def main(
                         kaggle_api.competition_submit(
                             file_name=kaggle_submissions_path / submission_file_name,
                             message=last_kaggle_action.start_time,
-                            competition=metadata["kaggle_name"]
+                            competition=metadata["kaggle_name"],
                         )
                     except ApiException as e:
                         print(e)
@@ -194,18 +241,20 @@ def main(
                     score = float(kaggle_scores[phase][sub_idx])
                     results_summary_df.loc[row_i, f"kaggle_{phase}_{submission}"] = score
                     results_summary_df.loc[row_i, f"kaggle_{phase}_prank_{submission}"] = kaggle_prank(
-                        score, leaderboard_scores[phase], problem)
+                        score, leaderboard_scores[phase], problem
+                    )
                     kaggle_file_counter += 1
 
         if kaggle_file_counter == n_kaggle_files:
             results_summary_df.loc[row_i, "kaggle_finished"] = 1
-            
+
     shutil.copy("results_summary.csv", "results_summary_bak.csv")
     results_summary_df.to_csv("results_summary.csv", index=False)
+
 
 def start():
     main()
 
+
 if __name__ == "__main__":
     start()
-
