@@ -87,7 +87,7 @@ def run_race(
             workflow_element_names = ["regressor"]
         elif "classification" in metadata["prediction_type"]:
             workflow_element_names = ["classifier"]
-        workflow_element_names += LLM_T2V
+        workflow_element_names += ['data_preprocessor_5_llm_text2vec']
         rh.actions.hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,

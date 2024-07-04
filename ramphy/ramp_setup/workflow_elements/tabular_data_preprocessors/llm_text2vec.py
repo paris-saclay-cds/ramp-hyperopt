@@ -7,7 +7,7 @@ os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
 import warnings
 from copy import deepcopy
-from typing import Tuple
+from typing import Optional, Tuple
 
 from requests.exceptions import RequestsDependencyWarning
 from urllib3.exceptions import InsecureRequestWarning
@@ -25,7 +25,9 @@ import torch
 from llm2vec import LLM2Vec
 from peft.peft_model import PeftModel
 from ramphy import Hyperparameter
+from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 from transformers import AutoConfig
 from transformers import AutoModel
 from transformers import AutoTokenizer
@@ -39,14 +41,19 @@ pooling_mode_llm2vec = Hyperparameter(
     default="mean",
     values=["mean", "eos_token", "weighted_mean", "bos_token"],
 )
-# positional is an experimental one that I am testing
-# TODO think about implementing positional that takes the top N
-# TODO think about implementing the encoding of all the cols at once other than separately
-encoding_mode_llm2vec = Hyperparameter(dtype="str", default="positional", values=["positional"])
+encoding_mode_llm2vec = Hyperparameter(dtype="str", default="pos_max", values=["pos_max", "extremes", "pca"])
 impute_strategy_num_llm2vec = Hyperparameter(
-    dtype="str", default="mean", values=["mean", "median", "most_frequent", "constant"]
+    dtype="str",
+    default="mean",
+    # values=["mean", "median", "most_frequent", "constant"]
+    values=["mean"],
 )
-fill_value_num_llm2vec = Hyperparameter(dtype="float", default=-1.0, values=[-1.0, 0.0])
+fill_value_num_llm2vec = Hyperparameter(
+    dtype="float",
+    default=-1.0,
+    # values=[-1.0, 0.0]
+    values=[-1.0],
+)
 # RAMP END HYPERPARAMETERS
 
 IMPUTE_STRATEGY_NUM = str(impute_strategy_num_llm2vec)
@@ -59,6 +66,10 @@ ENCODING_MODE = str(encoding_mode_llm2vec)
 class DataPreprocessor(rs.BaseDataPreprocessor):
     def __init__(self):
         self.to_cache = True
+
+        if ENCODING_MODE == "pca":
+            self.scaler: Optional[StandardScaler] = None
+            self.pca: Optional[PCA] = None
 
     def load_llm(self):
         device_map = "cuda:0"
@@ -189,7 +200,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         indexes = column.index
 
         queries = [[instruction, f"{{column_name}}: {{val}}"] for val in values]
-        raw_encoding = np.array(self.l2v.encode(queries, convert_to_numpy=True, batch_size=1024, device="cuda"))
+        raw_encoding = np.array(self.l2v.encode(queries, convert_to_numpy=True, batch_size=512, device="cuda"))
         encoding = self.postprocess_encoding(raw_encoding)
         new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
         encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names, index=indexes)
@@ -204,11 +215,29 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         if ENCODING_MODE == "full":
             # We just return the full raw encoding
             return raw_encoding
-        elif ENCODING_MODE == "positional":
+        elif ENCODING_MODE == "pos_max":
             # We select the max and return [normalized_max_position, max]
             normalized_idx = np.argmax(raw_encoding, axis=1) / raw_encoding.shape[1]
             max_values = np.max(raw_encoding, axis=1)
             encoding = np.array([max_values, normalized_idx]).swapaxes(1, 0)
+            return encoding
+        elif ENCODING_MODE == "extremes":
+            norm_max_idx = np.argmax(raw_encoding, axis=1) / raw_encoding.shape[1]
+            norm_min_idx = np.argmin(raw_encoding, axis=1) / raw_encoding.shape[1]
+            max_values = np.max(raw_encoding, axis=1)
+            min_values = np.min(raw_encoding, axis=1)
+            encoding = np.array([max_values, norm_max_idx, min_values, norm_min_idx]).swapaxes(1, 0)
+            return encoding
+        elif ENCODING_MODE == "pca":
+            # This happens when we pass the train dataset
+            if self.scaler is None:
+                self.scaler = StandardScaler()
+                self.pca = PCA(n_components=2)
+                scaled_data = self.scaler.fit_transform(raw_encoding)
+                encoding = self.pca.fit_transform(scaled_data)
+            else:
+                scaled_data = self.scaler.transform(raw_encoding)
+                encoding = self.pca.transform(scaled_data)
             return encoding
         else:
             raise ValueError(f"Encoding {{ENCODING_MODE}} not implemented")

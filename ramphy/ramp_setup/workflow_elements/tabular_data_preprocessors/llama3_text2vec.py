@@ -241,5 +241,6 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             else:
                 scaled_data = self.scaler.transform(raw_encoding)
                 encoding = self.pca.transform(scaled_data)
+            return encoding
         else:
             raise ValueError(f"Encoding {{ENCODING_MODE}} not implemented")
