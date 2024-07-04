@@ -36,6 +36,18 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The number of hyperopt rounds",
 )
+@click.option(
+    "--n-trials-per-round",
+    default=5,
+    show_default=True,
+    help="The number of trials per hyperopt round",
+)
+@click.option(
+    "--patience",
+    default=-1,
+    show_default=True,
+    help="The number of rounds after wwhich we stop if score does not improve.",
+)
 def main(
     ramp_kit,
     kit_root,
@@ -43,6 +55,8 @@ def main(
     number,
     resume,
     n_rounds,
+    n_trials_per_round,
+    patience,
 ):
     rs.orchestration.hyperopt_race(
         ramp_kit = ramp_kit,
@@ -51,6 +65,8 @@ def main(
         number = number,
         resume = resume,
         n_rounds = n_rounds,
+        n_trials_per_round = n_trials_per_round,
+        patience = patience,
     )
 
 def start():

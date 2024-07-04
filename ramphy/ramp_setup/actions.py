@@ -141,8 +141,13 @@ def download_file(url: str, destination: Path):
         print("Error downloading the file:", e)
 
 
-def download_private_leaderboard(kaggle_api: KaggleApi, competition: str, zip_destination: Path):
-    """Downloads private leaderboard.
+def download_leaderboard(
+    kaggle_api: KaggleApi,
+    competition: str,
+    zip_destination: Path,
+    phase: str
+):
+    """Downloads leaderboard.
 
     This is not supported by the Kaggle API so we implement it ourselves as there is
     a link on the leaderboard webpage to download it.
@@ -150,8 +155,10 @@ def download_private_leaderboard(kaggle_api: KaggleApi, competition: str, zip_de
     Args:
         kaggle_api (object): KaggleAPI instance
         competition (str): Identifier of the competition
+        zip_destination (Path): where the zip file is
+        phase (str): public or private
     """
-    # the url that is required to download the private leaderboard needs the numeric
+    # the url that is required to download the leaderboard needs the numeric
     # identifier of the competition, we first retrieve it.
     # using 'default' for the group parameter only returns the active competitions so
     # we use the entered one.
@@ -169,70 +176,66 @@ def download_private_leaderboard(kaggle_api: KaggleApi, competition: str, zip_de
     num_id = competition["id"]
 
     download_file(
-        f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/private",
+        f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/{phase}",
         zip_destination,
     )
 
 
-def read_private_leaderboard_scores(competition: str, zip_file: Path, destination_folder: Path) -> np.ndarray:
-    """Read private leaderboard scores from file.
+def read_leaderboard_scores(
+    competition: str,
+    zip_file: Path,
+    destination_folder: Path,
+    phase: str,
+) -> np.ndarray:
+    """Read leaderboard scores from file.
 
     Args:
         competition (str): Identifier of the competition
-        zip_file (Path): Zip file containing the private leaderboard
+        zip_file (Path): Zip file containing the leaderboard
         destination_folder (Path): Where to extract the zip file contents.
+        phase (str): public or private
 
     Returns:
-        private_scores (np.array): Private leaderboard scores.
+        scores (np.array): Leaderboard scores.
     """
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
         zip_ref.extractall(destination_folder)
 
     # the file contains the download date in its name so we consider the case where
     # there are several of them. they should all be the same.
-    files = list(destination_folder.glob(f"{competition}-privateleaderboard-*.csv"))
-    private_leaderboard_file = files[0]
-    return pd.read_csv(private_leaderboard_file)["Score"].to_numpy()
+    files = list(destination_folder.glob(f"{competition}-{phase}leaderboard-*.csv"))
+    leaderboard_file = files[0]
+    return pd.read_csv(leaderboard_file)["Score"].to_numpy()
 
 
-def get_private_leaderboard_scores(kaggle_api: KaggleApi, competition: str) -> np.ndarray:
-    """Get private leaderboard scores from Kaggle.
+def get_leaderboard_scores(
+    kaggle_api: KaggleApi,
+    competition: str,
+    phase: str,
+) -> np.ndarray:
+    """Get pleaderboard scores from Kaggle.
 
     Args:
         kaggle_api (object): KaggleAPI instance.
         competition (str): Kaggle competition name.
+        phase (str): public or private
 
     Returns:
-        private_scores (np.array): Private leaderboard scores.
+        scores (np.array): leaderboard scores.
             Sorted from best to worst.
     """
-    destination_folder = Path(f"private_leaderboard_{competition}")
-    zip_destination = destination_folder / f"private_leaderboard_{competition}.zip"
+    destination_folder = Path(f"{phase}_leaderboard_{competition}")
+    zip_destination = destination_folder / f"{phase}_leaderboard_{competition}.zip"
     if not zip_destination.exists():
         destination_folder.mkdir(exist_ok=True)
-        download_private_leaderboard(kaggle_api, competition, zip_destination)
-    private_scores = read_private_leaderboard_scores(
+        download_leaderboard(kaggle_api, competition, zip_destination, phase)
+    scores = read_leaderboard_scores(
         competition,
         zip_destination,
         destination_folder,
+        phase,
     )
-    return private_scores
-
-
-def get_public_leaderboard_scores(kaggle_api: KaggleApi, competition: str) -> np.ndarray:
-    """Get public leaderboard scores from Kaggle.
-
-    Args:
-        kaggle_api (object): KaggleApi instance.
-        competition (str): Kaggle competition name.
-
-    Returns:
-        public_scores (np.array): public leaderboard scores.
-            Sorted from best to worst.
-    """
-    public_leaderboard_raw = kaggle_api.competition_leaderboard_view(competition=competition)
-    public_scores = np.array([sub.score for sub in public_leaderboard_raw]).astype(float)
-    return public_scores
+    return scores
 
 
 def get_submission_scores(kaggle_api: KaggleApi, competition: str) -> Tuple[float, float]:
