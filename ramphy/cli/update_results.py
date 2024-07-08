@@ -29,7 +29,25 @@ def kaggle_prank(score, leaderboard_scores, problem):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.option(
+    "--ramp-kit",
+    default=None,
+    help="The kit to hyperopt.",
+)
+@click.option(
+    "--version",
+    default=None,
+    help="The program version",
+)
+@click.option(
+    "--number",
+    default=None,
+    help="The program number (repeated within version)",
+)
 def main(
+    ramp_kit,
+    version,
+    number,
 ):
     stop_fold_idx = 931
     kaggle_api = KaggleApi()
@@ -44,6 +62,12 @@ def main(
             results_summary_df[col] = results_summary_df[col].astype("timedelta64[ns]")
     #for row_i, row in results_summary_df.loc[[4]].iterrows():
     for row_i, row in results_summary_df.iterrows():
+        if ramp_kit is not None and row["ramp_kit"] != ramp_kit:
+            continue
+        if version is not None and row["version"] != version:
+            continue
+        if number is not None and row["number"] != number:
+            continue
         kit_suffix = f"v{row['version']}_n{row['number']}"
         ramp_kit_dir = f"{row['ramp_kit']}_{kit_suffix}"
         print(ramp_kit_dir)
@@ -80,6 +104,7 @@ def main(
     
         if len(hyperopt_actions) == 0:
             continue
+
         results_summary_df.loc[row_i, "runtime_hyperopt"] = pd.to_timedelta(
             np.array([ra.runtime for ra in hyperopt_actions]).sum())
         growing_folds_start_time = max([ra.stop_time for ra in hyperopt_actions])
@@ -127,8 +152,11 @@ def main(
             blend_action = [ra for ra in blend_actions if ra.start_time <= last_kaggle_action.start_time][-1]
             results_summary_df.loc[row_i, f"valid_{blend_type}"] = blend_action.blended_score
             for submission in ["lgbm", "xgboost", "catboost"]:
-                results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] =\
-                    np.array([c for s, c in blend_action.contributivities.items() if s[:len(submission)] == submission]).sum()
+                try:
+                    results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] =\
+                        np.array([c for s, c in blend_action.contributivities.items() if s[:len(submission)] == submission]).sum()
+                except AttributeError as e:
+                    print("No contributivities, old bag_then_blend action")
             if submission_file_name not in kaggle_file_names:
                 # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
                 print(f"Submitting {submission_file_name}")
