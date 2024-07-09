@@ -38,14 +38,14 @@ def main(
     kaggle_api.authenticate()
     
     try:
-        private_leaderboard_scores = rh.ramp_setup.actions.get_private_leaderboard_scores(
-            kaggle_api=kaggle_api, competition=metadata["kaggle_name"])
+        private_leaderboard_scores = rh.ramp_setup.actions.get_leaderboard_scores(
+            kaggle_api=kaggle_api, competition=metadata["kaggle_name"], phase="private")
         np.save(Path(ramp_kit_dir) / "data" / "private_leaderboard_scores.npy", private_leaderboard_scores)
     except Exception as e:
         print(e)
     try:
-        public_leaderboard_scores = rh.ramp_setup.actions.get_public_leaderboard_scores(
-            kaggle_api=kaggle_api, competition=metadata["kaggle_name"])
+        public_leaderboard_scores = rh.ramp_setup.actions.get_leaderboard_scores(
+            kaggle_api=kaggle_api, competition=metadata["kaggle_name"], phase="public")
         np.save(Path(ramp_kit_dir) / "data" / "public_leaderboard_scores.npy", public_leaderboard_scores)
     except Exception as e:
         print(e)

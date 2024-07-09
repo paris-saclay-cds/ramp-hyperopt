@@ -32,7 +32,26 @@ def kaggle_prank(score, leaderboard_scores, problem):
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-def main():
+@click.option(
+    "--ramp-kit",
+    default=None,
+    help="The kit to hyperopt.",
+)
+@click.option(
+    "--version",
+    default=None,
+    help="The program version",
+)
+@click.option(
+    "--number",
+    default=None,
+    help="The program number (repeated within version)",
+)
+def main(
+    ramp_kit,
+    version,
+    number,
+):
     stop_fold_idx = 931
     kaggle_api = KaggleApi()
     kaggle_api.authenticate()
@@ -46,6 +65,12 @@ def main():
             results_summary_df[col] = results_summary_df[col].astype("timedelta64[ns]")
     # for row_i, row in results_summary_df.loc[[4]].iterrows():
     for row_i, row in results_summary_df.iterrows():
+        if ramp_kit is not None and row["ramp_kit"] != ramp_kit:
+            continue
+        if version is not None and row["version"] != version:
+            continue
+        if number is not None and row["number"] != number:
+            continue
         kit_suffix = f"v{row['version']}_n{row['number']}"
         ramp_kit_dir = f"{row['ramp_kit']}_{kit_suffix}"
         print(ramp_kit_dir)
@@ -63,7 +88,7 @@ def main():
                 pass
         available_phases = leaderboard_scores.keys()
         print(f"Available leaderboards are {available_phases}")
-        n_kaggle_files = 5 * len(available_phases)  # growing folds, last blend, and three best models
+        n_kaggle_files = 6 * len(available_phases)  # growing folds, last blend, bag then blend, and three best models
         kaggle_file_counter = 0
 
         kaggle_submissions_path = Path(ramp_kit_dir) / "kaggle_submissions"
@@ -75,13 +100,14 @@ def main():
             ramp_program.append(rh.actions.load_ramp_action(action_f_name))
 
         hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
-        blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
+        blend_actions = [ra for ra in ramp_program if ra.name == "blend"] + [ra for ra in ramp_program if ra.name == "bag_then_blend"]
         train_actions = [ra for ra in ramp_program if ra.name == "train"]
         kaggle_actions = [ra for ra in ramp_program if ra.name == "kaggle_submit_file"]
         select_top_hyperopt_actions = [ra for ra in ramp_program if ra.name == "select_top_hyperopt"]
 
         if len(hyperopt_actions) == 0:
             continue
+
         results_summary_df.loc[row_i, "runtime_hyperopt"] = pd.to_timedelta(
             np.array([ra.runtime for ra in hyperopt_actions]).sum()
         )
@@ -91,22 +117,25 @@ def main():
 
         try:
             kaggle_submission_ids = kaggle_api.competition_submissions(competition=metadata["kaggle_name"])
+            # we select those ids that match xxxxxv<version>_n_<number>
+            kaggle_submission_ids = [id for id in kaggle_submission_ids if kaggle_select(kaggle_api, kit_suffix, id)]
+            kaggle_action_times = [kaggle_api.string(getattr(id, "description")) for id in kaggle_submission_ids]
+            kaggle_valid_ids = np.zeros(len(kaggle_submission_ids))
+            # we select those ids where the message is a valid date
+            for ki in range(len(kaggle_valid_ids)):
+                try:
+                    pd.to_datetime(kaggle_action_times[ki])
+                    kaggle_valid_ids[ki] = 1
+                except:
+                    pass
+            kaggle_submission_ids = [id for ki, id in enumerate(kaggle_submission_ids) if kaggle_valid_ids[ki]]
+            kaggle_action_times = [kaggle_api.string(getattr(id, "description")) for id in kaggle_submission_ids]
             kaggle_scores = {}
             for phase in available_phases:
-                kaggle_scores[phase] = [
-                    kaggle_api.string(getattr(ii, f"{phase}Score"))
-                    for ii in kaggle_submission_ids
-                    if kaggle_select(kaggle_api, kit_suffix, ii)
-                ]
-            kaggle_action_times = [
-                kaggle_api.string(getattr(ii, "description"))
-                for ii in kaggle_submission_ids
-                if kaggle_select(kaggle_api, kit_suffix, ii)
-            ]
+                kaggle_scores[phase] = [kaggle_api.string(getattr(ii, f"{phase}Score")) for ii in kaggle_submission_ids]
             kaggle_file_names = [
                 kaggle_api.string(getattr(ii, "fileName"))
                 for ii in kaggle_submission_ids
-                if kaggle_select(kaggle_api, kit_suffix, ii)
             ]
         except:
             pass
@@ -114,7 +143,7 @@ def main():
         print(f"Available kaggle scores are {available_phases}")
 
         failure_count = 0
-        for blend_type in ["growing_folds", "last_blend"]:
+        for blend_type in ["growing_folds", "last_blend", "bagged_then_blended"]:
             submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(3)}.csv"
             last_kaggle_actions = [
                 ra
@@ -133,10 +162,11 @@ def main():
             blend_action = [ra for ra in blend_actions if ra.start_time <= last_kaggle_action.start_time][-1]
             results_summary_df.loc[row_i, f"valid_{blend_type}"] = blend_action.blended_score
             for submission in ["lgbm", "xgboost", "catboost"]:
-                results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] = np.array(
-                    [c for s, c in blend_action.contributivities.items() if s[: len(submission)] == submission]
-                ).sum()
-
+                try:
+                    results_summary_df.loc[row_i, f"contributivity_{blend_type}_{submission}"] =\
+                        np.array([c for s, c in blend_action.contributivities.items() if s[:len(submission)] == submission]).sum()
+                except AttributeError as e:
+                    print("No contributivities, old bag_then_blend action")
             if submission_file_name not in kaggle_file_names:
                 # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
                 print(f"Submitting {submission_file_name}")
@@ -159,33 +189,23 @@ def main():
                         score, leaderboard_scores[phase], problem
                     )
                     kaggle_file_counter += 1
-        if failure_count == 2:
+        if failure_count == 3:
             print("MULTIPLE FAILS FOUND")
             continue
         results_summary_df.loc[row_i, "runtime_growing_folds"] = pd.to_timedelta(
-            np.array(
-                [
-                    ra.runtime
-                    for ra in train_actions
-                    if ra.start_time > growing_folds_start_time and ra.start_time < growing_folds_stop_time
-                ]
-            ).sum()
-        )
-        # growing folds done but not last blend
+            np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
+                      and ra.start_time < growing_folds_stop_time]).sum())
+        # growing folds done but not last blend and bagged and blended
         if failure_count == 1:
             continue
         # in last blend training time, we also need to take into consideration of training time of models that occur during the growing fold iteration
-        results_summary_df.loc[row_i, "runtime_last_blend"] = pd.to_timedelta(
-            np.array(
-                [
-                    ra.runtime
-                    for ra in train_actions
-                    if ra.start_time > growing_folds_start_time
-                    and ra.start_time < last_blend_stop_time
-                    and ra.kwargs["submission"] in blend_action.kwargs["submissions"]
-                ]
-            ).sum()
-        )
+        if blend_type in ["growing_folds", "last_blend"]:
+            results_summary_df.loc[row_i, "runtime_last_blend"] = pd.to_timedelta(
+                np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
+                          and ra.start_time < last_blend_stop_time and ra.kwargs["submission"] in blend_action.kwargs["submissions"]]).sum())
+        # growing folds and last blend done but not bagged and blended
+        if failure_count == 2:
+            continue
         for submission in ["lgbm", "xgboost", "catboost"]:
             submission_file_name = f"auto_{kit_suffix}_best_{submission}.csv"
             submission_hyperopt_actions = [
