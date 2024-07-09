@@ -199,7 +199,7 @@ def main():
             last_kaggle_actions = [
                 ra
                 for ra in kaggle_actions
-                if ra.kwargs["submission_target_f_name"] == kaggle_submissions_path / submission_file_name
+                if str(kaggle_submissions_path / submission_file_name) in str(ra.kwargs["submission_target_f_name"])
             ]
             if len(last_kaggle_actions) == 0:
                 # if contributivity is zero, it is normal not having the kaggle action
