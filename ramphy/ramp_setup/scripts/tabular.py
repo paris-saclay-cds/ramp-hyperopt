@@ -199,7 +199,7 @@ def tabular_classification_submit(
 @ramp_action
 def tabular_data_preprocessors_submit(
     submission: str | Path,
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -207,7 +207,7 @@ def tabular_data_preprocessors_submit(
 
     Args:
         submission (str | Path): New submission name
-        data_preprocessors (list[str], optional): List of data preprocessors to submit. Defaults to ['drop_id'].
+        data_preprocessors (list[str], optional): List of data preprocessors to submit. Defaults to ['drop_id', 'col_in_train_only'].
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
@@ -392,7 +392,7 @@ def tabular_encoder_imputer_submit(
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-    """Submit column encoders and imputers. 
+    """Submit column encoders and imputers.
 
     Args:
         submission (str | Path): Submission name
@@ -441,7 +441,7 @@ def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -456,7 +456,7 @@ def tabular_regression_columnwise_last_submit(
         submission (str | Path): Submission name
         regressor (str, optional): Regressor. Defaults to 'xgboost'.
         feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
         cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
         num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
         cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
@@ -495,7 +495,7 @@ def tabular_regression_columnwise_first_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -510,7 +510,7 @@ def tabular_regression_columnwise_first_submit(
         submission (str | Path): Submission name
         regressor (str, optional): Regressor. Defaults to 'xgboost'.
         feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
         cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
         num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
         cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
@@ -548,7 +548,7 @@ def tabular_classification_columnwise_last_submit(
     submission: str | Path,
     classifier: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -602,7 +602,7 @@ def tabular_classification_columnwise_first_submit(
     submission: str | Path,
     classifier: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -617,7 +617,7 @@ def tabular_classification_columnwise_first_submit(
         submission (str | Path): Submission name
         classifier (str, optional): Classifier. Defaults to 'xgboost'.
         feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
         cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
         num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
         cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
