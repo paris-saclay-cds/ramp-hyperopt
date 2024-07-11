@@ -35,7 +35,7 @@ class Regressor(BaseEstimator):
     def __init__(self, metadata):
         self.metadata = metadata
         self.cat_features = [
-            col for col, type in 
+            col for col, type in
             metadata["data_description"]["feature_types"].items()
             if type == "cat"
         ]
@@ -51,7 +51,11 @@ class Regressor(BaseEstimator):
 
     def fit(self, X, y):
         if self.metadata["score_name"] == "rmsle":
-            y = np.log(y)
+            y = np.log1p(y)
+        if y.ndim > 1 and y.shape[1] > 1:
+            # only loss function available for multi output regression
+            self.objective = 'MultiRMSE'
+
         self.reg = cb.CatBoostRegressor(
             cat_features=self.cat_features,
             iterations=ITERATIONS,
@@ -108,5 +112,5 @@ class Regressor(BaseEstimator):
     def predict(self, X):
         y_pred = self.reg.predict(X)
         if self.metadata["score_name"] == "rmsle":
-            y_pred = np.exp(y_pred)
+            y_pred = np.expm1(y_pred)
         return y_pred
