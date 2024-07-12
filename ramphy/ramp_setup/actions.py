@@ -318,8 +318,8 @@ def kaggle_submit(
     kaggle_api.authenticate()
     action_output = {}
 
-    private_scores = get_private_leaderboard_scores(kaggle_api, competition)
-    public_scores = get_public_leaderboard_scores(kaggle_api, competition)
+    private_scores = get_leaderboard_scores(kaggle_api, competition, 'private')
+    public_scores = get_leaderboard_scores(kaggle_api, competition, 'public')
 
     if submission == "blended":
         file_path = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
