@@ -41,7 +41,9 @@ pooling_mode_llm2vec = Hyperparameter(
     default="mean",
     values=["mean", "eos_token", "weighted_mean", "bos_token"],
 )
-encoding_mode_llm2vec = Hyperparameter(dtype="str", default="pos_max", values=["pos_max", "extremes", "pca"])
+encoding_mode_llm2vec = Hyperparameter(
+    dtype="str", default="pca_2", values=["pos_max", "extremes", "pca_2", "pca_3", "pca_5"]
+)
 impute_strategy_num_llm2vec = Hyperparameter(
     dtype="str",
     default="mean",
@@ -63,11 +65,14 @@ POOLING_MODE = str(pooling_mode_llm2vec)
 ENCODING_MODE = str(encoding_mode_llm2vec)
 
 
+MODEL = "Meta-Llama-3-8B-Instruct"  # Sheared-LLaMA
+
+
 class DataPreprocessor(rs.BaseDataPreprocessor):
     def __init__(self):
         self.to_cache = True
 
-        if ENCODING_MODE == "pca":
+        if "pca" in ENCODING_MODE:
             self.scaler: Optional[StandardScaler] = None
             self.pca: Optional[PCA] = None
 
@@ -75,36 +80,36 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         device_map = "cuda:0"
         print("Loading tokenizer")
         self.tokenizer = AutoTokenizer.from_pretrained(
-            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map, local_files_only=True
+            f"McGill-NLP/LLM2Vec-{{MODEL}}-mntp", device_map=device_map, local_files_only=False
         )
         self.config = AutoConfig.from_pretrained(
-            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
+            f"McGill-NLP/LLM2Vec-{{MODEL}}-mntp",
             trust_remote_code=True,
             device_map=device_map,
-            local_files_only=True,
+            local_files_only=False,
         )
         print("Loading LLM")
         self.model = AutoModel.from_pretrained(
-            "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp",
+            f"McGill-NLP/LLM2Vec-{{MODEL}}-mntp",
             trust_remote_code=True,
             config=self.config,
             torch_dtype=torch.bfloat16,
             device_map=device_map,
-            local_files_only=True,
+            local_files_only=False,
         )
 
         print("Loading PEFT")
         self.model = PeftModel.from_pretrained(
-            self.model, "McGill-NLP/LLM2Vec-Sheared-LLaMA-mntp", device_map=device_map, local_files_only=True
+            self.model, f"McGill-NLP/LLM2Vec-{{MODEL}}-mntp", device_map=device_map, local_files_only=False
         )
         if not PEFT_MODEL == "mntp":
             print("Loading PEFT model 2")
             self.model = self.model.merge_and_unload()
             self.model = PeftModel.from_pretrained(
                 self.model,
-                f"McGill-NLP/LLM2Vec-Sheared-LLaMA-{{PEFT_MODEL}}",
+                f"McGill-NLP/LLM2Vec-{{MODEL}}-{{PEFT_MODEL}}",
                 device_map=device_map,
-                local_files_only=True,
+                local_files_only=False,
             )
         print("Finished Loading")
         self.l2v = LLM2Vec(self.model, self.tokenizer, pooling_mode=POOLING_MODE, max_length=512)
@@ -228,11 +233,12 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             min_values = np.min(raw_encoding, axis=1)
             encoding = np.array([max_values, norm_max_idx, min_values, norm_min_idx]).swapaxes(1, 0)
             return encoding
-        elif ENCODING_MODE == "pca":
+        elif "pca" in ENCODING_MODE:
             # This happens when we pass the train dataset
             if self.scaler is None:
                 self.scaler = StandardScaler()
-                self.pca = PCA(n_components=2)
+                components = int(ENCODING_MODE.split("_")[-1])
+                self.pca = PCA(n_components=components)
                 scaled_data = self.scaler.fit_transform(raw_encoding)
                 encoding = self.pca.fit_transform(scaled_data)
             else:
