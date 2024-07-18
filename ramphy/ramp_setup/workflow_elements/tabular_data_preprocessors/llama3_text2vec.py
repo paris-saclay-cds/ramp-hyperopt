@@ -16,7 +16,9 @@ from urllib3.exceptions import InsecureRequestWarning
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
 # Suppress only the RequestsDependencyWarning
-warnings.filterwarnings("ignore", category=RequestsDependencyWarning, message=".*urllib3.*")
+warnings.filterwarnings(
+    "ignore", category=RequestsDependencyWarning, message=".*urllib3.*"
+)
 
 import numpy as np
 import pandas as pd
@@ -32,8 +34,12 @@ from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 
 # RAMP START HYPERPARAMETERS
-encoding_mode_llama2vec = Hyperparameter(dtype="str", default="pos_max", values=["pos_max", "extremes", "pca"])
-model_type_llama2vec = Hyperparameter(dtype="str", default="chat", values=["chat", "classic"])
+encoding_mode_llama2vec = Hyperparameter(
+    dtype="str",
+    default="pos_max",
+    values=["pos_max", "extremes", "pca_2", "pca_3", "pca_5"],
+)
+model_type_llama2vec = Hyperparameter(dtype="str", default="chat", values=["chat"])
 # RAMP END HYPERPARAMETERS
 
 IMPUTE_STRATEGY_NUM = "mean"
@@ -52,18 +58,23 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
     def load_llm(self):
         if MODEL_TYPE == "chat":
-            model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+            model_id = "meta-llama/Meta-Llama-3-70B-Instruct"
         elif MODEL_TYPE == "classic":
-            model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+            model_id = "meta-llama/Meta-Llama-3-70B-Instruct"
         else:
             raise ValueError(f"Model type {{MODEL_TYPE}} not implemented")
 
         print("Loading tokenizer")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True, padding_side="left")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_id, local_files_only=True, padding_side="left"
+        )
         self.tokenizer.add_special_tokens({{"pad_token": "<pad>"}})
         print("Loading model")
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_id, local_files_only=True, torch_dtype=torch.float16, device_map="auto"
+            model_id,
+            local_files_only=True,
+            torch_dtype=torch.float16,
+            device_map="auto",
         )
 
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
@@ -71,7 +82,11 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         print("Loading done")
 
     def preprocess(
-        self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
+        self,
+        X_train: pd.DataFrame,
+        y_train: np.ndarray,
+        X_test: pd.DataFrame,
+        metadata: dict,
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         self.load_llm()  # Load it here so we don't load it when caching
         # Find text columns
@@ -101,7 +116,9 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_test.drop(columns=text_columns, inplace=True)
 
         for new_col in all_new_features:
-            X_train, X_test = self.impute_column(col_name=new_col, X_train=X_train, X_test=X_test)
+            X_train, X_test = self.impute_column(
+                col_name=new_col, X_train=X_train, X_test=X_test
+            )
 
         # Update metadata
         metadata = deepcopy(metadata)
@@ -122,7 +139,9 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             for new_column in new_feature_names[feat]:
                 metadata["data_description"]["feature_types"][new_column] = "num"
                 if missing_count is not None:
-                    metadata["data_description"]["missing_data_count"][new_column] = missing_count
+                    metadata["data_description"]["missing_data_count"][new_column] = (
+                        missing_count
+                    )
 
         return X_train, y_train, X_test, metadata
 
@@ -155,7 +174,11 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             for val in values
         ]
         input_ids = self.tokenizer.apply_chat_template(
-            queries, add_generation_prompt=True, return_tensors="pt", padding=True, truncation=False
+            queries,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            padding=True,
+            truncation=False,
         )
 
         raw_encoding = []
@@ -168,15 +191,22 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         return raw_encoding
 
     def classic_encoding(self, values, column_name, batch_size=512) -> np.ndarray:
-        queries = [f"The value of the column {{column_name}} is {{val}}" for val in values]
-        input_ids = self.tokenizer.batch_encode_plus(queries, return_tensors="pt", padding=True, truncation=False)
+        queries = [
+            f"The value of the column {{column_name}} is {{val}}" for val in values
+        ]
+        input_ids = self.tokenizer.batch_encode_plus(
+            queries, return_tensors="pt", padding=True, truncation=False
+        )
 
         raw_encoding = []
         for batch_idx in tqdm(range(0, len(input_ids), batch_size), desc="Batch idx"):
             batch = input_ids[batch_idx : batch_idx + batch_size]
 
             with torch.no_grad():
-                out = self.model(batch["input_ids"].cuda(), attention_mask=batch["attention_mask"].cuda())
+                out = self.model(
+                    batch["input_ids"].cuda(),
+                    attention_mask=batch["attention_mask"].cuda(),
+                )
 
             raw_encoding.append(out["logits"][:, -1].cpu().numpy())
         raw_encoding = np.concatenate(raw_encoding)
@@ -192,21 +222,29 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         Returns:
             pd.DataFrame: The dataframe of the encoded columns
         """
-        column = dataset[column_name].dropna()  # We do this and with the idx as well so we only encode the values
+        column = dataset[
+            column_name
+        ].dropna()  # We do this and with the idx as well so we only encode the values
         values = column.values
         indexes = column.index
 
         batch_size = 256
         if MODEL_TYPE == "chat":
-            raw_encoding = self.chat_encoding(values=values, column_name=column_name, batch_size=batch_size)
+            raw_encoding = self.chat_encoding(
+                values=values, column_name=column_name, batch_size=batch_size
+            )
         elif MODEL_TYPE == "classic":
-            raw_encoding = self.classic_encoding(values=values, column_name=column_name, batch_size=batch_size)
+            raw_encoding = self.classic_encoding(
+                values=values, column_name=column_name, batch_size=batch_size
+            )
         else:
             raise ValueError(f"Model type {{MODEL_TYPE}} not implemented")
 
         encoding = self.postprocess_encoding(raw_encoding)
         new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
-        encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names, index=indexes)
+        encoded_columns = pd.DataFrame(
+            data=encoding, columns=new_col_names, index=indexes
+        )
         return encoded_columns
 
     def postprocess_encoding(self, raw_encoding: np.ndarray) -> np.ndarray:
@@ -229,13 +267,16 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             norm_min_idx = np.argmin(raw_encoding, axis=1) / raw_encoding.shape[1]
             max_values = np.max(raw_encoding, axis=1)
             min_values = np.min(raw_encoding, axis=1)
-            encoding = np.array([max_values, norm_max_idx, min_values, norm_min_idx]).swapaxes(1, 0)
+            encoding = np.array(
+                [max_values, norm_max_idx, min_values, norm_min_idx]
+            ).swapaxes(1, 0)
             return encoding
-        elif ENCODING_MODE == "pca":
+        elif "pca" in ENCODING_MODE:
             # This happens when we pass the train dataset
             if self.scaler is None:
                 self.scaler = StandardScaler()
-                self.pca = PCA(n_components=2)
+                components = int(ENCODING_MODE.split("_")[-1])
+                self.pca = PCA(n_components=components)
                 scaled_data = self.scaler.fit_transform(raw_encoding)
                 encoding = self.pca.fit_transform(scaled_data)
             else:
