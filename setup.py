@@ -33,7 +33,8 @@ CLASSIFIERS = ['Intended Audience :: Science/Research',
                'Operating System :: Unix',
                'Operating System :: MacOS']
 INSTALL_REQUIRES = ['numpy', 'scipy', 'pandas', 'scikit-learn>=0.22', 'joblib',
-                    'cloudpickle', 'click', 'ray[tune]', 'ramp-workflow']
+                    'cloudpickle', 'click', 'ray[tune]', 'ramp-workflow',
+                    'xarray', 'category_encoders', 'xgboost', 'lightgbm', 'catboost', 'kaggle']
 EXTRAS_REQUIRE = {
     'tests': ['pytest', 'pytest-cov'],
     'docs': ['sphinx', 'sphinx_rtd_theme', 'numpydoc', 'sphinx-click']
