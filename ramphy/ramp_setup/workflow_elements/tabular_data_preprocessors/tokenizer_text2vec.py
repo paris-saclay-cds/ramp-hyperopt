@@ -7,7 +7,7 @@ os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
 import warnings
 from copy import deepcopy
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 from requests.exceptions import RequestsDependencyWarning
 from urllib3.exceptions import InsecureRequestWarning
@@ -33,19 +33,19 @@ from transformers import AutoConfig
 from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 
+pd.set_option("display.max_columns", None)
+
 # RAMP START HYPERPARAMETERS
 encoding_mode_llama2vec = Hyperparameter(
     dtype="str",
-    default="pos_max",
-    values=["pos_max", "extremes", "pca_2", "pca_3", "pca_5"],
+    default="pca_1",
+    values=["extremes", "pca_1", "pca_2", "pca_3", "full"],
 )
-model_type_llama2vec = Hyperparameter(dtype="str", default="chat", values=["chat"])
 # RAMP END HYPERPARAMETERS
 
 IMPUTE_STRATEGY_NUM = "mean"
 FILL_VALUE_NUM = -1.0
 ENCODING_MODE = str(encoding_mode_llama2vec)
-MODEL_TYPE = str(model_type_llama2vec)
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
@@ -53,32 +53,17 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         self.to_cache = True
 
         if "pca" in ENCODING_MODE:
-            self.scaler: Optional[StandardScaler] = None
-            self.pca: Optional[PCA] = None
+            self.scaler: Dict[str, StandardScaler] = {{}}
+            self.pca: Dict[str, PCA] = {{}}
 
-    def load_llm(self):
-        if MODEL_TYPE == "chat":
-            model_id = "meta-llama/Meta-Llama-3-70B-Instruct"
-        elif MODEL_TYPE == "classic":
-            model_id = "meta-llama/Meta-Llama-3-70B"
-        else:
-            raise ValueError(f"Model type {{MODEL_TYPE}} not implemented")
+    def load_tokenizer(self):
+        model_id = "meta-llama/Meta-Llama-3-8B"
 
         print("Loading tokenizer")
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_id, local_files_only=False, padding_side="left"
         )
         self.tokenizer.add_special_tokens({{"pad_token": "<pad>"}})
-        print("Loading model")
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            local_files_only=False,
-            torch_dtype=torch.float16,
-            device_map="auto",
-        )
-
-        self.model.config.pad_token_id = self.tokenizer.pad_token_id
-        self.model.resize_token_embeddings(len(self.tokenizer))
         print("Loading done")
 
     def preprocess(
@@ -88,7 +73,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_test: pd.DataFrame,
         metadata: dict,
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
-        self.load_llm()  # Load it here so we don't load it when caching
+        self.load_tokenizer()  # Load it here so we don't load it when caching
         # Find text columns
         feature_types = metadata["data_description"]["feature_types"]
         text_columns = []
@@ -97,23 +82,29 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 text_columns.append(feature)
 
         print(f"Found the following text columns: {{text_columns}}")
+        # We store the idx so we can concat by ignoring them
+        train_len = X_train.shape[0]
+        train_idx = X_train.index
+        test_idx = X_test.index
+        all_data = pd.concat([X_train, X_test], axis=0, ignore_index=True)
 
         # Encode columns
         new_feature_names = {{}}  # Needed for metadata update
         all_new_features = []  # Needed for imputing
         for feature in text_columns:
             print(f"Encoding {{feature}}")
-            encoded_columns = self.encode_column(column_name=feature, dataset=X_train)
-            X_train = pd.concat([X_train, encoded_columns], axis=1)
+            encoded_columns = self.encode_column(column_name=feature, dataset=all_data)
+            all_data = pd.concat([all_data, encoded_columns], axis=1)
             new_feature_names[feature] = list(encoded_columns.columns)
             all_new_features += new_feature_names[feature]
 
-            encoded_columns = self.encode_column(column_name=feature, dataset=X_test)
-            X_test = pd.concat([X_test, encoded_columns], axis=1)
-
         # Drop text columns from datasets
-        X_train.drop(columns=text_columns, inplace=True)
-        X_test.drop(columns=text_columns, inplace=True)
+        all_data.drop(columns=text_columns, inplace=True)
+        # We split and restore the original inputs
+        X_train = all_data[:train_len]
+        X_train.index = train_idx
+        X_test = all_data[train_len:]
+        X_test.index = test_idx
 
         for new_col in all_new_features:
             X_train, X_test = self.impute_column(
@@ -164,54 +155,6 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_test[[col_name]] = imputer.transform(X_test[[col_name]])
         return X_train, X_test
 
-    def chat_encoding(self, values, column_name, batch_size=512) -> np.ndarray:
-        instruction = f"Given the text feature named {{column_name}} of a tabular dataset, extract the corresponding value in the given example."
-        queries = [
-            [
-                {{"role": "system", "content": instruction}},
-                {{"role": "user", "content": f"The value of {{column_name}} is {{val}}"}},
-            ]
-            for val in values
-        ]
-        input_ids = self.tokenizer.apply_chat_template(
-            queries,
-            add_generation_prompt=True,
-            return_tensors="pt",
-            padding=True,
-            truncation=False,
-        )
-
-        raw_encoding = []
-        for batch_idx in tqdm(range(0, len(input_ids), batch_size), desc="Batch idx"):
-            with torch.no_grad():
-                out = self.model(input_ids[batch_idx : batch_idx + batch_size].cuda())
-
-            raw_encoding.append(out["logits"][:, -1].cpu().numpy())
-        raw_encoding = np.concatenate(raw_encoding)
-        return raw_encoding
-
-    def classic_encoding(self, values, column_name, batch_size=512) -> np.ndarray:
-        queries = [
-            f"The value of the column {{column_name}} is {{val}}" for val in values
-        ]
-        input_ids = self.tokenizer.batch_encode_plus(
-            queries, return_tensors="pt", padding=True, truncation=False
-        )
-
-        raw_encoding = []
-        for batch_idx in tqdm(range(0, len(input_ids), batch_size), desc="Batch idx"):
-            batch = input_ids[batch_idx : batch_idx + batch_size]
-
-            with torch.no_grad():
-                out = self.model(
-                    batch["input_ids"].cuda(),
-                    attention_mask=batch["attention_mask"].cuda(),
-                )
-
-            raw_encoding.append(out["logits"][:, -1].cpu().numpy())
-        raw_encoding = np.concatenate(raw_encoding)
-        return raw_encoding
-
     def encode_column(self, column_name: str, dataset: pd.DataFrame) -> pd.DataFrame:
         """This function encodes the given column from the given dataset.
 
@@ -225,29 +168,23 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         column = dataset[
             column_name
         ].dropna()  # We do this and with the idx as well so we only encode the values
-        values = column.values
+        values = list(column.values)
         indexes = column.index
+        raw_encoding = self.tokenizer.batch_encode_plus(
+            values, return_attention_mask=False, padding="longest"
+        )
+        raw_encoding = np.array(raw_encoding["input_ids"])
 
-        batch_size = 256
-        if MODEL_TYPE == "chat":
-            raw_encoding = self.chat_encoding(
-                values=values, column_name=column_name, batch_size=batch_size
-            )
-        elif MODEL_TYPE == "classic":
-            raw_encoding = self.classic_encoding(
-                values=values, column_name=column_name, batch_size=batch_size
-            )
-        else:
-            raise ValueError(f"Model type {{MODEL_TYPE}} not implemented")
-
-        encoding = self.postprocess_encoding(raw_encoding)
+        encoding = self.postprocess_encoding(raw_encoding, column_name)
         new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
         encoded_columns = pd.DataFrame(
             data=encoding, columns=new_col_names, index=indexes
         )
         return encoded_columns
 
-    def postprocess_encoding(self, raw_encoding: np.ndarray) -> np.ndarray:
+    def postprocess_encoding(
+        self, raw_encoding: np.ndarray, column_name: str
+    ) -> np.ndarray:
         """This function postprocesses the raw encoding from the LLM
 
         Args:
@@ -273,15 +210,16 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             return encoding
         elif "pca" in ENCODING_MODE:
             # This happens when we pass the train dataset
-            if self.scaler is None:
-                self.scaler = StandardScaler()
+            # We use the dict, cause each column might be encoded with tensors of diff lenghts, depending on the len of the longest word
+            if column_name not in self.scaler:
+                self.scaler[column_name] = StandardScaler()
                 components = int(ENCODING_MODE.split("_")[-1])
-                self.pca = PCA(n_components=components)
-                scaled_data = self.scaler.fit_transform(raw_encoding)
-                encoding = self.pca.fit_transform(scaled_data)
+                self.pca[column_name] = PCA(n_components=components)
+                scaled_data = self.scaler[column_name].fit_transform(raw_encoding)
+                encoding = self.pca[column_name].fit_transform(scaled_data)
             else:
-                scaled_data = self.scaler.transform(raw_encoding)
-                encoding = self.pca.transform(scaled_data)
+                scaled_data = self.scaler[column_name].transform(raw_encoding)
+                encoding = self.pca[column_name].transform(scaled_data)
             return encoding
         else:
             raise ValueError(f"Encoding {{ENCODING_MODE}} not implemented")
