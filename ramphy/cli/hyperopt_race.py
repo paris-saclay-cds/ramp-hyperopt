@@ -1,5 +1,6 @@
 import ramphy.ramp_setup as rs
 import click
+
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 # flake8: noqa: E501
@@ -48,6 +49,18 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The number of rounds after wwhich we stop if score does not improve.",
 )
+@click.option(
+    "--data_preprocessors",
+    multiple=True,
+    default=["drop_id"],
+    help="A list of data_preprocessors.",
+)
+@click.option(
+    "--elements_to_hyper",
+    multiple=True,
+    default=None,
+    help="A list of element to hyperopt other than the model.",
+)
 def main(
     ramp_kit,
     kit_root,
@@ -57,21 +70,26 @@ def main(
     n_rounds,
     n_trials_per_round,
     patience,
+    data_preprocessors,
+    elements_to_hyper,
 ):
     rs.orchestration.hyperopt_race(
-        ramp_kit = ramp_kit,
-        kit_root = kit_root,
-        version = version,
-        number = number,
-        resume = resume,
-        n_rounds = n_rounds,
-        n_trials_per_round = n_trials_per_round,
-        patience = patience,
+        data_preprocessors=data_preprocessors,
+        ramp_kit=ramp_kit,
+        kit_root=kit_root,
+        version=version,
+        number=number,
+        resume=resume,
+        n_rounds=n_rounds,
+        n_trials_per_round=n_trials_per_round,
+        patience=patience,
+        elements_to_hyper=elements_to_hyper,
     )
+
 
 def start():
     main()
 
+
 if __name__ == "__main__":
     start()
-
