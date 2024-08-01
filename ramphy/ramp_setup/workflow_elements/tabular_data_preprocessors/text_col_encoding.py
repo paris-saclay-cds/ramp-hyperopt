@@ -27,10 +27,10 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         X = pd.concat((X_train, X_test))
         transformer = GapEncoder(n_components=N_COMPONENTS_GAP, random_state=1)
-        transformer.fit(X[[self.col]])
-        new_columns = transformer.get_feature_names_out([self.col])
+        transformer.fit(pd.Series(X[[self.col]].stack()))
+        new_columns = transformer.get_feature_names_out(n_labels=N_COMPONENTS_GAP)
         converted_columns = [re.sub(r'[^a-zA-Z0-9_]', '_', col) + f"_{{i}}" for i, col in enumerate(new_columns)]
-        X_transformed = transformer.transform(X[[self.col]])
+        X_transformed = transformer.transform(pd.Series(X[[self.col]].stack()))
         # Handling sparse matrix output
         if hasattr(X_transformed, 'toarray'):
             X_transformed = X_transformed.toarray()
