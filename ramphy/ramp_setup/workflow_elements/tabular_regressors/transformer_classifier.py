@@ -20,6 +20,7 @@ input_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard"
 target_bins = Hyperparameter(dtype="int", default=10, values=[5, 10, 20])
 binning_strategy = Hyperparameter(dtype="str", default="quantile", values=["uniform", "quantile", "kmeans"])
 unbinning_strategy = Hyperparameter(dtype="str", default="sampling", values=["sampling", "mean"])
+optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
 
 INPUT_SCALING = str(input_scaling)
 NUM_LAYERS = int(num_layers)
@@ -32,6 +33,78 @@ BATCH_SIZE = 10
 TARGET_BINS = int(target_bins)
 BINNING_STRATEGY = str(binning_strategy)
 UNBINNING_STRATEGY = str(unbinning_strategy)
+OPTIMIZER = str(optimizer)
+
+
+class SAM(optim.Optimizer):
+    """
+    SAM: Sharpness-Aware Minimization for Efficiently Improving Generalization https://arxiv.org/abs/2010.01412
+    https://github.com/davda54/sam
+    """
+
+    def __init__(self, params, base_optimizer, rho=0.05, adaptive=False, **kwargs):
+        assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
+
+        defaults = dict(rho=rho, adaptive=adaptive, **kwargs)
+        super(SAM, self).__init__(params, defaults)
+
+        self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
+        self.param_groups = self.base_optimizer.param_groups
+
+    @torch.no_grad()
+    def first_step(self, zero_grad=False):
+        grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["rho"] / (grad_norm + 1e-12)
+
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                self.state[p]["e_w"] = e_w
+
+        if zero_grad:
+            self.zero_grad()
+
+    @torch.no_grad()
+    def second_step(self, zero_grad=False):
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                p.sub_(self.state[p]["e_w"])  # get back to "w" from "w + e(w)"
+
+        self.base_optimizer.step()  # do the actual "sharpness-aware" update
+
+        if zero_grad:
+            self.zero_grad()
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
+        closure = torch.enable_grad()(closure)  # the closure should do a full forward-backward pass
+
+        self.first_step(zero_grad=True)
+        closure()
+        self.second_step()
+
+    def _grad_norm(self):
+        shared_device = self.param_groups[0]["params"][
+            0
+        ].device  # put everything on the same device, in case of model parallelism
+        norm = torch.norm(
+            torch.stack(
+                [
+                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+                    for group in self.param_groups
+                    for p in group["params"]
+                    if p.grad is not None
+                ]
+            ),
+            p=2,
+        )
+        return norm
 
 
 class Transformer(nn.Module):
@@ -132,8 +205,16 @@ class Regressor(BaseEstimator):
             output_size=output_size,
             softmax_out=softmax_out,
         ).to(self.device)
+        self.transformer.train()
 
-        optimizer = optim.Adam(self.transformer.parameters(), lr=LEARNING_RATE)
+        if OPTIMIZER == "adam":
+            optimizer = optim.Adam(self.transformer.parameters(), lr=LEARNING_RATE)
+        elif OPTIMIZER == "sam":
+            optimizer = SAM(
+                self.transformer.parameters(), base_optimizer=optim.Adam, rho=0.5, lr=LEARNING_RATE, weight_decay=1e-5
+            )
+        else:
+            ValueError("Only adam or sam optimizers available")
         # ---------------------------
 
         # Train
@@ -147,13 +228,21 @@ class Regressor(BaseEstimator):
             for batch_idx in range(0, len(X), BATCH_SIZE):
                 batch_X = X[batch_idx : batch_idx + BATCH_SIZE]
                 batch_y = y[batch_idx : batch_idx + BATCH_SIZE]
-
-                optimizer.zero_grad()
-
+                # Forward
                 output = self.transformer(batch_X)
                 loss = self.criterion(input=output, target=batch_y)
-                loss.backward()
-                optimizer.step()
+
+                if OPTIMIZER == "adam":
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                elif OPTIMIZER == "sam":
+                    loss.backward()
+                    optimizer.first_step(zero_grad=True)
+                    output = self.transformer(batch_X)
+                    loss = self.criterion(input=output, target=batch_y)
+                    loss.backward()
+                    optimizer.second_step(zero_grad=True)
 
                 # Log
                 epoch_loss += loss.detach().cpu().numpy()
@@ -162,11 +251,11 @@ class Regressor(BaseEstimator):
                 batch_count += 1
             epoch_loss = epoch_loss / batch_count
             writer.add_scalar("Loss/Training_loss", epoch_loss, epoch)
-            print(f"Epoch Loss: {epoch_loss}")
-        print()
+            # print(f"Epoch Loss: {epoch_loss}")
         # ---------------------------
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        self.transformer.eval()
         y_pred = self.get_logits(X=X)
         y_pred = np.argmax(y_pred, axis=1)
         return y_pred
