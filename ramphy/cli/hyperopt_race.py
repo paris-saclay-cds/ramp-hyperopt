@@ -48,6 +48,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The number of rounds after wwhich we stop if score does not improve.",
 )
+@click.option(
+    "--no-growing-folds",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Do not run the growing fold submission at the end.",
+)
 def main(
     ramp_kit,
     kit_root,
@@ -57,6 +64,7 @@ def main(
     n_rounds,
     n_trials_per_round,
     patience,
+    no_growing_folds,
 ):
     rs.orchestration.hyperopt_race(
         ramp_kit = ramp_kit,
@@ -67,6 +75,7 @@ def main(
         n_rounds = n_rounds,
         n_trials_per_round = n_trials_per_round,
         patience = patience,
+        no_growing_folds = no_growing_folds,
     )
 
 def start():

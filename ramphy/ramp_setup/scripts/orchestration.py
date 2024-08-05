@@ -9,7 +9,6 @@ import rampwf as rw
 import ramphy as rh
 import ramphy.ramp_setup as rs
 from pathlib import Path
-from kaggle.api.kaggle_api_extended import KaggleApi
 from typing import Optional
 
 def last_action(ramp_kit_dir, name):
@@ -135,6 +134,8 @@ def run_race(
                     ramp_kit_dir = ramp_kit_dir,
                 )
             else:
+                print("something wrong: no blended score")
+                exit(0)
                 blended_score = hyperopt_action.mean_score
                 contributivities = {s: 1000 / len(submissions) for s in base_submissions}
             scores.append(blended_score)
@@ -288,6 +289,7 @@ def final_blend_then_bag(
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
+    n_rounds: Optional[int] = -1, 
 ):
     """Blend then bag and submit after each fold.
 
@@ -301,7 +303,10 @@ def final_blend_then_bag(
             fold_idxs = range(900, stop_fold_idx),
         )
         submission_source_f_name = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-        submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}.csv"
+        if n_rounds > 0:
+            submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}_r{n_rounds}.csv"
+        else:
+            submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}.csv"
         kaggle_submit_file(
             submission_source_f_name = submission_source_f_name,
             submission_target_f_name = submission_target_f_name,
@@ -314,6 +319,7 @@ def final_bag_then_blend(
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
+    n_rounds: Optional[int] = -1, 
 ):
     """Bag then blend and submit after each fold.
 
@@ -327,7 +333,10 @@ def final_bag_then_blend(
             fold_idxs = range(900, stop_fold_idx),
         )
         submission_source_f_name = Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_bagged_then_blended_test.csv"
-        submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}.csv"
+        if n_rounds > 0:
+            submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}_r{n_rounds}.csv"
+        else:
+            submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}.csv"
         kaggle_submit_file(
             submission_source_f_name = submission_source_f_name,
             submission_target_f_name = submission_target_f_name,
@@ -352,9 +361,19 @@ def submit_best_submissions(
             top_n = 1,
         )["selected_submissions"]
         if len(best_submissions) == 0:
-            return
+            print(f"No best {submission}")
+            continue
         best_submission = best_submissions[0]
         submission_source_f_name = Path(ramp_kit_dir) / "submissions" / best_submission / "training_output" / "submission_bagged_test.csv"
+        if not submission_source_f_name.exists():
+            print(f"Bagging {submission}")
+            # It wasn't in the final blends so we need to bag it
+            rh.actions.train(
+                ramp_kit_dir = ramp_kit_dir,
+                submission = best_submission,
+                fold_idxs = range(900, 900 + n_folds),
+                bag = True,
+            )
         submission_target_f_name = Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_best_{submission}.csv"
         kaggle_submit_file(
             submission_source_f_name = submission_source_f_name,
@@ -378,6 +397,7 @@ def hyperopt_race(
     top_n_for_mean: Optional[int] = 10,
     n_sigma: Optional[float] = 1.0,    
     contributivity_floor: Optional[int] = 100,  # on 1000, added to contributivity to give a chance to every submission
+    no_growing_folds: Optional[bool] = False,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -439,16 +459,17 @@ def hyperopt_race(
     # n sigma and train on one more fold, then repeat. Then blend the best ones.
     # Conservative blend (discard diverse but bad submissions), we'll probably drop
     # this since blend_and_bag and bag_and_blend work better, but keep it for early
-    # versions to experiment.      
-    final_blend_growing_folds(
-        base_submissions = base_submissions,
-        ramp_kit_dir = ramp_kit_dir,
-        kit_suffix = kit_suffix,
-        n_folds = n_folds,
-        n_folds_hyperopt = n_folds_hyperopt,
-        top_n_for_mean = top_n_for_mean,
-        n_sigma = n_sigma,
-    )
+    # versions to experiment.
+    if not no_growing_folds:
+        final_blend_growing_folds(
+            base_submissions = base_submissions,
+            ramp_kit_dir = ramp_kit_dir,
+            kit_suffix = kit_suffix,
+            n_folds = n_folds,
+            n_folds_hyperopt = n_folds_hyperopt,
+            top_n_for_mean = top_n_for_mean,
+            n_sigma = n_sigma,
+        )
     # Train the final blend of the hyperopt race on all the folds
     train_on_all_folds(
         submissions = list(blended_submissions),
