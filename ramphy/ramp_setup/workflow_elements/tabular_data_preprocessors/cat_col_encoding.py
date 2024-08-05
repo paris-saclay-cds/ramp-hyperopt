@@ -8,7 +8,6 @@ from category_encoders import CountEncoder
 from category_encoders import HashingEncoder
 from category_encoders import TargetEncoder
 from ramphy import Hyperparameter
-#from ramphy.ramp_setup.metadata import MetaData
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
