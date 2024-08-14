@@ -187,7 +187,7 @@ def get_leaderboard_scores(
 def get_submission_scores(kaggle_api: KaggleApi, competition: str) -> Tuple[float, float]:
     """Get submission scores from Kaggle.
 
-    This takes the scoers of the most recent submission.
+    This takes the scores of the most recent submission.
 
     Args:
         kaggle_api (object): KaggleApi instance.

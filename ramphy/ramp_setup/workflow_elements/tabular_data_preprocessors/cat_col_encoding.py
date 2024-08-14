@@ -8,7 +8,6 @@ from category_encoders import CountEncoder
 from category_encoders import HashingEncoder
 from category_encoders import TargetEncoder
 from ramphy import Hyperparameter
-#from ramphy.ramp_setup.metadata import MetaData
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
@@ -74,7 +73,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             if hasattr(X_transformed, "toarray"):
                 X_transformed = X_transformed.toarray()
             X_train = X_train.drop(columns=[self.col])
-            X_train[new_columns] = X_transformed
+            X_transformed_df = pd.DataFrame(X_transformed, columns=new_columns, index=X_train.index)
+            X_train = pd.concat((X_train, X_transformed_df), axis=1)
             for col in new_columns:
                 X_train[col] = pd.to_numeric(X_train[col], downcast="integer")
     
@@ -82,7 +82,9 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             if hasattr(X_transformed, "toarray"):
                 X_transformed = X_transformed.toarray()
             X_test = X_test.drop(columns=[self.col])
-            X_test[new_columns] = X_transformed
+            X_transformed_df = pd.DataFrame(X_transformed, columns=new_columns, index=X_test.index)
+            X_test = pd.concat((X_test, X_transformed_df), axis=1)
+            # X_test[new_columns] = X_transformed
             for col in new_columns:
                 X_test[col] = pd.to_numeric(X_test[col], downcast="integer")
     

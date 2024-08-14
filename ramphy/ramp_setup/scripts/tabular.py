@@ -1,15 +1,15 @@
-import re
 import json
-import glob
+import re
 import shutil
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from ramphy import ramp_setup as rs
+
 from ramphy import actions as ra
-from ramphy.actions import ramp_action, RAMP_ACTIONS
+from ramphy import ramp_setup as rs
+from ramphy.actions import ramp_action
 
 
 @ramp_action
@@ -58,8 +58,20 @@ def tabular_setup(
             new_feature_types[col] = col_type
         else:
             new_feature_types[new_col] = col_type
-    train_data = train_data.rename(columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
-    test_data = test_data.rename(columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
+    train_data = train_data.rename(
+        columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
+    test_data = test_data.rename(
+        columns=dict(zip(feature_types.keys(), new_feature_types.keys())))
+
+    if "feature_types_to_cast" in metadata["data_description"] and metadata["data_description"]["feature_types_to_cast"] is not None:
+        feature_types_to_cast = metadata["data_description"]["feature_types_to_cast"]
+        for old_key, new_key in zip(feature_types.keys(), new_feature_types.keys()):
+            if old_key in feature_types_to_cast:
+                feature_types_to_cast[new_key] = feature_types_to_cast.pop(old_key)
+        metadata["data_description"]["feature_types_to_cast"] = feature_types_to_cast
+    else:
+        metadata["data_description"]["feature_types_to_cast"] = None
+
     feature_types = metadata["data_description"]["feature_types"] = new_feature_types
 
     problem_code = problem_code.format_map(metadata)

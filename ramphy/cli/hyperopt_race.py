@@ -50,6 +50,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="The number of rounds after wwhich we stop if score does not improve.",
 )
 @click.option(
+    "--no-growing-folds",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Do not run the growing fold submission at the end.",
+)
+@click.option(
     "--data_preprocessors",
     multiple=True,
     default=["drop_id"],
@@ -70,6 +77,7 @@ def main(
     n_rounds,
     n_trials_per_round,
     patience,
+    no_growing_folds,
     data_preprocessors,
     elements_to_hyper,
 ):
@@ -83,8 +91,10 @@ def main(
         n_rounds=n_rounds,
         n_trials_per_round=n_trials_per_round,
         patience=patience,
+        no_growing_folds = no_growing_folds,
         elements_to_hyper=elements_to_hyper,
     )
+
 
 
 def start():

@@ -35,7 +35,7 @@ def kaggle_prank(score, leaderboard_scores, problem):
 @click.option(
     "--ramp-kit",
     default=None,
-    help="The kit to hyperopt.",
+    help="The kit to update.",
 )
 @click.option(
     "--version",
@@ -69,7 +69,7 @@ def main(
             continue
         if version is not None and row["version"] != version:
             continue
-        if number is not None and row["number"] != number:
+        if number is not None and str(row["number"]) != number:
             continue
         kit_suffix = f"v{row['version']}_n{row['number']}"
         ramp_kit_dir = f"{row['ramp_kit']}_{kit_suffix}"
@@ -143,6 +143,7 @@ def main(
         print(f"Available kaggle scores are {available_phases}")
 
         failure_count = 0
+        no_growing_folds = False
         for blend_type in ["growing_folds", "last_blend", "bagged_then_blended"]:
             submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(3)}.csv"
             last_kaggle_actions = [
@@ -151,7 +152,10 @@ def main(
                 if str(kaggle_submissions_path / submission_file_name) in str(ra.kwargs["submission_target_f_name"])
             ]
             if len(last_kaggle_actions) == 0:
-                results_summary_df.loc[row_i, "run_finished"] = 0
+                if blend_type == "growing_folds":
+                    no_growing_folds = True
+                else:
+                    results_summary_df.loc[row_i, "run_finished"] = 0
                 failure_count += 1
                 continue
             last_kaggle_action = last_kaggle_actions[0]
@@ -192,11 +196,15 @@ def main(
         if failure_count == 3:
             print("MULTIPLE FAILS FOUND")
             continue
-        results_summary_df.loc[row_i, "runtime_growing_folds"] = pd.to_timedelta(
-            np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
-                      and ra.start_time < growing_folds_stop_time]).sum())
+        if not no_growing_folds:
+            results_summary_df.loc[row_i, "runtime_growing_folds"] = pd.to_timedelta(
+                np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
+                          and ra.start_time < growing_folds_stop_time]).sum())
+        if no_growing_folds:
+            n_kaggle_files -= len(available_phases)
+        print(n_kaggle_files)
         # growing folds done but not last blend and bagged and blended
-        if failure_count == 1:
+        if failure_count == 1 and not no_growing_folds:
             continue
         # in last blend training time, we also need to take into consideration of training time of models that occur during the growing fold iteration
         if blend_type in ["growing_folds", "last_blend"]:
@@ -204,7 +212,7 @@ def main(
                 np.array([ra.runtime for ra in train_actions if ra.start_time > growing_folds_start_time
                           and ra.start_time < last_blend_stop_time and ra.kwargs["submission"] in blend_action.kwargs["submissions"]]).sum())
         # growing folds and last blend done but not bagged and blended
-        if failure_count == 2:
+        if failure_count == 2 and not no_growing_folds:
             continue
         for submission in ["lgbm", "xgboost", "catboost"]:
             submission_file_name = f"auto_{kit_suffix}_best_{submission}.csv"
@@ -265,6 +273,7 @@ def main(
                     )
                     kaggle_file_counter += 1
 
+        print(n_kaggle_files, kaggle_file_counter)
         if kaggle_file_counter == n_kaggle_files:
             results_summary_df.loc[row_i, "kaggle_finished"] = 1
 

@@ -49,7 +49,7 @@ class Regressor(BaseEstimator):
     def __init__(self, metadata):
         self.metadata = metadata
         score_name = metadata["score_name"]
-        if score_name in ["mse", "rmse", "rmsle", "r2"]:
+        if score_name in ["mse", "rmse", "rmsle", "r2", "ngini"]:
             self.objective = "mse"
         elif score_name in ["mae", "medae", "smape"]:
             self.objective = "mae"
