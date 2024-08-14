@@ -227,7 +227,9 @@ class Classifier(BaseEstimator):
                 batch_y = y[batch_idx : batch_idx + BATCH_SIZE]
                 # Forward
                 output = self.transformer(batch_X)
-                loss = self.criterion(input=output, target=batch_y)
+                loss = self.criterion(
+                    input=output.to(torch.float), target=batch_y.to(torch.float)
+                )
 
                 if OPTIMIZER == "adam":
                     optimizer.zero_grad()
@@ -237,7 +239,9 @@ class Classifier(BaseEstimator):
                     loss.backward()
                     optimizer.first_step(zero_grad=True)
                     output = self.transformer(batch_X)
-                    loss = self.criterion(input=output, target=batch_y)
+                    loss = self.criterion(
+                        input=output.to(torch.float), target=batch_y.to(torch.float)
+                    )
                     loss.backward()
                     optimizer.second_step(zero_grad=True)
 
