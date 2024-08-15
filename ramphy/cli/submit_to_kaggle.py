@@ -30,16 +30,20 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="The program number (repeated within version)",
 )
 @click.option(
-    "--round-idx",
-    help="The race round",
-)
-@click.option(
     "--stop-fold-idx",
     help="The fold index",
 )
 @click.option(
     "--round-idx",
+    default="",
+    show_default=True,
     help="The race round",
+)
+@click.option(
+    "--blend-type",
+    default="last_blend",
+    show_default=True,
+    help="The blend type (last_blend or bagged_then_blended)",
 )
 def main(
     ramp_kit,
@@ -47,6 +51,7 @@ def main(
     number,
     stop_fold_idx,
     round_idx,
+    blend_type,
 ):
     kaggle_api = KaggleApi()
     kaggle_api.authenticate()
@@ -54,7 +59,10 @@ def main(
     ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
     metadata = json.load(open(Path(ramp_kit_dir) / "data" / "metadata.json"))
     kaggle_submissions_path = Path(ramp_kit_dir) / "kaggle_submissions"
-    submission_file_name = f"auto_{kit_suffix}_last_blend_{stop_fold_idx}_r{round_idx}.csv"
+    if round_idx == "":
+        submission_file_name = f"auto_{kit_suffix}_{blend_type}_{stop_fold_idx}.csv"
+    else:
+        submission_file_name = f"auto_{kit_suffix}_{blend_type}_{stop_fold_idx}_r{round_idx}.csv"
     try:
         kaggle_api.competition_submit(
             file_name=kaggle_submissions_path / submission_file_name,

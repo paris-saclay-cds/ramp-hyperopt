@@ -26,10 +26,17 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     default=None,
     help="The program number (repeated within version)",
 )
+@click.option(
+    "--n-folds",
+    default=15,
+    show_default=True,
+    help="The number of folds to bag",
+)
 def main(
     ramp_kit,
     version,
     number,
+    n_folds,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
@@ -60,7 +67,6 @@ def main(
     last_race_blended_submissions = [key for key, value in last_race_blend_action.contributivities.items() if value > 0]
     print(last_race_blend_action.__dict__)
 
-    n_folds = 15
     rs.orchestration.train_on_all_folds(
         submissions = last_race_blended_submissions,
         ramp_kit_dir = ramp_kit_dir,
