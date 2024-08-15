@@ -160,6 +160,7 @@ def resume_race(
     ramp_kit_dir: str,
     base_submissions: list[str],
     contributivity_floor: int,
+    n_folds_hyperopt: int,
 ) -> tuple[int, set[str], dict, list[float]]:
     print("Loading actions...")
     action_f_names = glob.glob(f'{ramp_kit_dir}/actions/*')
@@ -168,7 +169,7 @@ def resume_race(
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(action_f_name))
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
+    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)]
     stop_time = blend_actions[-1].stop_time
     print(f"Last blending action at {stop_time}, deleting all actions after...")
     actions_f_names_to_delete = [a for a in action_f_names if pd.to_datetime(Path(a).stem) > stop_time]
@@ -181,7 +182,8 @@ def resume_race(
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(action_f_name))
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
+    # we only need race blend actions
+    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 903)]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
     start_round = len(hyperopt_actions)
     scores = []
@@ -416,6 +418,7 @@ def hyperopt_race(
             ramp_kit_dir = ramp_kit_dir,
             base_submissions = base_submissions,
             contributivity_floor = contributivity_floor,
+            n_folds_hyperopt = n_folds_hyperopt,
         )
     else:
         start_round = 0
