@@ -8,17 +8,16 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import QuantileTransformer
-from scipy.special import softmax
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
+
+# NOTE This is only for BINARY CLASSIFICATION
 
 num_layers = Hyperparameter(dtype="int", default=1, values=[1, 2, 3, 5])
 num_heads = Hyperparameter(dtype="int", default=1, values=[1, 2, 5, 10])
 ff_size = Hyperparameter(dtype="int", default=128, values=[128, 256, 512, 1024, 2056])
 activation = Hyperparameter(dtype="str", default="gelu", values=["gelu", "relu"])
-num_epochs = Hyperparameter(
-    dtype="int", default=100, values=[50, 100, 300]
-)  # Maybe not necessary
+num_epochs = Hyperparameter(dtype="int", default=100, values=[50, 100, 300])
 input_scaling = Hyperparameter(
     dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
 )
@@ -170,7 +169,7 @@ class Classifier(BaseEstimator):
             raise NotImplementedError(
                 "Multi-output classification is not yet supported."
             )
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.BCEWithLogitsLoss()
         softmax_out = (
             False  # No softmax as from here https://jaykmody.com/blog/gpt-from-scratch
         )
@@ -261,7 +260,8 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         self.transformer.eval()
         y_pred = self.get_logits(X=X)
-        y_pred = softmax(y_pred, axis=1)
+        y_pred = 1 / (1 + np.exp(-y_pred))
+        y_pred = np.concatenate([1 - y_pred, y_pred], axis=-1)
         return y_pred
 
     def get_logits(self, X: np.ndarray) -> np.ndarray:
