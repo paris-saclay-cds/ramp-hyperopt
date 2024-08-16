@@ -7,6 +7,7 @@ from ramphy import Hyperparameter
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import QuantileTransformer
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
@@ -18,7 +19,7 @@ num_epochs = Hyperparameter(
     dtype="int", default=100, values=[50, 100, 300]
 )  # Maybe not necessary
 input_scaling = Hyperparameter(
-    dtype="str", default="minmax", values=["standard", "minmax"]
+    dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
 )
 optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
 
@@ -173,6 +174,8 @@ class Regressor(BaseEstimator):
             self.feature_scaler = StandardScaler()
         elif INPUT_SCALING == "minmax":
             self.feature_scaler = MinMaxScaler()
+        elif INPUT_SCALING == "quantile":
+            self.feature_scaler = QuantileTransformer()
         else:
             ValueError(
                 f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented"

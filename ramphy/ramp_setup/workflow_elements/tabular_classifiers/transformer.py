@@ -7,6 +7,8 @@ from ramphy import Hyperparameter
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import QuantileTransformer
+from scipy.special import softmax
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
@@ -18,7 +20,7 @@ num_epochs = Hyperparameter(
     dtype="int", default=100, values=[50, 100, 300]
 )  # Maybe not necessary
 input_scaling = Hyperparameter(
-    dtype="str", default="minmax", values=["standard", "minmax"]
+    dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
 )
 optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
 
@@ -180,6 +182,8 @@ class Classifier(BaseEstimator):
             self.feature_scaler = StandardScaler()
         elif INPUT_SCALING == "minmax":
             self.feature_scaler = MinMaxScaler()
+        elif INPUT_SCALING == "quantile":
+            self.feature_scaler = QuantileTransformer()
         else:
             ValueError(
                 f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented"
@@ -254,10 +258,10 @@ class Classifier(BaseEstimator):
             writer.add_scalar("Loss/Training_loss", epoch_loss, epoch)
         # ---------------------------
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
         self.transformer.eval()
         y_pred = self.get_logits(X=X)
-        y_pred = np.argmax(y_pred, axis=1)
+        y_pred = softmax(y_pred, axis=1)
         return y_pred
 
     def get_logits(self, X: np.ndarray) -> np.ndarray:
