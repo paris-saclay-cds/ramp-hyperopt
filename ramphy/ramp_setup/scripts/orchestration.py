@@ -62,7 +62,8 @@ def run_race(
     elif "classification" in metadata["prediction_type"]:
         predictor_we_name = "classifier"
     # The WEs the orchestrator needs to choose from in every round
-    base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns"]
+    base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
+#    base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns"]
         
     for round_idx in range(start_round, n_rounds):
         if patience >= 0 and len(scores) > patience:

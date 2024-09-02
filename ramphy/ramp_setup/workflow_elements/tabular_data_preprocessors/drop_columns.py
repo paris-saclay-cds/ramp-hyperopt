@@ -17,7 +17,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         cols_to_drop = []
         for col in X_train.columns:
-            if bool(eval(f"{{col}}_to_select")):
+            if bool(eval(f"{{col}}_{hyper_suffix}")):
                 cols_to_drop.append(col)
         print(f"Dropping {{cols_to_drop}}")
         X_train = X_train.drop(cols_to_drop, axis=1)

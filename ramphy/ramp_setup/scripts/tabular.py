@@ -86,6 +86,7 @@ def tabular_setup(
 
     feature_values = {}
     missing_data_count = {}
+    unique_value_count = {}
     for col, col_type in feature_types.items():
         # in some challenges some columns can be in the train and not in the test and
         # vice versa (see for instance https://www.kaggle.com/c/bike-sharing-demand)
@@ -116,9 +117,13 @@ def tabular_setup(
                 print("Train data head:")
                 print(train_data.head())
                 raise
+        if col_type in ["num", "cat"]:
+            unique_value_count[col] = len(train_data[col].unique())
+            
 
     metadata["data_description"]["feature_values"] = feature_values
     metadata["data_description"]["missing_data_count"] = missing_data_count
+    metadata["data_description"]["unique_value_count"] = unique_value_count
 
     # mock test labels
     # matching mean and sigma from training set
@@ -219,6 +224,8 @@ def tabular_data_preprocessor_submit(
     submission: str | Path,
     data_preprocessor: str,
     hyper_type: Optional[str] = None,
+    hyper_suffix: Optional[str] = None,
+    column_types: Optional[list[str]] = None,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -228,6 +235,8 @@ def tabular_data_preprocessor_submit(
         submission (str | Path): New submission name
         data_preprocessor (str): data preprocessor to submit.
         hyper_type (str, optional): how to add hypers, defaults to None.
+        hyper_suffix (str, optional): the name suffix of the hyper, defaults to None.
+        column_types (list[str], optional): which column types to include, defaults to None (all).
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
     """
@@ -239,23 +248,27 @@ def tabular_data_preprocessor_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / f"{data_preprocessor}.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
-    dp_code = dp_code.format_map(metadata)
+    dp_code = dp_code.format_map(metadata | {"hyper_suffix": hyper_suffix})
     submission_path = ramp_kit_dir / "submissions" / submission
     wen = f"data_preprocessor_{dp_idx}_{data_preprocessor}"
-    with open(submission_path / f"{wen}.py", "w") as f_out:
-        f_out.write(dp_code)
-    # Add a selection hyper per column
-    if hyper_type == "select_column":
-        cols = metadata["data_description"]["feature_types"].keys()
-        hs = [rh.Hyperparameter(
-                  dtype = "bool",
-                  default = False,
-                  values = [False, True],
-                  name = f"{col}_to_select"
-              ) for col in cols]   
-        rh.write_hyperparameters_per_element(
-           submission_path, submission_path, hs, wen
-        )
+    cols = metadata["data_description"]["feature_types"].keys()
+    if column_types is not None:
+        cols = [col for col in cols if metadata["data_description"]["feature_types"][col] in column_types
+                and (hyper_suffix != "to_target_encode" or metadata["data_description"]["unique_value_count"][col] < 300)]
+    if len(cols) > 0:
+        with open(submission_path / f"{wen}.py", "w") as f_out:
+            f_out.write(dp_code)
+        # Add a selection hyper per column
+        if hyper_type == "select_column":
+            hs = [rh.Hyperparameter(
+                      dtype = "bool",
+                      default = False,
+                      values = [False, True],
+                      name = f"{col}_{hyper_suffix}"
+                  ) for col in cols]   
+            rh.write_hyperparameters_per_element(
+               submission_path, submission_path, hs, wen
+            )
 
 
 @ramp_action
@@ -545,6 +558,16 @@ def tabular_regression_columnwise_last_submit(
         submission=submission,
         data_preprocessor="drop_columns",
         hyper_type = "select_column",
+        hyper_suffix = "to_drop",
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    tabular_data_preprocessor_submit(
+        submission=submission,
+        data_preprocessor="cat_target_encoding",
+        hyper_type = "select_column",
+        hyper_suffix = "to_target_encode",
+        column_types = ["cat", "num"],
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -662,6 +685,16 @@ def tabular_classification_columnwise_last_submit(
         submission=submission,
         data_preprocessor="drop_columns",
         hyper_type = "select_column",
+        hyper_suffix = "to_drop",
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    tabular_data_preprocessor_submit(
+        submission=submission,
+        data_preprocessor="cat_target_encoding",
+        hyper_type = "select_column",
+        hyper_suffix = "to_target_encode",
+        column_types = ["cat", "num"],
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
