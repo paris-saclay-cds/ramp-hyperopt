@@ -13,7 +13,7 @@ import ramphy.ramp_setup as rs
 import rampwf as rw
 
 
-def last_action(ramp_kit_dir, name):
+def last_action(ramp_kit_dir: str, name: str) -> rh.actions.RampAction | None:
     """Last action of a given action name."""
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
     action_f_names.sort(reverse=True)
