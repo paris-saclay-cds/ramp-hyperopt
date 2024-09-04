@@ -265,7 +265,7 @@ def tabular_data_preprocessor_submit(
         if hyper_type == "select_column":
             hs = [
                 rh.Hyperparameter(dtype="bool", default=False, values=[False, True], name=f"{col}_{hyper_suffix}")
-                for col in cols
+                for col in cols if not col == 'id'  
             ]
             rh.write_hyperparameters_per_element(submission_path, submission_path, hs, wen)
 
