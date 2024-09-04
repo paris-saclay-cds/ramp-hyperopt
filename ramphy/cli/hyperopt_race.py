@@ -89,7 +89,7 @@ def main(
     base_predictors,
 ):
     rs.orchestration.hyperopt_race(
-        additional_preprocessors=additional_preprocessors,
+        additional_preprocessors=list(additional_preprocessors),
         ramp_kit=ramp_kit,
         kit_root=kit_root,
         version=version,
@@ -99,8 +99,8 @@ def main(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         no_growing_folds=no_growing_folds,
-        preprocessors_to_hyper=preprocessors_to_hyper,
-        base_predictors=base_predictors,
+        preprocessors_to_hyper=list(preprocessors_to_hyper),
+        base_predictors=list(base_predictors),
     )
 
 
