@@ -11,7 +11,7 @@ gamma = Hyperparameter(dtype='float', default=0.0, values=[0.0, 0.1, 0.2, 0.3, 0
 learning_rate = Hyperparameter(dtype='float', default=0.1, values=[0.0005, 0.001, 0.002, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
 max_depth = Hyperparameter(dtype='int', default=2, values=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100])
 min_child_weight = Hyperparameter(dtype='int', default=1, values=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-n_estimators = Hyperparameter(dtype='int', default=700, values=[10, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 400, 500, 700, 1000, 2000, 3000, 5000, 7000, 10000])
+n_estimators = Hyperparameter(dtype='int', default=700, values=[10, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 400, 500, 700, 1000])#, 2000, 3000, 5000, 7000, 10000])
 reg_alpha = Hyperparameter(dtype='float', default=0.1, values=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 2.0, 3.0])
 reg_lambda = Hyperparameter(dtype='float', default=0.5, values=[0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0])
 subsample = Hyperparameter(dtype='float', default=1.0, values=[0.5, 0.6, 0.7, 0.8, 0.9, 1.0])

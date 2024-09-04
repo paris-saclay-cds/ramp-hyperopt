@@ -219,31 +219,35 @@ def main(
                 continue
             last_kaggle_action = last_kaggle_actions[0]
             select_top_hyperopt_action = [ra for ra in select_top_hyperopt_actions if ra.start_time <= last_kaggle_action.start_time][-1]
-            train_action = [ra for ra in train_actions if ra.kwargs["submission"] == select_top_hyperopt_action.selected_submissions[0]][-1]
-            for scoring_type in ["mean", "bagged"]:
-                results_summary_df.loc[row_i, f"valid_{scoring_type}_{submission}"] = train_action.__dict__[f"{scoring_type}_score"]
-
-            if submission_file_name not in kaggle_file_names:
-                # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
-                print(f"Submitting {submission_file_name}")
-                if kaggle_ok:
-                    try:
-                        kaggle_api.competition_submit(
-                            file_name=kaggle_submissions_path / submission_file_name,
-                            message=last_kaggle_action.start_time,
-                            competition=metadata["kaggle_name"]
-                        )
-                    except ApiException as e:
-                        print(e)
-                        kaggle_ok = False
+            train_actions = [ra for ra in train_actions if ra.kwargs["submission"] == select_top_hyperopt_action.selected_submissions[0]]
+            if len(train_actions) == 0:
+                n_kaggle_files -= len(available_phases)
             else:
-                sub_idx = kaggle_file_names.index(submission_file_name)
-                for phase in available_phases:
-                    score = float(kaggle_scores[phase][sub_idx])
-                    results_summary_df.loc[row_i, f"kaggle_{phase}_{submission}"] = score
-                    results_summary_df.loc[row_i, f"kaggle_{phase}_prank_{submission}"] = kaggle_prank(
-                        score, leaderboard_scores[phase], problem)
-                    kaggle_file_counter += 1
+                train_action = train_actions[-1]
+                for scoring_type in ["mean", "bagged"]:
+                    results_summary_df.loc[row_i, f"valid_{scoring_type}_{submission}"] = train_action.__dict__[f"{scoring_type}_score"]
+    
+                if submission_file_name not in kaggle_file_names:
+                    # We submit to Kaggle in this call, fill the table in the next, to avoid possible delays
+                    print(f"Submitting {submission_file_name}")
+                    if kaggle_ok:
+                        try:
+                            kaggle_api.competition_submit(
+                                file_name=kaggle_submissions_path / submission_file_name,
+                                message=last_kaggle_action.start_time,
+                                competition=metadata["kaggle_name"]
+                            )
+                        except ApiException as e:
+                            print(e)
+                            kaggle_ok = False
+                else:
+                    sub_idx = kaggle_file_names.index(submission_file_name)
+                    for phase in available_phases:
+                        score = float(kaggle_scores[phase][sub_idx])
+                        results_summary_df.loc[row_i, f"kaggle_{phase}_{submission}"] = score
+                        results_summary_df.loc[row_i, f"kaggle_{phase}_prank_{submission}"] = kaggle_prank(
+                            score, leaderboard_scores[phase], problem)
+                        kaggle_file_counter += 1
 
         print(n_kaggle_files, kaggle_file_counter)
         if kaggle_file_counter == n_kaggle_files:

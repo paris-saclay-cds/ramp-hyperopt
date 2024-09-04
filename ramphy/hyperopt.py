@@ -59,8 +59,8 @@ class Hyperparameter(object):
             hyperparameter optimizers should do that when using the list
     """
 
-    def __init__(self, dtype, default=None, values=None, prior=None):
-        self.name = ""
+    def __init__(self, dtype, default=None, values=None, prior=None, name=""):
+        self.name = name
         self.workflow_element_name = ""
         self.dtype = dtype
         if default is None and values is None:
@@ -310,6 +310,44 @@ def parse_all_hyperparameters(submission_path, workflow, workflow_element_names=
     return hyperparameters
 
 
+def write_hyperparameters_per_element(
+    submission_path, output_submission_path, hs, wen
+):
+    """Write hyperparameters in a submission.
+
+    Read workflow elements from submission_path, replace the hyperparameter
+    section with the hyperparameters in the hypers_per_workflow_element
+    dictionary (with new hyperparamter values set by, e.g, a hyperopt engine),
+    then write the new workflow elements into output_submission_path (which
+    can be a temporary directory or submission_path itself when the function
+    is called to replace the hyperparameters in the input submission with the
+    best hyperparameters.)
+
+    Parameters:
+        submission_path : str
+            The path to the submission directory from which the submission is
+            read.
+        output_submission_path : str
+            The path to the output submission directory into which the
+            submission with the new hyperparameter values is written.
+        hs : list
+            List of Hyperparameter instances
+        wen : str
+            Workflow element name
+    """
+    hyper_section = "{}\n".format(HYPERPARAMS_SECTION_START)
+    for h in hs:
+        hyper_section += h.python_repr
+    hyper_section += HYPERPARAMS_SECTION_END
+    f_name = os.path.join(submission_path, wen + ".py")
+    with open(f_name) as f:
+        content = f.read()
+        content = HYPERPARAMS_REPL_REGEX.sub(hyper_section, content)
+    Path(output_submission_path).mkdir(parents=True, exist_ok=True)
+    output_f_name = Path(output_submission_path) / f"{wen}.py"
+    with open(output_f_name, "w") as f:
+        f.write(content)
+
 def write_hyperparameters(
     submission_path, output_submission_path, hypers_per_workflow_element
 ):
@@ -336,18 +374,9 @@ def write_hyperparameters(
             the workflow element.
     """
     for wen, hs in hypers_per_workflow_element.items():
-        hyper_section = "{}\n".format(HYPERPARAMS_SECTION_START)
-        for h in hs:
-            hyper_section += h.python_repr
-        hyper_section += HYPERPARAMS_SECTION_END
-        f_name = os.path.join(submission_path, wen + ".py")
-        with open(f_name) as f:
-            content = f.read()
-            content = HYPERPARAMS_REPL_REGEX.sub(hyper_section, content)
-        Path(output_submission_path).mkdir(parents=True, exist_ok=True)
-        output_f_name = Path(output_submission_path) / f"{wen}.py"
-        with open(output_f_name, "w") as f:
-            f.write(content)
+        write_hyperparameters_per_element(
+            submission_path, output_submission_path, hs, wen
+        )
 
 
 class HyperparameterOptimization(object):
@@ -459,6 +488,7 @@ class HyperparameterOptimization(object):
 
 
     def update_df_scores(self, output_submission, df_scores, fold_i):
+
         row = {"hyperopt_submission": output_submission, "fold_idx": self.fold_idxs[fold_i]}
         for h in self.hyperparameters:
             row[f"hyper_{h.name}"] = h.default
@@ -475,6 +505,7 @@ class HyperparameterOptimization(object):
         if self.test:
             row["test_time"] = float(df_scores.loc["test"]["time"])
             row["n_test"] = len(self.X_test)
+
         self.df_scores_.loc[len(self.df_scores_)] = pd.Series(row)
         self.df_scores_["fold_idx"] = self.df_scores_["fold_idx"].astype(int)
         for h in self.hyperparameters:
