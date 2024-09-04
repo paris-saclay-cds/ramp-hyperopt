@@ -63,6 +63,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="A list of data_preprocessors to use other than the base col encoding and inputing.",
 )
 @click.option(
+    "--columnwise_first",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="If given adds columnwise preprocessors first. Otherwise adds them after other preprocessors",
+)
+@click.option(
     "--preprocessors_to_hyper",
     multiple=True,
     default=None,
@@ -85,6 +92,7 @@ def main(
     patience,
     no_growing_folds,
     additional_preprocessors,
+    columnwise_first,
     preprocessors_to_hyper,
     base_predictors,
 ):
@@ -101,6 +109,7 @@ def main(
         no_growing_folds=no_growing_folds,
         preprocessors_to_hyper=list(preprocessors_to_hyper),
         base_predictors=list(base_predictors),
+        columnwise_first=columnwise_first,
     )
 
 
