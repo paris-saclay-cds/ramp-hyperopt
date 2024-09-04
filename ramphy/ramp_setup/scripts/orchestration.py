@@ -473,6 +473,7 @@ def hyperopt_race(
     no_growing_folds: bool = True,
     preprocessors_to_hyper: Optional[list[str]] = None,
     additional_preprocessors: Optional[list[str]] = None,
+    columnwise_first: bool = False,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -503,17 +504,28 @@ def hyperopt_race(
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_regression_columnwise_last_submit(
+                if columnwise_first:
+                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_first_submit
+                else:
+                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_last_submit
+                submitter_function(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
+                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
+
             elif "classification" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_classification_columnwise_last_submit(
+                if columnwise_first:
+                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_first_submit
+                else:
+                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_last_submit
+                submitter_function(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
+                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
