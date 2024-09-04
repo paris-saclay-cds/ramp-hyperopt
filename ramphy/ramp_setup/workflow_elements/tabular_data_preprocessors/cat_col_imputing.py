@@ -19,9 +19,10 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
-        feature_types = metadata["data_description"]["feature_types"]
-        imputer = SimpleImputer(strategy='most_frequent')
-        imputer.fit(pd.concat([X_train, X_test])[[self.col]])
-        X_train[[self.col]] = imputer.transform(X_train[[self.col]])
-        X_test[[self.col]] = imputer.transform(X_test[[self.col]])
+        if self.col in X_train.columns:
+            feature_types = metadata["data_description"]["feature_types"]
+            imputer = SimpleImputer(strategy='most_frequent')
+            imputer.fit(pd.concat([X_train, X_test])[[self.col]])
+            X_train[[self.col]] = imputer.transform(X_train[[self.col]])
+            X_test[[self.col]] = imputer.transform(X_test[[self.col]])
         return X_train, y_train, X_test, metadata

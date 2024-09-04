@@ -52,7 +52,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option(
     "--no-growing-folds",
     is_flag=True,
-    default=False,
+    default=True,
     show_default=True,
     help="Do not run the growing fold submission at the end.",
 )

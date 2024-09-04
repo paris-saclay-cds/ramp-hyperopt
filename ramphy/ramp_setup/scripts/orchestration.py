@@ -43,7 +43,7 @@ def kaggle_submit_file(
 
 
 def run_race(
-    base_submissions: list[str],
+    base_predictors: list[str],
     action_stats: dict,
     ramp_kit_dir: str,
     kit_suffix: str,
@@ -60,67 +60,65 @@ def run_race(
     elements_to_hyper: Optional[list[str]] = None,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
-    improvement_speed_df = pd.DataFrame(columns=["round"] + base_submissions)
+    improvement_speed_df = pd.DataFrame(columns=["round"] + base_predictors)
+
+    if "regression" in metadata["prediction_type"]:
+        predictor_we_name = "regressor"
+    elif "classification" in metadata["prediction_type"]:
+        predictor_we_name = "classifier"
+    # The WEs the orchestrator needs to choose from in every round
+    base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
+    if elements_to_hyper is not None:
+        base_we_names += elements_to_hyper
 
     for round_idx in range(start_round, n_rounds):
         if patience >= 0 and len(scores) > patience:
             if is_lower_the_better:
+                print(f"Best occured {len(scores) - scores.index(min(scores))} rounds ago.")
                 if min(scores[:-patience]) <= min(scores):
                     break
             else:
+                print(f"Best occured {len(scores) - scores.index(max(scores))} rounds ago.")
                 if max(scores[:-patience]) >= max(scores):
                     break
         # We'll choose the submission that improves the results the fastest
         improvement_speeds = {}
-        for submission in base_submissions:
-            ast = action_stats[submission]
+        for predictor in base_predictors:
+            ast = action_stats[predictor]
             # sum of contributivities, applying this action
             if len(ast) >= 2:
                 last_ast = ast[-1]
                 total_time = np.array([a["runtime"].total_seconds() for a in ast]).sum()
-                contributivity = last_ast["contributivities"][submission]
+                contributivity = last_ast["contributivities"][predictor]
                 speed = contributivity / total_time
             else:
                 speed = np.finfo(float).max
-            improvement_speeds[submission] = speed
+            improvement_speeds[predictor] = speed
         print(f"improvement_speeds:\n{improvement_speeds}")
-        row = pd.DataFrame(
-            dict({"round_idx": round_idx}, **improvement_speeds), index=[round_idx]
-        )
+        row = pd.DataFrame(dict({"round_idx": round_idx}, **improvement_speeds), index=[round_idx])
         improvement_speed_df = pd.concat([improvement_speed_df, row], ignore_index=True)
         improvement_speed_df.to_csv("improvement_speeds.csv")
         max_speed = max(improvement_speeds.values())
-        best_submissions = [
-            submission
-            for submission, speed in improvement_speeds.items()
-            if speed == max_speed
-        ]
-        submission = random.choice(
-            best_submissions
-        )  # in case of tie (at zero typically), or eps greedy, random choice
-        print(f"best_submissions: {best_submissions}")
-        print(f"selected submission : {submission}")
+        best_predictors = [predictor for predictor, speed in improvement_speeds.items() if speed == max_speed]
+        predictor = random.choice(best_predictors)  # in case of tie (at zero typically), or eps greedy, random choice
+        print(f"best_predictors: {best_predictors}")
+        print(f"selected predictor : {predictor}")
         #    input("Press Enter to continue...")
         n_trials = n_trials_per_round * n_folds_hyperopt
-        if "regression" in metadata["prediction_type"]:
-            workflow_element_names = ["regressor"]
-        elif "classification" in metadata["prediction_type"]:
-            workflow_element_names = ["classifier"]
-
-        if elements_to_hyper is not None:
-            for element in elements_to_hyper:
-                submission_path = Path(ramp_kit_dir) / "submissions" / submission
-                workflow_element_names += [
-                    str(file.stem)
-                    for file in submission_path.iterdir()
-                    if file.is_file() and element in file.stem
-                ]
-            print(f"Hyperopting the following elements: {workflow_element_names}")
-
+        wes_to_hyperopt = random.sample(base_we_names, 1)
+        print(f"Choosen workflow element: {wes_to_hyperopt[0]}")
+        submission_to_hyperopt = predictor  # default: hyperopt one of the base submissions
+        blended_submissions_of_predictor = [
+            submission for submission in blended_submissions if submission[:-20] == predictor
+        ]
+        print(f"Submissions to choose from: {blended_submissions_of_predictor}")
+        if len(blended_submissions_of_predictor) > 0:
+            submission_to_hyperopt = random.choice(blended_submissions_of_predictor)
+        print(f"Choosen submission: {submission_to_hyperopt}")
         rh.actions.hyperopt(
             ramp_kit_dir=ramp_kit_dir,
-            submission=submission,
-            workflow_element_names=workflow_element_names,
+            submission=submission_to_hyperopt,
+            workflow_element_names=wes_to_hyperopt,
             n_trials=n_trials,
             fold_idxs=range(900, 900 + n_folds_hyperopt),
             resume=True,
@@ -148,25 +146,14 @@ def run_race(
                 blended_score = blend_action.blended_score
                 contributivities = {
                     s: contributivity_floor
-                    + np.array(
-                        [
-                            c
-                            for sh, c in blend_action.contributivities.items()
-                            if sh[: len(s)] == s
-                        ]
-                    ).sum()
-                    for s in base_submissions
+                    + np.array([c for sh, c in blend_action.contributivities.items() if sh[: len(s)] == s]).sum()
+                    for s in base_predictors
                 }
                 submission_source_f_name = (
-                    Path(ramp_kit_dir)
-                    / "submissions"
-                    / "training_output"
-                    / "submission_combined_bagged_test.csv"
+                    Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
                 )
                 submission_target_f_name = (
-                    Path(ramp_kit_dir)
-                    / "kaggle_submissions"
-                    / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
+                    Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
                 )
                 kaggle_submit_file(
                     submission_source_f_name=submission_source_f_name,
@@ -177,11 +164,9 @@ def run_race(
                 print("something wrong: no blended score")
                 exit(0)
                 blended_score = hyperopt_action.mean_score
-                contributivities = {
-                    s: 1000 / len(submissions) for s in base_submissions
-                }
+                contributivities = {s: 1000 / len(predictors) for s in base_predictors}
             scores.append(blended_score)
-            action_stats[submission].append(
+            action_stats[predictor].append(
                 {
                     "runtime": hyperopt_action.runtime,
                     "contributivities": contributivities,
@@ -190,9 +175,7 @@ def run_race(
 
             # Delete submissions with zero contributivity from the submissions to be blended
             contributivities_df = rh.actions.load_contributivities(ramp_kit_dir)
-            non_contributive_submissions = set(
-                contributivities_df[contributivities_df["contributivity"] == 0].index
-            )
+            non_contributive_submissions = set(contributivities_df[contributivities_df["contributivity"] == 0].index)
             print(f"blended submissions: {blended_submissions}")
             print(f"non-contributive submissions: {non_contributive_submissions}")
             blended_submissions = blended_submissions - non_contributive_submissions
@@ -204,8 +187,9 @@ def run_race(
 def resume_race(
     action_stats: dict,
     ramp_kit_dir: str,
-    base_submissions: list[str],
+    base_predictors: list[str],
     contributivity_floor: int,
+    n_folds_hyperopt: int,
 ) -> tuple[int, set[str], dict, list[float]]:
     print("Loading actions...")
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
@@ -214,12 +198,12 @@ def resume_race(
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(action_f_name))
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
+    blend_actions = [
+        ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)
+    ]
     stop_time = blend_actions[-1].stop_time
     print(f"Last blending action at {stop_time}, deleting all actions after...")
-    actions_f_names_to_delete = [
-        a for a in action_f_names if pd.to_datetime(Path(a).stem) > stop_time
-    ]
+    actions_f_names_to_delete = [a for a in action_f_names if pd.to_datetime(Path(a).stem) > stop_time]
     for f_name in actions_f_names_to_delete:
         Path(f_name).unlink()
     print("Re-loading actions...")
@@ -229,7 +213,8 @@ def resume_race(
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(action_f_name))
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
+    # we only need race blend actions
+    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 903)]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
     start_round = len(hyperopt_actions)
     scores = []
@@ -237,39 +222,32 @@ def resume_race(
     blend_action_idx = 0
     for hyperopt_action in hyperopt_actions:
         submission = hyperopt_action.kwargs["submission"]
+        predictor = submission
+        if "hyperopt" in submission:
+            predictor = submission[:-20]
         if len(hyperopt_action.mean_scores) > 0:
             blend_action = blend_actions[blend_action_idx]
-            blend_action_idx += (
-                1  # if hyperopt did not return with any submissions, there was no blend
-            )
+            blend_action_idx += 1  # if hyperopt did not return with any submissions, there was no blend
             blended_score = blend_action.blended_score
             scores.append(blended_score)
             contributivities = {
                 s: contributivity_floor
-                + np.array(
-                    [
-                        c
-                        for sh, c in blend_action.contributivities.items()
-                        if sh[: len(s)] == s
-                    ]
-                ).sum()
-                for s in base_submissions
+                + np.array([c for sh, c in blend_action.contributivities.items() if sh[: len(s)] == s]).sum()
+                for s in base_predictors
             }
-            action_stats[submission].append(
+            action_stats[predictor].append(
                 {
                     "runtime": hyperopt_action.runtime,
                     "contributivities": contributivities,
                 }
             )
-            blended_submissions = set(
-                [sh for sh, c in blend_action.contributivities.items() if c > 0]
-            )
+            blended_submissions = set([sh for sh, c in blend_action.contributivities.items() if c > 0])
     print(f"Blended submissions: {blended_submissions}")
     return start_round, blended_submissions, action_stats, scores
 
 
 def final_blend_growing_folds(
-    base_submissions: list[str],
+    base_predictors: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
@@ -284,7 +262,7 @@ def final_blend_growing_folds(
     """
     for stop_fold_idx in range(900 + n_folds_hyperopt + 1, 900 + n_folds + 1):
         selected_submissions = []
-        for submission in base_submissions:
+        for submission in base_predictors:
             rh.actions.select_top_hyperopt_and_train(
                 ramp_kit_dir=ramp_kit_dir,
                 submission=submission,
@@ -307,10 +285,7 @@ def final_blend_growing_folds(
             fold_idxs=range(900, stop_fold_idx),
         )
         submission_source_f_name = (
-            Path(ramp_kit_dir)
-            / "submissions"
-            / "training_output"
-            / "submission_combined_bagged_test.csv"
+            Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         )
         submission_target_f_name = (
             Path(ramp_kit_dir)
@@ -325,14 +300,14 @@ def final_blend_growing_folds(
 
 
 def update_hyperopt_summary(
-    base_submissions: list[str],
+    base_predictors: list[str],
     ramp_kit_dir: str,
 ):
     """Update the hyperopt summary.
 
     This is needed when submissions are trained outside hyperopt.
     """
-    for submission in base_submissions:
+    for submission in base_predictors:
         rh.actions.update_hyperopt_score_summary(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
@@ -372,10 +347,7 @@ def final_blend_then_bag(
             fold_idxs=range(900, stop_fold_idx),
         )
         submission_source_f_name = (
-            Path(ramp_kit_dir)
-            / "submissions"
-            / "training_output"
-            / "submission_combined_bagged_test.csv"
+            Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
         )
         if n_rounds > 0:
             submission_target_f_name = (
@@ -415,10 +387,7 @@ def final_bag_then_blend(
             fold_idxs=range(900, stop_fold_idx),
         )
         submission_source_f_name = (
-            Path(ramp_kit_dir)
-            / "submissions"
-            / "training_output"
-            / "submission_bagged_then_blended_test.csv"
+            Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_bagged_then_blended_test.csv"
         )
         if n_rounds > 0:
             submission_target_f_name = (
@@ -440,7 +409,7 @@ def final_bag_then_blend(
 
 
 def submit_best_submissions(
-    base_submissions: list[str],
+    base_predictors: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
@@ -448,7 +417,7 @@ def submit_best_submissions(
     """Submit the best of each submission (classical hyperopt) in
     <ramp_kit_dir>/kaggle_submissions.
     """
-    for submission in base_submissions:
+    for submission in base_predictors:
         best_submissions = rh.actions.select_top_hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
@@ -460,11 +429,7 @@ def submit_best_submissions(
             continue
         best_submission = best_submissions[0]
         submission_source_f_name = (
-            Path(ramp_kit_dir)
-            / "submissions"
-            / best_submission
-            / "training_output"
-            / "submission_bagged_test.csv"
+            Path(ramp_kit_dir) / "submissions" / best_submission / "training_output" / "submission_bagged_test.csv"
         )
         if not submission_source_f_name.exists():
             print(f"Bagging {submission}")
@@ -476,9 +441,7 @@ def submit_best_submissions(
                 bag=True,
             )
         submission_target_f_name = (
-            Path(ramp_kit_dir)
-            / "kaggle_submissions"
-            / f"auto_{kit_suffix}_best_{submission}.csv"
+            Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_best_{submission}.csv"
         )
         kaggle_submit_file(
             submission_source_f_name=submission_source_f_name,
@@ -498,20 +461,11 @@ def hyperopt_race(
     patience: Optional[int] = -1,
     n_folds_hyperopt: Optional[int] = 3,
     n_folds: Optional[int] = 31,
-    base_submissions: Optional[list[str]] = [
-        "lgbm",
-        "xgboost",
-        "catboost",
-        "transformer",
-    ],
-    data_preprocessors: list[str] = ["drop_id"],
-    elements_to_hyper: Optional[list[str]] = None,
+    base_predictors: Optional[list[str]] = ["lgbm", "xgboost", "catboost"],
     top_n_for_mean: Optional[int] = 10,
     n_sigma: Optional[float] = 1.0,
-    contributivity_floor: Optional[
-        int
-    ] = 100,  # on 1000, added to contributivity to give a chance to every submission
-    no_growing_folds: Optional[bool] = False,
+    contributivity_floor: Optional[int] = 100,  # on 1000, added to contributivity to give a chance to every submission
+    no_growing_folds: Optional[bool] = True,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -523,54 +477,51 @@ def hyperopt_race(
         metadata = json.load(f)
 
     # Dictionary of submissions: list of dictionary of run times and scores
-    action_stats = {submission: [] for submission in base_submissions}
+    action_stats = {submission: [] for submission in base_predictors}
     if resume:
         start_round, blended_submissions, action_stats, scores = resume_race(
-            action_stats=action_stats,
-            ramp_kit_dir=ramp_kit_dir,
-            base_submissions=base_submissions,
-            contributivity_floor=contributivity_floor,
+            action_stats = action_stats,
+            ramp_kit_dir = ramp_kit_dir,
+            base_predictors = base_predictors,
+            contributivity_floor = contributivity_floor,
+            n_folds_hyperopt = n_folds_hyperopt,
         )
     else:
         start_round = 0
         blended_submissions = set()
         scores = []
         # submit base submissions
-        for submission in base_submissions:
+        for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_regression_columnwise_first_submit(
-                    ramp_kit_dir=ramp_kit_dir,
-                    submission=submission,
-                    data_preprocessors=data_preprocessors,
-                    regressor=submission,
+                rs.scripts.tabular.tabular_regression_columnwise_last_submit(         
+                    ramp_kit_dir = ramp_kit_dir,
+                    submission = submission,
+                    regressor = submission,
                 )
             elif "classification" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_classification_columnwise_first_submit(
-                    ramp_kit_dir=ramp_kit_dir,
-                    submission=submission,
-                    classifier=submission,
-                    data_preprocessors=data_preprocessors,
-                    text_col_encode=False,
+                rs.scripts.tabular.tabular_classification_columnwise_last_submit(         
+                    ramp_kit_dir = ramp_kit_dir,
+                    submission = submission,
+                    classifier = submission,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
 
     blended_submissions = run_race(
-        base_submissions=base_submissions,
-        action_stats=action_stats,
-        ramp_kit_dir=ramp_kit_dir,
-        kit_suffix=kit_suffix,
-        metadata=metadata,
-        n_rounds=n_rounds,
-        n_trials_per_round=n_trials_per_round,
-        patience=patience,
-        n_folds_hyperopt=n_folds_hyperopt,
-        start_round=start_round,
-        scores=scores,
-        is_lower_the_better=is_lower_the_better,
-        contributivity_floor=contributivity_floor,
-        blended_submissions=blended_submissions,
-        elements_to_hyper=elements_to_hyper,
+        base_predictors = base_predictors,
+        action_stats = action_stats,
+        ramp_kit_dir = ramp_kit_dir,
+        kit_suffix = kit_suffix,
+        metadata = metadata,
+        n_rounds = n_rounds,
+        n_trials_per_round = n_trials_per_round,
+        patience = patience,
+        n_folds_hyperopt = n_folds_hyperopt,
+        start_round = start_round,
+        scores = scores,
+        is_lower_the_better = is_lower_the_better,
+        contributivity_floor = contributivity_floor,
+        blended_submissions = blended_submissions,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
@@ -580,13 +531,13 @@ def hyperopt_race(
     # versions to experiment.
     if not no_growing_folds:
         final_blend_growing_folds(
-            base_submissions=base_submissions,
-            ramp_kit_dir=ramp_kit_dir,
-            kit_suffix=kit_suffix,
-            n_folds=n_folds,
-            n_folds_hyperopt=n_folds_hyperopt,
-            top_n_for_mean=top_n_for_mean,
-            n_sigma=n_sigma,
+            base_predictors = base_predictors,
+            ramp_kit_dir = ramp_kit_dir,
+            kit_suffix = kit_suffix,
+            n_folds = n_folds,
+            n_folds_hyperopt = n_folds_hyperopt,
+            top_n_for_mean = top_n_for_mean,
+            n_sigma = n_sigma,
         )
     # Train the final blend of the hyperopt race on all the folds
     train_on_all_folds(
@@ -596,7 +547,7 @@ def hyperopt_race(
     )
     # Whenever hyperopt submissions are trained outside of hyperopt, we need to update the summary.
     update_hyperopt_summary(
-        base_submissions=base_submissions,
+        base_predictors=base_predictors,
         ramp_kit_dir=ramp_kit_dir,
     )
     # Blend then bag the final blend of the hyperopt race on all the folds
@@ -615,7 +566,7 @@ def hyperopt_race(
     )
     # Submit the best of each base submission (classical hyperopt)
     submit_best_submissions(
-        base_submissions=base_submissions,
+        base_predictors=base_predictors,
         ramp_kit_dir=ramp_kit_dir,
         kit_suffix=kit_suffix,
         n_folds=n_folds,

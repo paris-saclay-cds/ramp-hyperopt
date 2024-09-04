@@ -4,6 +4,7 @@ from .hyperopt import (
     parse_all_hyperparameters,
     parse_hyperparameters,
     run_hyperopt,
+    write_hyperparameters_per_element,
     write_hyperparameters,
 )
 from .actions import (
@@ -34,6 +35,7 @@ __all__ = [
     "parse_hyperparameters",
     "run_hyperopt",
     "write_hyperparameters",
+    "write_hyperparameters_per_element",
     "submit_hybrid",
     "blend",
     "clean_up_predictions",

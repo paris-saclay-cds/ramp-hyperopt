@@ -662,6 +662,7 @@ def get_hyperopt_score_summary(
     fold_idxs: Optional[Sequence[int]] = None,
     ramp_data_dir: Optional[str] = None,
     force_reload: Optional[bool] = False,
+    test: Optional[bool] = False,
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -695,7 +696,8 @@ def get_hyperopt_score_summary(
         return pd.read_csv(summary_fname, index_col=0)
 
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    X_train, y_train = problem.get_train_data(ramp_data_dir)
+    X_train, y_train, X_test, y_test = rw.utils.assert_data(ramp_kit_dir, ramp_data_dir)
+    cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir, fold_idxs=fold_idxs)
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
     is_lower_the_better = problem.score_types[0].is_lower_the_better
@@ -715,6 +717,7 @@ def get_hyperopt_score_summary(
             score_f_names.append(glob.glob(f"{str(ramp_kit_dir)}/submissions/{ss}/training_output/fold*/scores.csv"))
     row_dicts = []
     for score_f_name in score_f_names:
+        print(score_f_name)
         row_dict = {}
         fold_idx = int(Path(score_f_name).parent.name.split("_")[1])
         if fold_idxs is None or fold_idx in fold_idxs:
@@ -728,9 +731,22 @@ def get_hyperopt_score_summary(
                 row_dict[f"hyper_{h.name}_i"] = h.default_index
             score_df = pd.read_csv(hyper_submission_path / "training_output" / f"fold_{fold_idx}" / "scores.csv")
             score_df = score_df.set_index("step")
-            for step in ["train", "valid", "test"]:
-                for sn in score_names + ["time"]:
+            steps = ["train", "valid"]
+            if test:
+                steps += ["test"]
+            for step in steps:
+                for sn in score_names:
                     row_dict[f"{step}_{sn}"] = score_df.loc[step, sn]
+            for step in steps:
+                row_dict[f"{step}_time"] = score_df.loc[step, "time"]
+            if fold_idxs is None:
+                fold_i = fold_idx
+            else:
+                fold_i = fold_idxs.index(fold_idx)
+            row_dict["n_train"] = len(cv[fold_i][0])
+            row_dict["n_valid"] = len(cv[fold_i][1])
+            if test:
+                row["n_test"] = len(X_test)
             row_dicts.append(row_dict)
     summary_df = pd.DataFrame.from_records(row_dicts)
     return summary_df
