@@ -55,7 +55,7 @@ def run_race(
     is_lower_the_better: bool,
     contributivity_floor: int,
     blended_submissions: set[str],
-    elements_to_hyper: Optional[list[str]] = None,
+    preprocessors_to_hyper: Optional[list[str]] = None,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
     improvement_speed_df = pd.DataFrame(columns=["round"] + base_predictors)
@@ -66,8 +66,8 @@ def run_race(
         predictor_we_name = "classifier"
     # The WEs the orchestrator needs to choose from in every round
     base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
-    if elements_to_hyper is not None:
-        base_we_names += elements_to_hyper
+    if preprocessors_to_hyper is not None:
+        base_we_names += preprocessors_to_hyper
 
     for round_idx in range(start_round, n_rounds):
         if patience >= 0 and len(scores) > patience:
@@ -466,6 +466,8 @@ def hyperopt_race(
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
     no_growing_folds: bool = True,
+    preprocessors_to_hyper: Optional[list[str]] = None,
+    additional_preprocessors: Optional[list[str]] = None,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -490,6 +492,9 @@ def hyperopt_race(
         start_round = 0
         blended_submissions = set()
         scores = []
+        data_preprocessors = ["drop_id"]
+        if additional_preprocessors is not None:
+            data_preprocessors += additional_preprocessors
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
@@ -497,12 +502,16 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
+                    text_col_encode=False,
+                    data_preprocessors=data_preprocessors,
                 )
             elif "classification" in metadata["prediction_type"]:
                 rs.scripts.tabular.tabular_classification_columnwise_last_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
+                    text_col_encode=False,
+                    data_preprocessors=data_preprocessors,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
@@ -522,6 +531,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
+        preprocessors_to_hyper=preprocessors_to_hyper,
     )
 
     # Run the growing folds algorithm: select best of each base submission within

@@ -57,16 +57,22 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Do not run the growing fold submission at the end.",
 )
 @click.option(
-    "--data_preprocessors",
-    multiple=True,
-    default=["drop_id"],
-    help="A list of data_preprocessors.",
-)
-@click.option(
-    "--elements_to_hyper",
+    "--additional_preprocessors",
     multiple=True,
     default=None,
-    help="A list of element to hyperopt other than the model.",
+    help="A list of data_preprocessors to use other than the base col encoding and inputing.",
+)
+@click.option(
+    "--preprocessors_to_hyper",
+    multiple=True,
+    default=None,
+    help="A list of preprocessors to hyperopt.",
+)
+@click.option(
+    "--base_predictors",
+    multiple=True,
+    default=["lgbm", "xgboost", "catboost"],
+    help="A list of base predictors.",
 )
 def main(
     ramp_kit,
@@ -78,11 +84,12 @@ def main(
     n_trials_per_round,
     patience,
     no_growing_folds,
-    data_preprocessors,
-    elements_to_hyper,
+    additional_preprocessors,
+    preprocessors_to_hyper,
+    base_predictors,
 ):
     rs.orchestration.hyperopt_race(
-        data_preprocessors=data_preprocessors,
+        additional_preprocessors=additional_preprocessors,
         ramp_kit=ramp_kit,
         kit_root=kit_root,
         version=version,
@@ -91,10 +98,10 @@ def main(
         n_rounds=n_rounds,
         n_trials_per_round=n_trials_per_round,
         patience=patience,
-        no_growing_folds = no_growing_folds,
-        elements_to_hyper=elements_to_hyper,
+        no_growing_folds=no_growing_folds,
+        preprocessors_to_hyper=preprocessors_to_hyper,
+        base_predictors=base_predictors,
     )
-
 
 
 def start():
