@@ -1,6 +1,7 @@
 from . import actions
 from . import utils
 from .scripts import orchestration
+from .scripts import tabular
 from .scripts.setup import setup
 from .scripts.tabular import tabular_cat_col_encoders_submit
 from .scripts.tabular import tabular_cat_col_imputers_submit
@@ -18,6 +19,7 @@ from .workflow_elements.tabular_data_preprocessors.transformer_base_preprocessor
 
 __all__ = [
     "orchestration",
+    "tabular",
     "tabular_setup",
     "tabular_regression_columnwise_last_submit",
     "tabular_regression_submit",
