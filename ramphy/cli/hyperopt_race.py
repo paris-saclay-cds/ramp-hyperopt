@@ -59,8 +59,8 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option(
     "--additional_preprocessors",
     multiple=True,
-    default=None,
-    help="A list of data_preprocessors to use other than the base col encoding and inputing and the drop_id.",
+    default=["drop_id", "drop_columns", "cat_target_encoding"],
+    help="A list of data_preprocessors to use other than the base col encoding and inputing.",
 )
 @click.option(
     "--preprocessors_to_hyper",
