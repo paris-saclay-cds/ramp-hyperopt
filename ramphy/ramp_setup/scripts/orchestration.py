@@ -64,11 +64,11 @@ def run_race(
         predictor_we_name = "regressor"
     elif "classification" in metadata["prediction_type"]:
         predictor_we_name = "classifier"
-    
-    # NOTE if you want these now you can add them with the additional_preprocessors cli flag and 
+
+    # NOTE if you want these now you can add them with the additional_preprocessors cli flag and
     # then select for optim with the preprocessors_to_hyperopt
     # base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
-    
+
     # The WEs the orchestrator needs to choose from in every round
     base_we_names = [predictor_we_name]
     if preprocessors_to_hyper is not None:
@@ -497,9 +497,9 @@ def hyperopt_race(
         start_round = 0
         blended_submissions = set()
         scores = []
-        data_preprocessors = ["drop_id"]
+        data_preprocessors = []
         if additional_preprocessors is not None:
-            data_preprocessors += additional_preprocessors
+            data_preprocessors = additional_preprocessors
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
