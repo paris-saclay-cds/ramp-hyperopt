@@ -1,18 +1,16 @@
+import datetime
 import glob
 import json
-import shutil
 import random
-import datetime
-import numpy as np
-import pandas as pd
-import rampwf as rw
-import ramphy as rh
-import ramphy.ramp_setup as rs
+import shutil
 from pathlib import Path
 from typing import Optional
 
-
-LLM_T2V = "llm_text2vec"
+import numpy as np
+import pandas as pd
+import ramphy as rh
+import ramphy.ramp_setup as rs
+import rampwf as rw
 
 
 def last_action(ramp_kit_dir, name):
@@ -20,7 +18,7 @@ def last_action(ramp_kit_dir, name):
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
     action_f_names.sort(reverse=True)
     for i in range(len(action_f_names)):
-        ramp_action_object = rh.actions.load_ramp_action(action_f_names[i])
+        ramp_action_object = rh.actions.load_ramp_action(Path(action_f_names[i]))
         if ramp_action_object.name == name:
             return ramp_action_object
     return None
@@ -125,7 +123,9 @@ def run_race(
             subtract_existing=False,
         )
         hyperopt_action = last_action(ramp_kit_dir, "hyperopt")
-        if len(hyperopt_action.mean_scores) > 0:
+        if hyperopt_action is None:
+            continue
+        elif len(hyperopt_action.mean_scores) > 0:
             # Add the best submission from this round of hyperopt to the set to be blended
             for hyperopt_submission, mean_score in hyperopt_action.mean_scores.items():
                 # Add best
@@ -156,8 +156,8 @@ def run_race(
                     Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
                 )
                 kaggle_submit_file(
-                    submission_source_f_name=submission_source_f_name,
-                    submission_target_f_name=submission_target_f_name,
+                    submission_source_f_name=str(submission_source_f_name),
+                    submission_target_f_name=str(submission_target_f_name),
                     ramp_kit_dir=ramp_kit_dir,
                 )
             else:
@@ -197,7 +197,7 @@ def resume_race(
     ramp_program = []
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
-        ramp_program.append(rh.actions.load_ramp_action(action_f_name))
+        ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     blend_actions = [
         ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)
     ]
@@ -212,7 +212,7 @@ def resume_race(
     ramp_program = []
     for action_f_name in action_f_names:
         f_name = Path(action_f_name).name
-        ramp_program.append(rh.actions.load_ramp_action(action_f_name))
+        ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     # we only need race blend actions
     blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 903)]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
@@ -293,8 +293,8 @@ def final_blend_growing_folds(
             / f"auto_{kit_suffix}_growing_folds_{str(stop_fold_idx).zfill(3)}.csv"
         )
         kaggle_submit_file(
-            submission_source_f_name=submission_source_f_name,
-            submission_target_f_name=submission_target_f_name,
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
         )
 
@@ -333,7 +333,7 @@ def final_blend_then_bag(
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
-    n_rounds: Optional[int] = -1,
+    n_rounds: int = -1,
 ):
     """Blend then bag and submit after each fold.
 
@@ -362,8 +362,8 @@ def final_blend_then_bag(
                 / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}.csv"
             )
         kaggle_submit_file(
-            submission_source_f_name=submission_source_f_name,
-            submission_target_f_name=submission_target_f_name,
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
         )
 
@@ -373,7 +373,7 @@ def final_bag_then_blend(
     ramp_kit_dir: str,
     kit_suffix: str,
     n_folds: int,
-    n_rounds: Optional[int] = -1,
+    n_rounds: int = -1,
 ):
     """Bag then blend and submit after each fold.
 
@@ -402,8 +402,8 @@ def final_bag_then_blend(
                 / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}.csv"
             )
         kaggle_submit_file(
-            submission_source_f_name=submission_source_f_name,
-            submission_target_f_name=submission_target_f_name,
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
         )
 
@@ -444,8 +444,8 @@ def submit_best_submissions(
             Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_best_{submission}.csv"
         )
         kaggle_submit_file(
-            submission_source_f_name=submission_source_f_name,
-            submission_target_f_name=submission_target_f_name,
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
         )
 
@@ -456,20 +456,20 @@ def hyperopt_race(
     version: str,
     number: str | int,
     resume: bool,
-    n_rounds: Optional[int] = 100,
-    n_trials_per_round: Optional[int] = 5,
-    patience: Optional[int] = -1,
-    n_folds_hyperopt: Optional[int] = 3,
-    n_folds: Optional[int] = 31,
-    base_predictors: Optional[list[str]] = ["lgbm", "xgboost", "catboost"],
-    top_n_for_mean: Optional[int] = 10,
-    n_sigma: Optional[float] = 1.0,
-    contributivity_floor: Optional[int] = 100,  # on 1000, added to contributivity to give a chance to every submission
-    no_growing_folds: Optional[bool] = True,
+    n_rounds: int = 100,
+    n_trials_per_round: int = 5,
+    patience: int = -1,
+    n_folds_hyperopt: int = 3,
+    n_folds: int = 31,
+    base_predictors: list[str] = list(["lgbm", "xgboost", "catboost"]),
+    top_n_for_mean: int = 10,
+    n_sigma: float = 1.0,
+    contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
+    no_growing_folds: bool = True,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
-    problem = rw.utils.assert_read_problem(ramp_kit_dir)
+    problem = rw.utils.assert_read_problem(str(ramp_kit_dir))
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
     is_lower_the_better = problem.score_types[0].is_lower_the_better
@@ -480,11 +480,11 @@ def hyperopt_race(
     action_stats = {submission: [] for submission in base_predictors}
     if resume:
         start_round, blended_submissions, action_stats, scores = resume_race(
-            action_stats = action_stats,
-            ramp_kit_dir = ramp_kit_dir,
-            base_predictors = base_predictors,
-            contributivity_floor = contributivity_floor,
-            n_folds_hyperopt = n_folds_hyperopt,
+            action_stats=action_stats,
+            ramp_kit_dir=str(ramp_kit_dir),
+            base_predictors=base_predictors,
+            contributivity_floor=contributivity_floor,
+            n_folds_hyperopt=n_folds_hyperopt,
         )
     else:
         start_round = 0
@@ -493,35 +493,35 @@ def hyperopt_race(
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_regression_columnwise_last_submit(         
-                    ramp_kit_dir = ramp_kit_dir,
-                    submission = submission,
-                    regressor = submission,
+                rs.scripts.tabular.tabular_regression_columnwise_last_submit(
+                    ramp_kit_dir=ramp_kit_dir,
+                    submission=submission,
+                    regressor=submission,
                 )
             elif "classification" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_classification_columnwise_last_submit(         
-                    ramp_kit_dir = ramp_kit_dir,
-                    submission = submission,
-                    classifier = submission,
+                rs.scripts.tabular.tabular_classification_columnwise_last_submit(
+                    ramp_kit_dir=ramp_kit_dir,
+                    submission=submission,
+                    classifier=submission,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
 
     blended_submissions = run_race(
-        base_predictors = base_predictors,
-        action_stats = action_stats,
-        ramp_kit_dir = ramp_kit_dir,
-        kit_suffix = kit_suffix,
-        metadata = metadata,
-        n_rounds = n_rounds,
-        n_trials_per_round = n_trials_per_round,
-        patience = patience,
-        n_folds_hyperopt = n_folds_hyperopt,
-        start_round = start_round,
-        scores = scores,
-        is_lower_the_better = is_lower_the_better,
-        contributivity_floor = contributivity_floor,
-        blended_submissions = blended_submissions,
+        base_predictors=base_predictors,
+        action_stats=action_stats,
+        ramp_kit_dir=str(ramp_kit_dir),
+        kit_suffix=kit_suffix,
+        metadata=metadata,
+        n_rounds=n_rounds,
+        n_trials_per_round=n_trials_per_round,
+        patience=patience,
+        n_folds_hyperopt=n_folds_hyperopt,
+        start_round=start_round,
+        scores=scores,
+        is_lower_the_better=is_lower_the_better,
+        contributivity_floor=contributivity_floor,
+        blended_submissions=blended_submissions,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
@@ -531,43 +531,43 @@ def hyperopt_race(
     # versions to experiment.
     if not no_growing_folds:
         final_blend_growing_folds(
-            base_predictors = base_predictors,
-            ramp_kit_dir = ramp_kit_dir,
-            kit_suffix = kit_suffix,
-            n_folds = n_folds,
-            n_folds_hyperopt = n_folds_hyperopt,
-            top_n_for_mean = top_n_for_mean,
-            n_sigma = n_sigma,
+            base_predictors=base_predictors,
+            ramp_kit_dir=str(ramp_kit_dir),
+            kit_suffix=kit_suffix,
+            n_folds=n_folds,
+            n_folds_hyperopt=n_folds_hyperopt,
+            top_n_for_mean=top_n_for_mean,
+            n_sigma=n_sigma,
         )
     # Train the final blend of the hyperopt race on all the folds
     train_on_all_folds(
         submissions=list(blended_submissions),
-        ramp_kit_dir=ramp_kit_dir,
+        ramp_kit_dir=str(ramp_kit_dir),
         n_folds=n_folds,
     )
     # Whenever hyperopt submissions are trained outside of hyperopt, we need to update the summary.
     update_hyperopt_summary(
         base_predictors=base_predictors,
-        ramp_kit_dir=ramp_kit_dir,
+        ramp_kit_dir=str(ramp_kit_dir),
     )
     # Blend then bag the final blend of the hyperopt race on all the folds
     final_blend_then_bag(
         submissions=list(blended_submissions),
-        ramp_kit_dir=ramp_kit_dir,
+        ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
         n_folds=n_folds,
     )
     # Bag then blend the final blend of the hyperopt race on all the folds
     final_bag_then_blend(
         submissions=list(blended_submissions),
-        ramp_kit_dir=ramp_kit_dir,
+        ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
         n_folds=n_folds,
     )
     # Submit the best of each base submission (classical hyperopt)
     submit_best_submissions(
         base_predictors=base_predictors,
-        ramp_kit_dir=ramp_kit_dir,
+        ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
         n_folds=n_folds,
     )
