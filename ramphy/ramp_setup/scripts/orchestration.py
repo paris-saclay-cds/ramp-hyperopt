@@ -507,7 +507,6 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
-                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
             elif "classification" in metadata["prediction_type"]:
@@ -515,7 +514,6 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
-                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
