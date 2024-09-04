@@ -40,14 +40,11 @@ def tabular_setup(
     prediction_type = metadata["prediction_type"]
 
     if "regression" in prediction_type:
-        problem_code = rs.utils.load_template(
-            package=rs, template_path="problems/tabular_regression_problem.py")
+        problem_code = rs.utils.load_template(package=rs, template_path="problems/tabular_regression_problem.py")
     elif "classification" in prediction_type:
-        target_values = {target_col: [str(tv) for tv in train_data[target_col].unique()]
-                         for target_col in target_cols}
+        target_values = {target_col: [str(tv) for tv in train_data[target_col].unique()] for target_col in target_cols}
         metadata["data_description"]["target_values"] = target_values
-        problem_code = rs.utils.load_template(
-            package=rs, template_path="problems/tabular_classification_problem.py")
+        problem_code = rs.utils.load_template(package=rs, template_path="problems/tabular_classification_problem.py")
     else:
         raise NotImplementedError("Unknown tabular prediction type.")
 
@@ -55,8 +52,8 @@ def tabular_setup(
     # and adding _<i> to col names to avoid clash
     new_feature_types = {}
     for col_i, (col, col_type) in enumerate(feature_types.items()):
-        var_col = "_" + re.sub(r'[^a-zA-Z0-9_]', '_', col)
-        new_col = f'{var_col}_{col_i}'
+        var_col = "_" + re.sub(r"[^a-zA-Z0-9_]", "_", col)
+        new_col = f"{var_col}_{col_i}"
         if col == metadata["id_col"]:
             new_feature_types[col] = col_type
         else:
@@ -111,10 +108,10 @@ def tabular_setup(
             try:
                 train_data[col] = train_data[col].astype(str)
                 train_data[col] = train_data[col].str.strip()
-                train_data[col] = train_data[col].replace('nan', '')
+                train_data[col] = train_data[col].replace("nan", "")
                 test_data[col] = test_data[col].astype(str)
                 test_data[col] = test_data[col].str.strip()
-                test_data[col] = test_data[col].replace('nan', '')
+                test_data[col] = test_data[col].replace("nan", "")
                 feature_values[col] = sorted(pd.concat([train_data[col], test_data[col]]).dropna().unique().tolist())
             except KeyError as e:
                 print(e)
@@ -134,7 +131,8 @@ def tabular_setup(
     if prediction_type == "regression":
         for target_col in target_cols:
             test_data[target_col] = np.random.normal(
-                train_data[target_col].mean(), train_data[target_col].std(), size=len(test_data))
+                train_data[target_col].mean(), train_data[target_col].std(), size=len(test_data)
+            )
     elif "classification" in prediction_type:
         for target_col in target_cols:
             target_values = list(train_data[target_col].unique())
@@ -157,12 +155,11 @@ def tabular_setup(
 @ramp_action
 def tabular_regression_submit(
     submission: str | Path,
-    regressor: str = 'xgboost',
-    feature_extractor: str = 'empty',
+    regressor: str = "xgboost",
+    feature_extractor: str = "empty",
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     submission_dir = ramp_kit_dir / "submissions" / submission
     if submission_dir.exists():
@@ -172,7 +169,7 @@ def tabular_regression_submit(
 
     # Regressor
     # ---------------------------
-    regressor_template_path = Path("workflow_elements") / "tabular_regressors" / f'{regressor}.py'
+    regressor_template_path = Path("workflow_elements") / "tabular_regressors" / f"{regressor}.py"
     regressor_code = rs.utils.load_template(package=rs, template_path=regressor_template_path)
     regressor_code = regressor_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "regressor.py", "w") as f_out:
@@ -181,7 +178,7 @@ def tabular_regression_submit(
 
     # Feature Extractor
     # ---------------------------
-    fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f'{feature_extractor}.py'
+    fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f"{feature_extractor}.py"
     fe_code = rs.utils.load_template(package=rs, template_path=fe_template_path)
     fe_code = fe_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
@@ -191,12 +188,11 @@ def tabular_regression_submit(
 @ramp_action
 def tabular_classification_submit(
     submission: str | Path,
-    classifier: str = 'xgboost',
-    feature_extractor: str = 'empty',
+    classifier: str = "xgboost",
+    feature_extractor: str = "empty",
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
     submission_dir = ramp_kit_dir / "submissions" / submission
     if submission_dir.exists():
@@ -206,7 +202,7 @@ def tabular_classification_submit(
 
     # Regressor
     # ---------------------------
-    classifier_template_path = Path("workflow_elements") / "tabular_classifiers" / f'{classifier}.py'
+    classifier_template_path = Path("workflow_elements") / "tabular_classifiers" / f"{classifier}.py"
     classifier_code = rs.utils.load_template(package=rs, template_path=classifier_template_path)
     classifier_code = classifier_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "classifier.py", "w") as f_out:
@@ -215,7 +211,7 @@ def tabular_classification_submit(
 
     # Feature Extractor
     # ---------------------------
-    fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f'{feature_extractor}.py'
+    fe_template_path = Path("workflow_elements") / "tabular_feature_extractors" / f"{feature_extractor}.py"
     fe_code = rs.utils.load_template(package=rs, template_path=fe_template_path)
     fe_code = fe_code.format_map(metadata)
     with open(ramp_kit_dir / "submissions" / submission / "feature_extractor.py", "w") as f_out:
@@ -277,7 +273,7 @@ def tabular_data_preprocessor_submit(
 @ramp_action
 def tabular_data_preprocessors_submit(
     submission: str | Path,
-    data_preprocessors: list[str] = ['drop_id'],
+    data_preprocessors: list[str] = ["drop_id"],
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
@@ -327,8 +323,10 @@ def tabular_cat_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_imputing.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
+            with open(
+                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_imputing.py", "w"
+            ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -356,8 +354,10 @@ def tabular_num_col_imputers_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_num_col_imputing.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
+            with open(
+                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_num_col_imputing.py", "w"
+            ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -385,8 +385,10 @@ def tabular_cat_col_encoders_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat":
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_encoding.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
+            with open(
+                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_encoding.py", "w"
+            ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -414,8 +416,10 @@ def tabular_text_col_encoders_submit(
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "text":
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f'{col}', "str_col": f'"{col}"'})
-            with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_text_col_encoding.py", "w") as f_out:
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
+            with open(
+                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_text_col_encoding.py", "w"
+            ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
 
@@ -439,25 +443,18 @@ def tabular_date_col_encoder_submit(
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
-    dp_template_path = (
-        Path("workflow_elements") / "tabular_data_preprocessors" /
-        "date_col_encoding.py"
-    )
+    dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "date_col_encoding.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "date":
-            dp_code_formatted = dp_code.format_map(
-                metadata | {"col": f"{col}", "str_col": f'"{col}"'}
-            )
+            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
             with open(
-                ramp_kit_dir
-                / "submissions"
-                / submission
-                / f"data_preprocessor_{dp_idx}_{col}_date_col_encoding.py",
+                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_date_col_encoding.py",
                 "w",
             ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+
 
 def tabular_encoder_imputer_submit(
     submission: str | Path,
@@ -470,7 +467,7 @@ def tabular_encoder_imputer_submit(
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> None:
-    """Submit column encoders and imputers. 
+    """Submit column encoders and imputers.
 
     Args:
         submission (str | Path): Submission name
@@ -514,6 +511,7 @@ def tabular_encoder_imputer_submit(
             ramp_data_dir=ramp_data_dir,
         )
 
+
 @ramp_action
 def tabular_regression_columnwise_last_submit(
     submission: str | Path,
@@ -525,6 +523,7 @@ def tabular_regression_columnwise_last_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> Dict[str, list]:
@@ -584,6 +583,7 @@ def tabular_regression_columnwise_last_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -601,6 +601,7 @@ def tabular_regression_columnwise_first_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> Dict[str, list]:
@@ -632,6 +633,7 @@ def tabular_regression_columnwise_first_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
@@ -664,6 +666,7 @@ def tabular_regression_columnwise_first_submit(
             )
     return {"created_submissions": [submission]}
 
+
 @ramp_action
 def tabular_classification_columnwise_last_submit(
     submission: str | Path,
@@ -675,6 +678,7 @@ def tabular_classification_columnwise_last_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> Dict[str, list]:
@@ -735,10 +739,12 @@ def tabular_classification_columnwise_last_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
     return {"created_submissions": [submission]}
+
 
 @ramp_action
 def tabular_classification_columnwise_first_submit(
@@ -751,6 +757,7 @@ def tabular_classification_columnwise_first_submit(
     cat_col_encode: bool = True,
     num_col_encode: bool = True,
     date_col_encode: bool = True,
+    text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> Dict[str, list]:
@@ -782,6 +789,7 @@ def tabular_classification_columnwise_first_submit(
         cat_col_encode=cat_col_encode,
         num_col_encode=num_col_encode,
         date_col_encode=date_col_encode,
+        text_col_encode=text_col_encode,
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
