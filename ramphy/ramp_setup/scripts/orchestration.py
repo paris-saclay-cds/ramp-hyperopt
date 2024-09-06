@@ -167,7 +167,7 @@ def run_race(
                 )
             else:
                 print("something wrong: no blended score")
-                exit(0)
+                raise RuntimeError("something wrong: no blended score")
                 blended_score = hyperopt_action.mean_score
                 contributivities = {s: 1000 / len(predictors) for s in base_predictors}
             scores.append(blended_score)
