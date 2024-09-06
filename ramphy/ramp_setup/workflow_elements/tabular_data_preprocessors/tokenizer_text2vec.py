@@ -16,9 +16,7 @@ from urllib3.exceptions import InsecureRequestWarning
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 
 # Suppress only the RequestsDependencyWarning
-warnings.filterwarnings(
-    "ignore", category=RequestsDependencyWarning, message=".*urllib3.*"
-)
+warnings.filterwarnings("ignore", category=RequestsDependencyWarning, message=".*urllib3.*")
 
 import numpy as np
 import pandas as pd
@@ -28,24 +26,21 @@ from ramphy import Hyperparameter
 from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from tqdm import tqdm
-from transformers import AutoConfig
-from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 
 pd.set_option("display.max_columns", None)
 
 # RAMP START HYPERPARAMETERS
-encoding_mode_llama2vec = Hyperparameter(
+encoding_mode_tokenizer = Hyperparameter(
     dtype="str",
     default="pca_1",
-    values=["extremes", "pca_1", "pca_2", "pca_3", "full"],
+    values=["extremes", "pca_1", "pca_3", "pca_5", "pca_max"],
 )
 # RAMP END HYPERPARAMETERS
 
 IMPUTE_STRATEGY_NUM = "mean"
 FILL_VALUE_NUM = -1.0
-ENCODING_MODE = str(encoding_mode_llama2vec)
+ENCODING_MODE = str(encoding_mode_tokenizer)
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
@@ -60,9 +55,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         model_id = "meta-llama/Meta-Llama-3-8B"
 
         print("Loading tokenizer")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_id, local_files_only=False, padding_side="left"
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=False, padding_side="left")
         self.tokenizer.add_special_tokens({{"pad_token": "<pad>"}})
         print("Loading done")
 
@@ -107,9 +100,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         X_test.index = test_idx
 
         for new_col in all_new_features:
-            X_train, X_test = self.impute_column(
-                col_name=new_col, X_train=X_train, X_test=X_test
-            )
+            X_train, X_test = self.impute_column(col_name=new_col, X_train=X_train, X_test=X_test)
 
         # Update metadata
         metadata = deepcopy(metadata)
@@ -130,9 +121,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             for new_column in new_feature_names[feat]:
                 metadata["data_description"]["feature_types"][new_column] = "num"
                 if missing_count is not None:
-                    metadata["data_description"]["missing_data_count"][new_column] = (
-                        missing_count
-                    )
+                    metadata["data_description"]["missing_data_count"][new_column] = missing_count
 
         return X_train, y_train, X_test, metadata
 
@@ -165,26 +154,18 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         Returns:
             pd.DataFrame: The dataframe of the encoded columns
         """
-        column = dataset[
-            column_name
-        ].dropna()  # We do this and with the idx as well so we only encode the values
+        column = dataset[column_name].dropna()  # We do this and with the idx as well so we only encode the values
         values = list(column.values)
         indexes = column.index
-        raw_encoding = self.tokenizer.batch_encode_plus(
-            values, return_attention_mask=False, padding="longest"
-        )
+        raw_encoding = self.tokenizer.batch_encode_plus(values, return_attention_mask=False, padding="longest")
         raw_encoding = np.array(raw_encoding["input_ids"])
 
         encoding = self.postprocess_encoding(raw_encoding, column_name)
         new_col_names = [f"{{column_name}}_{{idx}}" for idx in range(encoding.shape[1])]
-        encoded_columns = pd.DataFrame(
-            data=encoding, columns=new_col_names, index=indexes
-        )
+        encoded_columns = pd.DataFrame(data=encoding, columns=new_col_names, index=indexes)
         return encoded_columns
 
-    def postprocess_encoding(
-        self, raw_encoding: np.ndarray, column_name: str
-    ) -> np.ndarray:
+    def postprocess_encoding(self, raw_encoding: np.ndarray, column_name: str) -> np.ndarray:
         """This function postprocesses the raw encoding from the LLM
 
         Args:
@@ -204,9 +185,18 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             norm_min_idx = np.argmin(raw_encoding, axis=1) / raw_encoding.shape[1]
             max_values = np.max(raw_encoding, axis=1)
             min_values = np.min(raw_encoding, axis=1)
-            encoding = np.array(
-                [max_values, norm_max_idx, min_values, norm_min_idx]
-            ).swapaxes(1, 0)
+            encoding = np.array([max_values, norm_max_idx, min_values, norm_min_idx]).swapaxes(1, 0)
+            return encoding
+        elif ENCODING_MODE == "pca_max":
+            if column_name not in self.scaler:
+                self.scaler[column_name] = StandardScaler()
+                components = min(raw_encoding.shape)
+                self.pca[column_name] = PCA(n_components=components)
+                scaled_data = self.scaler[column_name].fit_transform(raw_encoding)
+                encoding = self.pca[column_name].fit_transform(scaled_data)
+            else:
+                scaled_data = self.scaler[column_name].transform(raw_encoding)
+                encoding = self.pca[column_name].transform(scaled_data)
             return encoding
         elif "pca" in ENCODING_MODE:
             # This happens when we pass the train dataset
