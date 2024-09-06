@@ -467,13 +467,12 @@ def hyperopt_race(
     n_folds_hyperopt: int = 3,
     n_folds: int = 31,
     base_predictors: list[str] = ["lgbm", "xgboost", "catboost"],
+    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    preprocessors_to_hyper: Optional[list[str]] = None,
     top_n_for_mean: int = 10,
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
     no_growing_folds: bool = True,
-    preprocessors_to_hyper: Optional[list[str]] = None,
-    additional_preprocessors: Optional[list[str]] = None,
-    columnwise_first: bool = False,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -498,17 +497,10 @@ def hyperopt_race(
         start_round = 0
         blended_submissions = set()
         scores = []
-        data_preprocessors = []
-        if additional_preprocessors is not None:
-            data_preprocessors = additional_preprocessors
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                if columnwise_first:
-                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_first_submit
-                else:
-                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_last_submit
-                submitter_function(
+                rs.scripts.tabular.tabular_regression_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
@@ -517,11 +509,7 @@ def hyperopt_race(
                 )
 
             elif "classification" in metadata["prediction_type"]:
-                if columnwise_first:
-                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_first_submit
-                else:
-                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_last_submit
-                submitter_function(
+                rs.scripts.tabular.tabular_classification_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
