@@ -58,19 +58,6 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Do not run the growing fold submission at the end.",
 )
 @click.option(
-    "--additional_preprocessors",
-    multiple=True,
-    default=["drop_id", "drop_columns", "cat_target_encoding"],
-    help="A list of data_preprocessors to use other than the base col encoding and inputing.",
-)
-@click.option(
-    "--columnwise_first",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="If given adds columnwise preprocessors first. Otherwise adds them after other preprocessors",
-)
-@click.option(
     "--base_predictors",
     multiple=True,
     default=["lgbm", "xgboost", "catboost"],
