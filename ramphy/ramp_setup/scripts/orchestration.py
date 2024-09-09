@@ -3,6 +3,7 @@ import glob
 import json
 import random
 import shutil
+import configparser
 from pathlib import Path
 from typing import Optional
 
@@ -70,6 +71,10 @@ def run_race(
     # base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
 
     # The WEs the orchestrator needs to choose from in every round
+    # element_types = ["model"]
+    # if preprocessors_to_hyper is not None:
+    #     element_types.append("data_preprocessor")
+
     base_we_names = [predictor_we_name]
     if preprocessors_to_hyper is not None:
         base_we_names += preprocessors_to_hyper
@@ -108,8 +113,16 @@ def run_race(
         print(f"selected predictor : {predictor}")
         #    input("Press Enter to continue...")
         n_trials = n_trials_per_round * n_folds_hyperopt
-        wes_to_hyperopt = random.sample(base_we_names, 1)
-        print(f"Choosen workflow element: {wes_to_hyperopt[0]}")
+        # element_type_to_hyperopt = random.sample(element_types, 1)[0]
+        # print(f"Choosen workflow element: {element_type_to_hyperopt}")
+        # if element_type_to_hyperopt == "model":
+        #     wes_to_hyperopt = predictor_we_name
+        # elif element_type_to_hyperopt == "data_preprocessor":
+        #     wes_to_hyperopt = preprocessors_to_hyper
+        # print(f"Hyperopting: {wes_to_hyperopt}")
+        wes_to_hyperopt = base_we_names
+        print(f"Hyperopting: {wes_to_hyperopt}")
+
         submission_to_hyperopt = predictor  # default: hyperopt one of the base submissions
         blended_submissions_of_predictor = [
             submission for submission in blended_submissions if submission[:-20] == predictor
@@ -455,6 +468,16 @@ def submit_best_submissions(
         )
 
 
+def save_config(save_path: Path, **kwargs):
+    config = configparser.ConfigParser()
+    config["DEFAULT"] = kwargs
+
+    with open(save_path / "config.ini", "w") as configfile:
+        config.write(configfile)
+
+    print(f'Config file saved at {save_path / "config.ini"}')
+
+
 def hyperopt_race(
     ramp_kit: str,
     kit_root: str,
@@ -476,6 +499,28 @@ def hyperopt_race(
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
+
+    save_config(
+        ramp_kit=ramp_kit,
+        kit_root=kit_root,
+        version=version,
+        number=number,
+        resume=resume,
+        n_rounds=n_rounds,
+        n_trials_per_round=n_trials_per_round,
+        patience=patience,
+        n_folds_hyperopt=n_folds_hyperopt,
+        n_folds=n_folds,
+        base_predictors=base_predictors,
+        data_preprocessors=data_preprocessors,
+        preprocessors_to_hyper=preprocessors_to_hyper,
+        top_n_for_mean=top_n_for_mean,
+        n_sigma=n_sigma,
+        contributivity_floor=contributivity_floor,
+        no_growing_folds=no_growing_folds,
+        save_path=ramp_kit_dir,
+    )
+
     problem = rw.utils.assert_read_problem(str(ramp_kit_dir))
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
