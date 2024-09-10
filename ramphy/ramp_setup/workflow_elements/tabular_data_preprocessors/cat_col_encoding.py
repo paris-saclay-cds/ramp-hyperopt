@@ -39,12 +39,12 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         global R_FEATURES_FOR_HASHING
         if self.col in X_train.columns:
             # For now drop high-cardinality columns, later maybe dirty_cat
-            if len(X_train[self.col].unique()) > 200:
+            if len(X_train[self.col].unique()) > 20:
 #                X_train = X_train.drop(columns=self.col)
 #                X_test = X_test.drop(columns=self.col)
 #                metadata["data_description"]["feature_types"].pop(self.col)
                 ENCODING_STRATEGY = "Hashing"
-                N_FEATURES_FOR_HASHING = 200
+                N_FEATURES_FOR_HASHING = 20
 #            else:
             if ENCODING_STRATEGY == "OneHot":
                 # to avoid non authorized characters in column names
