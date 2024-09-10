@@ -39,12 +39,12 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         global R_FEATURES_FOR_HASHING
         if self.col in X_train.columns:
             # For now drop high-cardinality columns, later maybe dirty_cat
-            if len(X_train[self.col].unique()) > 500:
+            if len(X_train[self.col].unique()) > 200:
 #                X_train = X_train.drop(columns=self.col)
 #                X_test = X_test.drop(columns=self.col)
 #                metadata["data_description"]["feature_types"].pop(self.col)
                 ENCODING_STRATEGY = "Hashing"
-                R_FEATURES_FOR_HASHING = 0.3
+                N_FEATURES_FOR_HASHING = 200
 #            else:
             if ENCODING_STRATEGY == "OneHot":
                 # to avoid non authorized characters in column names
@@ -64,7 +64,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 transformer = BinaryEncoder(handle_unknown="value", cols=[self.col])
             elif ENCODING_STRATEGY == "Hashing":
                 n_unique_values = np.sum([len(v) for v in metadata["data_description"]["feature_values"]])
-                n_features_for_hashing = max(1, int(round(R_FEATURES_FOR_HASHING * n_unique_values)))
+#                n_features_for_hashing = max(1, int(round(R_FEATURES_FOR_HASHING * n_unique_values)))
+                n_features_for_hashing = N_FEATURES_FOR_HASHING
                 transformer = HashingEncoder(drop_invariant=True, n_components=n_features_for_hashing, cols=[self.col])
     
             if ENCODING_STRATEGY == "Target":
@@ -79,6 +80,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             X_transformed = transformer.transform(X_train[[self.col]])
             if hasattr(X_transformed, "toarray"):
                 X_transformed = X_transformed.toarray()
+            else:
+                X_transformed = X_transformed.values
             X_train = X_train.drop(columns=[self.col])
             X_transformed_df = pd.DataFrame(X_transformed, columns=new_columns, index=X_train.index)
             X_train = pd.concat((X_train, X_transformed_df), axis=1)
@@ -88,6 +91,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             X_transformed = transformer.transform(X_test[[self.col]])
             if hasattr(X_transformed, "toarray"):
                 X_transformed = X_transformed.toarray()
+            else:
+                X_transformed = X_transformed.values
             X_test = X_test.drop(columns=[self.col])
             X_transformed_df = pd.DataFrame(X_transformed, columns=new_columns, index=X_test.index)
             X_test = pd.concat((X_test, X_transformed_df), axis=1)
