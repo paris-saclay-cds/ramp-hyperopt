@@ -5,7 +5,7 @@ import random
 import shutil
 import configparser
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -478,6 +478,30 @@ def save_config(save_path: Path, **kwargs):
     print(f'Config file saved at {save_path / "config.ini"}')
 
 
+def get_full_preprocessor_name(data_preprocessor: str, submitted_preprocessors: List[str]):
+    if data_preprocessor == "base_columnwise":
+        full_names = []
+        for dp in submitted_preprocessors:
+            print(dp)
+            # Imputers
+            if "cat_col_imputing" in dp:
+                full_names.append(dp)
+            if "num_col_imputing" in dp:
+                full_names.append(dp)
+            # Encoders
+            if "cat_col_encoding" in dp:
+                full_names.append(dp)
+            if "num_col_encoding" in dp:
+                full_names.append(dp)
+            if "text_col_encoding" in dp:
+                full_names.append(dp)
+            if "date_col_encoding" in dp:
+                full_names.append(dp)
+    else:
+        full_names = [dp for dp in submitted_preprocessors if data_preprocessor in dp]
+    return full_names
+
+
 def hyperopt_race(
     ramp_kit: str,
     kit_root: str,
@@ -545,7 +569,7 @@ def hyperopt_race(
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_regression_ordered_submit(
+                submitted_elements = rs.scripts.tabular.tabular_regression_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
@@ -554,7 +578,7 @@ def hyperopt_race(
                 )
 
             elif "classification" in metadata["prediction_type"]:
-                rs.scripts.tabular.tabular_classification_ordered_submit(
+                submitted_elements = rs.scripts.tabular.tabular_classification_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
@@ -563,6 +587,12 @@ def hyperopt_race(
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
+
+    dp_full_name = []
+    for dp in preprocessors_to_hyper:
+        dp_full_name += get_full_preprocessor_name(
+            data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
+        )
 
     blended_submissions = run_race(
         base_predictors=base_predictors,
@@ -579,7 +609,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyper=preprocessors_to_hyper,
+        preprocessors_to_hyper=dp_full_name,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
