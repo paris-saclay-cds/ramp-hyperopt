@@ -517,7 +517,7 @@ def tabular_encoder_imputer_submit(
     """
     dp_names = []
     if text_col_encode:
-        dp_names = tabular_text_col_encoders_submit(
+        dp_names += tabular_text_col_encoders_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
@@ -529,19 +529,19 @@ def tabular_encoder_imputer_submit(
             ramp_data_dir=ramp_data_dir,
         )
     if cat_col_impute:
-        dp_names = tabular_cat_col_imputers_submit(
+        dp_names += tabular_cat_col_imputers_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if num_col_impute:
-        dp_names = tabular_num_col_imputers_submit(
+        dp_names += tabular_num_col_imputers_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if cat_col_encode:
-        dp_names = tabular_cat_col_encoders_submit(
+        dp_names += tabular_cat_col_encoders_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
