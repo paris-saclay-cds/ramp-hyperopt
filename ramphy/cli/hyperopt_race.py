@@ -70,7 +70,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="A list of data_preprocessors to use. base_columnwise are the base col encoding and inputing",
 )
 @click.option(
-    "--preprocessors_to_hyper",
+    "--preprocessors_to_hyperopt",
     multiple=True,
     default=None,
     help="A list of preprocessors to hyperopt.",
@@ -88,7 +88,7 @@ def main(
     no_growing_folds,
     base_predictors,
     data_preprocessors,
-    preprocessors_to_hyper,
+    preprocessors_to_hyperopt,
 ):
     rs.orchestration.hyperopt_race(
         data_preprocessors=list(data_preprocessors),
@@ -101,7 +101,7 @@ def main(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         no_growing_folds=no_growing_folds,
-        preprocessors_to_hyper=list(preprocessors_to_hyper),
+        preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),
     )
 

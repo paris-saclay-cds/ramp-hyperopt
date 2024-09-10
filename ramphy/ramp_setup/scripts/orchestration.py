@@ -56,7 +56,7 @@ def run_race(
     is_lower_the_better: bool,
     contributivity_floor: int,
     blended_submissions: set[str],
-    preprocessors_to_hyper: Optional[list[str]] = None,
+    preprocessors_to_hyperopt: Optional[list[str]] = None,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
     improvement_speed_df = pd.DataFrame(columns=["round"] + base_predictors)
@@ -76,8 +76,8 @@ def run_race(
     #     element_types.append("data_preprocessor")
 
     base_we_names = [predictor_we_name]
-    if preprocessors_to_hyper is not None:
-        base_we_names += preprocessors_to_hyper
+    if preprocessors_to_hyperopt is not None:
+        base_we_names += preprocessors_to_hyperopt
 
     for round_idx in range(start_round, n_rounds):
         if patience >= 0 and len(scores) > patience:
@@ -515,7 +515,7 @@ def hyperopt_race(
     n_folds: int = 31,
     base_predictors: list[str] = ["lgbm", "xgboost", "catboost"],
     data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
-    preprocessors_to_hyper: Optional[list[str]] = None,
+    preprocessors_to_hyperopt: Optional[list[str]] = None,
     top_n_for_mean: int = 10,
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
@@ -537,7 +537,7 @@ def hyperopt_race(
         n_folds=n_folds,
         base_predictors=base_predictors,
         data_preprocessors=data_preprocessors,
-        preprocessors_to_hyper=preprocessors_to_hyper,
+        preprocessors_to_hyperopt=preprocessors_to_hyperopt,
         top_n_for_mean=top_n_for_mean,
         n_sigma=n_sigma,
         contributivity_floor=contributivity_floor,
@@ -589,7 +589,7 @@ def hyperopt_race(
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
 
     dp_full_name = []
-    for dp in preprocessors_to_hyper:
+    for dp in preprocessors_to_hyperopt:
         dp_full_name += get_full_preprocessor_name(
             data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
         )
@@ -609,7 +609,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyper=dp_full_name,
+        preprocessors_to_hyperopt=dp_full_name,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
