@@ -44,7 +44,7 @@ class Regressor(BaseEstimator):
 
     def fit(self, X, y):
         if self.metadata["score_name"] == "rmsle":
-            y = np.log(y)
+            y = np.log1p(y)
         self.reg = xb.XGBRegressor(
             n_estimators=N_ESTIMATORS,
             max_depth=MAX_DEPTH,
@@ -64,5 +64,5 @@ class Regressor(BaseEstimator):
     def predict(self, X):
         y_pred = self.reg.predict(X)
         if self.metadata["score_name"] == "rmsle":
-            y_pred = np.exp(y_pred)
+            y_pred = np.expm1(y_pred)
         return y_pred

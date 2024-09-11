@@ -6,7 +6,7 @@ from ramphy import Hyperparameter
 
 # RAMP START HYPERPARAMETERS
 encoding_strategy{col} = Hyperparameter(
-    dtype="str", default="Raw", values=["Raw", "Cyclical", "Both"]
+    dtype="str", default="cyclical", values=["raw", "cyclical", "cyclical-ohe"]
 )
 # RAMP END HYPERPARAMETERS
 
@@ -27,15 +27,22 @@ def raw_features(
     minute, second, microsecond, nanosecond):
 
     df[column_name + "_month"] = month
-    df[column_name + "_weekofyear"] = weekofyear
-    df[column_name + "_dayofyear"] = dayofyear
-    df[column_name + "_dayofmonth"] = dayofmonth
+    if weekofyear is not None:
+        df[column_name + "_weekofyear"] = weekofyear
+    if dayofyear is not None:
+        df[column_name + "_dayofyear"] = dayofyear
+    if dayofmonth is not None:
+        df[column_name + "_dayofmonth"] = dayofmonth
     df[column_name + "_dayofweek"] = dayofweek
     df[column_name + "_hour"] = hour
-    df[column_name + "_minute"] = minute
-    df[column_name + "_second"] = second
-    df[column_name + "_microsecond"] = microsecond
-    df[column_name + "_nanosecond"] = nanosecond
+    if minute is not None:
+        df[column_name + "_minute"] = minute
+    if second is not None:
+        df[column_name + "_second"] = second
+    if microsecond is not None:
+        df[column_name + "_microsecond"] = microsecond
+    if nanosecond is not None:
+        df[column_name + "_nanosecond"] = nanosecond
 
     return df
 
@@ -44,13 +51,13 @@ def cyclical_features(
     df, column_name,
     month, weekofyear, dayofyear, dayofmonth, dayofweek, hour,
     minute, second, microsecond, nanosecond):
-
-    df[column_name + '_month_cos'] = cos_transformer(
-        month, 12
-    )
-    df[column_name + '_month_sin'] = sin_transformer(
-        month, 12
-    )
+    if month is not None:
+        df[column_name + '_month_cos'] = cos_transformer(
+            month, 12
+        )
+        df[column_name + '_month_sin'] = sin_transformer(
+            month, 12
+        )
     df[column_name + '_weekofyear_cos'] = cos_transformer(
         weekofyear, 52
     )
@@ -69,18 +76,20 @@ def cyclical_features(
     df[column_name + '_dayofmonth_sin'] = sin_transformer(
         dayofmonth, 30  # can be 31 or 28... to be fixed
     )
-    df[column_name + '_dayofweek_cos'] = cos_transformer(
-        dayofweek, 7
-    )
-    df[column_name + '_dayofweek_sin'] = sin_transformer(
-        dayofweek, 7
-    )
-    df[column_name + '_hour_cos'] = cos_transformer(
-        hour, 24
-    )
-    df[column_name + '_hour_sin'] = sin_transformer(
-        hour, 24
-    )
+    if dayofweek is not None:
+        df[column_name + '_dayofweek_cos'] = cos_transformer(
+            dayofweek, 7
+        )
+        df[column_name + '_dayofweek_sin'] = sin_transformer(
+            dayofweek, 7
+        )
+    if hour is not None:
+        df[column_name + '_hour_cos'] = cos_transformer(
+            hour, 24
+        )
+        df[column_name + '_hour_sin'] = sin_transformer(
+            hour, 24
+        )
     df[column_name + '_minute_cos'] = cos_transformer(
         minute, 60
     )
@@ -137,34 +146,48 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         microsecond = X_transformed[self.col].dt.microsecond.to_numpy()
         nanosecond = X_transformed[self.col].dt.nanosecond.to_numpy()
 
-        X_transformed['is_weekend'] = dayofweek
-        X_transformed['is_weekend'] = X_transformed["is_weekend"].apply(
-            lambda x: 1 if x >= 5 else 0)
+        # X_transformed['is_weekend'] = dayofweek
+        # X_transformed['is_weekend'] = X_transformed["is_weekend"].apply(
+        #     lambda x: 1 if x >= 5 else 0)
         # ideally we should also add holidays but this is country/job dependent. An LLM
         # should be able to know that more or less
 
-        if ENCODING_STRATEGY == 'Raw':
+        if ENCODING_STRATEGY == 'raw':
             X_transformed = raw_features(
                 X_transformed, self.col,
                 month, weekofyear, dayofyear, dayofmonth, dayofweek, hour,
                 minute, second, microsecond, nanosecond
             )
-
-        elif ENCODING_STRATEGY == 'Cyclical':
+        elif ENCODING_STRATEGY == 'cyclical':
             X_transformed = cyclical_features(
                 X_transformed, self.col,
                 month, weekofyear, dayofyear, dayofmonth, dayofweek, hour,
                 minute, second, microsecond, nanosecond)
-        elif ENCODING_STRATEGY == 'Both':
-            X_transformed = raw_features(
-                X_transformed, self.col,
-                month, weekofyear, dayofyear, dayofmonth, dayofweek, hour,
-                minute, second, microsecond, nanosecond
+        elif ENCODING_STRATEGY == 'cyclical-ohe':
+            # cyclical for feature with large number of values (e.g. day of year) and
+            # one hot encoding for features with
+            X_cyclical = cyclical_features(
+                X_transformed.copy(),
+                self.col,
+                None,
+                weekofyear,
+                dayofyear,
+                dayofmonth,
+                None,
+                None,
+                minute,
+                second,
+                microsecond,
+                nanosecond,
             )
-            X_transformed = cyclical_features(
-                X_transformed, self.col,
-                month, weekofyear, dayofyear, dayofmonth, dayofweek, hour,
-                minute, second, microsecond, nanosecond)
+            X_raw = raw_features(
+                X_transformed.copy(), self.col,
+                month, None, None, None, dayofweek, hour,
+                None, None, None, None
+            )
+            X_raw.drop([self.col + "_year", self.col], axis=1, inplace=True)
+            X_ohe = pd.get_dummies(X_raw, columns=X_raw.columns).astype(int)
+            X_transformed = pd.concat([X_cyclical, X_ohe], axis=1)
         else:
             raise ValueError('Encoding strategy not supported for dates')
 

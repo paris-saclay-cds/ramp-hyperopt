@@ -148,44 +148,50 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             self.regressor.fit(X_tr_imputed.drop(columns=[self.col]), X_tr_imputed[self.col])
         
             # Impute missing values in other columns of X_te
-            X_te_imputed = X_te.drop(columns=[self.col])
-            if len(num_cols) > 0:
-                X_te_imputed[num_cols] = imputer_num.transform(X_te_imputed[num_cols])
-            if len(cat_cols) > 0:                
-                X_te_imputed[cat_cols] = imputer_cat.transform(X_te_imputed[cat_cols])
-                
-                # One-hot encode categoric variables
-                X_transformed = transformer.transform(X_te_imputed[cat_cols])
-                if hasattr(X_transformed, "toarray"):
-                    X_transformed = X_transformed.toarray()
-                X_te_imputed = X_te_imputed.drop(columns=cat_cols)
-                X_te_transformed = pd.DataFrame(X_transformed, columns=new_columns, index=X_te_imputed.index)
-                X_te_imputed = pd.concat((X_te_imputed, X_te_transformed), axis=1)
-                for col in new_columns:
-                    X_te_imputed[col] = pd.to_numeric(X_te_imputed[col], downcast="integer")
-    
-            # Predict the missing values in self.col
-            X_te[self.col] = self.regressor.predict(X_te_imputed)
-    
-            # Impute the predicted values back into the original X_train
-            X_train.loc[X_te.index, self.col] = X_te[self.col]
+            if len(X_te) > 0:  # it is possible that all missing values are in test
+                X_te_imputed = X_te.drop(columns=[self.col])
+                if len(num_cols) > 0:
+                    X_te_imputed[num_cols] = imputer_num.transform(X_te_imputed[num_cols])
+                if len(cat_cols) > 0:                
+                    X_te_imputed[cat_cols] = imputer_cat.transform(X_te_imputed[cat_cols])
+                    
+                    # One-hot encode categoric variables
+                    X_transformed = transformer.transform(X_te_imputed[cat_cols])
+                    if hasattr(X_transformed, "toarray"):
+                        X_transformed = X_transformed.toarray()
+                    X_te_imputed = X_te_imputed.drop(columns=cat_cols)
+                    X_te_transformed = pd.DataFrame(X_transformed, columns=new_columns, index=X_te_imputed.index)
+                    X_te_imputed = pd.concat((X_te_imputed, X_te_transformed), axis=1)
+                    for col in new_columns:
+                        X_te_imputed[col] = pd.to_numeric(X_te_imputed[col], downcast="integer")
+        
+                # Predict the missing values in self.col
+                X_te[self.col] = self.regressor.predict(X_te_imputed)
+        
+                # Impute the predicted values back into the original X_train
+                X_train.loc[X_te.index, self.col] = X_te[self.col]
+            else:
+                print(f"No missing values in train for column {{self.col}}")
 
             # Repeat for X_test
             X_te = X_test[X_test[self.col].isnull()]
-            X_te_imputed = X_te.drop(columns=[self.col])
-            if len(num_cols) > 0:
-                X_te_imputed[num_cols] = imputer_num.transform(X_te_imputed[num_cols])
-            if len(cat_cols) > 0:                
-                X_te_imputed[cat_cols] = imputer_cat.transform(X_te_imputed[cat_cols])
-                X_transformed = transformer.transform(X_te_imputed[cat_cols])
-                if hasattr(X_transformed, "toarray"):
-                    X_transformed = X_transformed.toarray()
-                X_te_imputed = X_te_imputed.drop(columns=cat_cols)
-                X_te_transformed = pd.DataFrame(X_transformed, columns=new_columns, index=X_te_imputed.index)
-                X_te_imputed = pd.concat((X_te_imputed, X_te_transformed), axis=1)
-                for col in new_columns:
-                    X_te_imputed[col] = pd.to_numeric(X_te_imputed[col], downcast="integer")
-            X_te[self.col] = self.regressor.predict(X_te_imputed)
-            X_test.loc[X_te.index, self.col] = X_te[self.col]
-            
+            if len(X_te) > 0:  # it is possible that all missing values are in train
+                X_te_imputed = X_te.drop(columns=[self.col])
+                if len(num_cols) > 0:
+                    X_te_imputed[num_cols] = imputer_num.transform(X_te_imputed[num_cols])
+                if len(cat_cols) > 0:                
+                    X_te_imputed[cat_cols] = imputer_cat.transform(X_te_imputed[cat_cols])
+                    X_transformed = transformer.transform(X_te_imputed[cat_cols])
+                    if hasattr(X_transformed, "toarray"):
+                        X_transformed = X_transformed.toarray()
+                    X_te_imputed = X_te_imputed.drop(columns=cat_cols)
+                    X_te_transformed = pd.DataFrame(X_transformed, columns=new_columns, index=X_te_imputed.index)
+                    X_te_imputed = pd.concat((X_te_imputed, X_te_transformed), axis=1)
+                    for col in new_columns:
+                        X_te_imputed[col] = pd.to_numeric(X_te_imputed[col], downcast="integer")
+                X_te[self.col] = self.regressor.predict(X_te_imputed)
+                X_test.loc[X_te.index, self.col] = X_te[self.col]
+            else:
+                print(f"No missing values in test for column {{self.col}}")
+
         return X_train, y_train, X_test, metadata
