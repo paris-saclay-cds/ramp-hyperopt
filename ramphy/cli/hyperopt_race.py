@@ -1,5 +1,6 @@
 import ramphy.ramp_setup as rs
 import click
+import click_config_file
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -57,30 +58,24 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Do not run the growing fold submission at the end.",
 )
 @click.option(
-    "--additional_preprocessors",
-    multiple=True,
-    default=["drop_id", "drop_columns", "cat_target_encoding"],
-    help="A list of data_preprocessors to use other than the base col encoding and inputing.",
-)
-@click.option(
-    "--columnwise_first",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="If given adds columnwise preprocessors first. Otherwise adds them after other preprocessors",
-)
-@click.option(
-    "--preprocessors_to_hyper",
-    multiple=True,
-    default=None,
-    help="A list of preprocessors to hyperopt.",
-)
-@click.option(
     "--base_predictors",
     multiple=True,
     default=["lgbm", "xgboost", "catboost"],
     help="A list of base predictors.",
 )
+@click.option(
+    "--data_preprocessors",
+    multiple=True,
+    default=["drop_id", "drop_columns", "base_columnwise"],
+    help="A list of data_preprocessors to use. base_columnwise are the base col encoding and inputing",
+)
+@click.option(
+    "--preprocessors_to_hyperopt",
+    multiple=True,
+    default=None,
+    help="A list of preprocessors to hyperopt.",
+)
+@click_config_file.configuration_option()
 def main(
     ramp_kit,
     kit_root,
@@ -91,13 +86,12 @@ def main(
     n_trials_per_round,
     patience,
     no_growing_folds,
-    additional_preprocessors,
-    columnwise_first,
-    preprocessors_to_hyper,
     base_predictors,
+    data_preprocessors,
+    preprocessors_to_hyperopt,
 ):
     rs.orchestration.hyperopt_race(
-        additional_preprocessors=list(additional_preprocessors),
+        data_preprocessors=list(data_preprocessors),
         ramp_kit=ramp_kit,
         kit_root=kit_root,
         version=version,
@@ -107,9 +101,8 @@ def main(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         no_growing_folds=no_growing_folds,
-        preprocessors_to_hyper=list(preprocessors_to_hyper),
+        preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),
-        columnwise_first=columnwise_first,
     )
 
 

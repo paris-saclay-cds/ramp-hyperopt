@@ -1,11 +1,9 @@
-import datetime
 import glob
 import json
 import random
 import shutil
 from pathlib import Path
-from typing import Optional
-
+from typing import Optional, List
 import numpy as np
 import pandas as pd
 import ramphy as rh
@@ -109,6 +107,7 @@ def run_race(
         #    input("Press Enter to continue...")
         n_trials = n_trials_per_round * n_folds_hyperopt
         wes_to_hyperopt = random.sample(base_we_names, 1)
+        print(f"Workflow elements to choose from: {base_we_names}")
         print(f"Choosen workflow element: {wes_to_hyperopt[0]}")
         submission_to_hyperopt = predictor  # default: hyperopt one of the base submissions
         blended_submissions_of_predictor = [
@@ -467,13 +466,12 @@ def hyperopt_race(
     n_folds_hyperopt: int = 3,
     n_folds: int = 31,
     base_predictors: list[str] = ["lgbm", "xgboost", "catboost"],
+    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    preprocessors_to_hyperopt: Optional[list[str]] = None,
     top_n_for_mean: int = 10,
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
     no_growing_folds: bool = True,
-    preprocessors_to_hyper: Optional[list[str]] = None,
-    additional_preprocessors: Optional[list[str]] = None,
-    columnwise_first: bool = False,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -494,21 +492,17 @@ def hyperopt_race(
             contributivity_floor=contributivity_floor,
             n_folds_hyperopt=n_folds_hyperopt,
         )
+        config = rs.utils.load_config(load_path=ramp_kit_dir)
+        dp_hyperopt_full_name = config["preprocessors_to_hyperopt"]
+        print(dp_hyperopt_full_name)
     else:
         start_round = 0
         blended_submissions = set()
         scores = []
-        data_preprocessors = []
-        if additional_preprocessors is not None:
-            data_preprocessors = additional_preprocessors
         # submit base submissions
         for submission in base_predictors:
             if "regression" in metadata["prediction_type"]:
-                if columnwise_first:
-                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_first_submit
-                else:
-                    submitter_function = rs.scripts.tabular.tabular_regression_columnwise_last_submit
-                submitter_function(
+                submitted_elements = rs.scripts.tabular.tabular_regression_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
@@ -517,11 +511,7 @@ def hyperopt_race(
                 )
 
             elif "classification" in metadata["prediction_type"]:
-                if columnwise_first:
-                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_first_submit
-                else:
-                    submitter_function = rs.scripts.tabular.tabular_classification_columnwise_last_submit
-                submitter_function(
+                submitted_elements = rs.scripts.tabular.tabular_classification_ordered_submit(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
@@ -530,6 +520,34 @@ def hyperopt_race(
                 )
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
+
+        dp_hyperopt_full_name = []
+        if preprocessors_to_hyperopt is not None:
+            for dp in preprocessors_to_hyperopt:
+                dp_hyperopt_full_name += rs.utils.get_full_preprocessor_name(
+                    data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
+                )
+
+        rs.utils.save_config(
+            ramp_kit=ramp_kit,
+            kit_root=kit_root,
+            version=version,
+            number=number,
+            resume=resume,
+            n_rounds=n_rounds,
+            n_trials_per_round=n_trials_per_round,
+            patience=patience,
+            n_folds_hyperopt=n_folds_hyperopt,
+            n_folds=n_folds,
+            base_predictors=base_predictors,
+            data_preprocessors=data_preprocessors,
+            preprocessors_to_hyperopt=dp_hyperopt_full_name,
+            top_n_for_mean=top_n_for_mean,
+            n_sigma=n_sigma,
+            contributivity_floor=contributivity_floor,
+            no_growing_folds=no_growing_folds,
+            save_path=ramp_kit_dir,
+        )
 
     blended_submissions = run_race(
         base_predictors=base_predictors,
@@ -546,7 +564,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyper=preprocessors_to_hyper,
+        preprocessors_to_hyper=dp_hyperopt_full_name,
     )
 
     # Run the growing folds algorithm: select best of each base submission within

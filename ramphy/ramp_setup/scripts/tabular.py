@@ -2,7 +2,7 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -227,7 +227,7 @@ def tabular_data_preprocessor_submit(
     column_types: Optional[list[str]] = None,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> str:
     """Submit data preprocessor.
 
     Args:
@@ -238,6 +238,8 @@ def tabular_data_preprocessor_submit(
         column_types (list[str], optional): which column types to include, defaults to None (all).
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Return
+        The name of the submitted preprocessor
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -263,11 +265,14 @@ def tabular_data_preprocessor_submit(
             f_out.write(dp_code)
         # Add a selection hyper per column
         if hyper_type == "select_column":
+            id_name = metadata["id_col"]
             hs = [
                 rh.Hyperparameter(dtype="bool", default=False, values=[False, True], name=f"{col}_{hyper_suffix}")
-                for col in cols if not col == 'id'  
+                for col in cols
+                if not col == id_name
             ]
             rh.write_hyperparameters_per_element(submission_path, submission_path, hs, wen)
+    return wen
 
 
 @ramp_action
@@ -276,7 +281,7 @@ def tabular_data_preprocessors_submit(
     data_preprocessors: list[str] = ["drop_id"],
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit data preprocessor.
 
     Args:
@@ -284,6 +289,8 @@ def tabular_data_preprocessors_submit(
         data_preprocessors (list[str], optional): List of data preprocessors to submit. Defaults to ['drop_id'].
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -291,13 +298,17 @@ def tabular_data_preprocessors_submit(
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
+    dp_names = []
     for dp in data_preprocessors:
         dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / f"{dp}.py"
         dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
         dp_code = dp_code.format_map(metadata)
-        with open(ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{dp}.py", "w") as f_out:
+        dp_name = f"data_preprocessor_{dp_idx}_{dp}"
+        dp_names.append(dp_name)
+        with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
             f_out.write(dp_code)
         dp_idx += 1
+    return dp_names
 
 
 @ramp_action
@@ -305,13 +316,15 @@ def tabular_cat_col_imputers_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit column imputer, a preprocessor that makes sure that no NaN are present in the categorical columns.
 
     Args:
         submission (str | Path): New submission name
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -321,14 +334,16 @@ def tabular_cat_col_imputers_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "cat_col_imputing.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat" and metadata["data_description"]["missing_data_count"][col] > 0:
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            with open(
-                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_imputing.py", "w"
-            ) as f_out:
+            dp_name = f"data_preprocessor_{dp_idx}{col}_cat_col_imputing"
+            dp_names.append(dp_name)
+            with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+    return dp_names
 
 
 @ramp_action
@@ -336,13 +351,15 @@ def tabular_num_col_imputers_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit column imputer, a preprocessor that makes sure that no NaN are present in the numerical columns.
 
     Args:
         submission (str | Path): New submission name
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -352,14 +369,16 @@ def tabular_num_col_imputers_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "num_col_imputing.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "num" and metadata["data_description"]["missing_data_count"][col] > 0:
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            with open(
-                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_num_col_imputing.py", "w"
-            ) as f_out:
+            dp_name = f"data_preprocessor_{dp_idx}{col}_num_col_imputing"
+            dp_names.append(dp_name)
+            with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+    return dp_names
 
 
 @ramp_action
@@ -367,13 +386,15 @@ def tabular_cat_col_encoders_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit categorical column encoders.
 
     Args:
         submission (str | Path): New submission name
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -383,14 +404,16 @@ def tabular_cat_col_encoders_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "cat_col_encoding.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "cat":
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            with open(
-                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_cat_col_encoding.py", "w"
-            ) as f_out:
+            dp_name = f"data_preprocessor_{dp_idx}{col}_cat_col_encoding"
+            dp_names.append(dp_name)
+            with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+    return dp_names
 
 
 @ramp_action
@@ -398,13 +421,15 @@ def tabular_text_col_encoders_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit text column encoders.
 
     Args:
         submission (str | Path): New submission name
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -414,14 +439,16 @@ def tabular_text_col_encoders_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "text_col_encoding.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "text":
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            with open(
-                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}{col}_text_col_encoding.py", "w"
-            ) as f_out:
+            dp_name = f"data_preprocessor_{dp_idx}{col}_text_col_encoding"
+            dp_names.append(dp_name)
+            with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+    return dp_names
 
 
 @ramp_action
@@ -429,13 +456,15 @@ def tabular_date_col_encoder_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit datetime column encoders.
 
     Args:
         submission (str | Path): New submission name
         ramp_kit_dir (str | Path, optional): Path of the ramp kit. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of the data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dp
     """
 
     ramp_kit_dir, ramp_data_dir = ra.convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -445,15 +474,19 @@ def tabular_date_col_encoder_submit(
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "date_col_encoding.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
+    dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "date":
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
+            dp_name = f"data_preprocessor_{dp_idx}{col}_date_col_encoding"
+            dp_names.append(dp_name)
             with open(
-                ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{col}_date_col_encoding.py",
+                ramp_kit_dir / "submissions" / submission / f"{dp_name}.py",
                 "w",
             ) as f_out:
                 f_out.write(dp_code_formatted)
             dp_idx += 1
+    return dp_names
 
 
 def tabular_encoder_imputer_submit(
@@ -466,7 +499,7 @@ def tabular_encoder_imputer_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit column encoders and imputers.
 
     Args:
@@ -479,37 +512,126 @@ def tabular_encoder_imputer_submit(
         text_col_encode (bool, optional): If True appends a text_col_encode to the list of preprocessors. Defaults to True.
         ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
         ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
+    Returns:
+        List of the names of the submitted dps
     """
+    dp_names = []
     if text_col_encode:
-        tabular_text_col_encoders_submit(
+        dp_names += tabular_text_col_encoders_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if date_col_encode:
-        tabular_date_col_encoder_submit(
+        dp_names += tabular_date_col_encoder_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if cat_col_impute:
-        tabular_cat_col_imputers_submit(
+        dp_names += tabular_cat_col_imputers_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if num_col_impute:
-        tabular_num_col_imputers_submit(
+        dp_names += tabular_num_col_imputers_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
     if cat_col_encode:
-        tabular_cat_col_encoders_submit(
+        dp_names += tabular_cat_col_encoders_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
         )
+    return dp_names
+
+
+@ramp_action
+def tabular_regression_ordered_submit(
+    submission: str | Path,
+    regressor: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    cat_col_impute: bool = True,
+    num_col_impute: bool = True,
+    cat_col_encode: bool = True,
+    num_col_encode: bool = True,
+    date_col_encode: bool = True,
+    text_col_encode: bool = True,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+) -> Dict[str, list]:
+    """Make new submission with ordered preprocessors.
+    The cat_col encoders and imputers are put in the place where base_columnwise is in the list
+
+    Args:
+        submission (str | Path): Submission name
+        regressor (str, optional): Regressor. Defaults to 'xgboost'.
+        feature_extractor (str, optional): FE. Defaults to 'empty'.
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
+        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
+        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
+        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
+        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
+        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
+        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
+    """
+    print(submission)
+    tabular_regression_submit(
+        submission=submission,
+        regressor=regressor,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    dp_names = []
+    for dp in data_preprocessors:
+        if dp == "drop_columns":
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor="drop_columns",
+                hyper_type="select_column",
+                hyper_suffix="to_drop",
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+        elif dp == "cat_target_encoding":
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor="cat_target_encoding",
+                hyper_type="select_column",
+                hyper_suffix="to_target_encode",
+                column_types=["cat", "num"],
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+        elif dp == "base_columnwise":
+            dp_names += tabular_encoder_imputer_submit(
+                submission=submission,
+                cat_col_impute=cat_col_impute,
+                num_col_impute=num_col_impute,
+                cat_col_encode=cat_col_encode,
+                num_col_encode=num_col_encode,
+                date_col_encode=date_col_encode,
+                text_col_encode=text_col_encode,
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+        else:
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor=dp,
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
 
 @ramp_action
@@ -549,9 +671,10 @@ def tabular_regression_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    dp_names = []
     for dp in data_preprocessors:
         if dp == "drop_columns":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="drop_columns",
                 hyper_type="select_column",
@@ -559,8 +682,9 @@ def tabular_regression_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         elif dp == "cat_target_encoding":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="cat_target_encoding",
                 hyper_type="select_column",
@@ -569,14 +693,16 @@ def tabular_regression_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         else:
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-    tabular_encoder_imputer_submit(
+            dp_names.append(dp_name)
+    dp_names += tabular_encoder_imputer_submit(
         submission=submission,
         cat_col_impute=cat_col_impute,
         num_col_impute=num_col_impute,
@@ -587,7 +713,8 @@ def tabular_regression_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    return {"created_submissions": [submission]}
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
 
 @ramp_action
@@ -626,7 +753,7 @@ def tabular_regression_columnwise_first_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    tabular_encoder_imputer_submit(
+    dp_names = tabular_encoder_imputer_submit(
         submission=submission,
         cat_col_impute=cat_col_impute,
         num_col_impute=num_col_impute,
@@ -639,7 +766,7 @@ def tabular_regression_columnwise_first_submit(
     )
     for dp in data_preprocessors:
         if dp == "drop_columns":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="drop_columns",
                 hyper_type="select_column",
@@ -647,8 +774,9 @@ def tabular_regression_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         elif dp == "cat_target_encoding":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="cat_target_encoding",
                 hyper_type="select_column",
@@ -657,14 +785,102 @@ def tabular_regression_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         else:
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-    return {"created_submissions": [submission]}
+            dp_names.append(dp_name)
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
+
+
+@ramp_action
+def tabular_classification_ordered_submit(
+    submission: str | Path,
+    classifier: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    cat_col_impute: bool = True,
+    num_col_impute: bool = True,
+    cat_col_encode: bool = True,
+    num_col_encode: bool = True,
+    date_col_encode: bool = True,
+    text_col_encode: bool = True,
+    ramp_kit_dir: str | Path = ".",
+    ramp_data_dir: Optional[str | Path] = None,
+) -> Dict[str, list]:
+    """Make new submission with ordered preprocessors.
+    The cat_col encoders and imputers are put in the place where base_columnwise is in the list
+
+    Args:
+        submission (str | Path): Submission name
+        classifier (str, optional): Classifier. Defaults to 'xgboost'.
+        feature_extractor (str, optional): FE. Defaults to 'empty'.
+        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
+        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
+        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
+        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
+        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
+        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
+        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
+        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
+    """
+    print(submission)
+    tabular_classification_submit(
+        submission=submission,
+        classifier=classifier,
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
+    )
+    dp_names = []
+    for dp in data_preprocessors:
+        if dp == "drop_columns":
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor="drop_columns",
+                hyper_type="select_column",
+                hyper_suffix="to_drop",
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+        elif dp == "cat_target_encoding":
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor="cat_target_encoding",
+                hyper_type="select_column",
+                hyper_suffix="to_target_encode",
+                column_types=["cat", "num"],
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+        elif dp == "base_columnwise":
+            dp_names += tabular_encoder_imputer_submit(
+                submission=submission,
+                cat_col_impute=cat_col_impute,
+                num_col_impute=num_col_impute,
+                cat_col_encode=cat_col_encode,
+                num_col_encode=num_col_encode,
+                date_col_encode=date_col_encode,
+                text_col_encode=text_col_encode,
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+        else:
+            dp_name = tabular_data_preprocessor_submit(
+                submission=submission,
+                data_preprocessor=dp,
+                ramp_kit_dir=ramp_kit_dir,
+                ramp_data_dir=ramp_data_dir,
+            )
+            dp_names.append(dp_name)
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
 
 @ramp_action
@@ -704,9 +920,10 @@ def tabular_classification_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+    dp_names = []
     for dp in data_preprocessors:
         if dp == "drop_columns":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="drop_columns",
                 hyper_type="select_column",
@@ -714,8 +931,9 @@ def tabular_classification_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         elif dp == "cat_target_encoding":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="cat_target_encoding",
                 hyper_type="select_column",
@@ -724,15 +942,17 @@ def tabular_classification_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         else:
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
 
-    tabular_encoder_imputer_submit(
+    dp_names += tabular_encoder_imputer_submit(
         submission=submission,
         cat_col_impute=cat_col_impute,
         num_col_impute=num_col_impute,
@@ -743,7 +963,8 @@ def tabular_classification_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    return {"created_submissions": [submission]}
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
 
 @ramp_action
@@ -782,7 +1003,7 @@ def tabular_classification_columnwise_first_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
-    tabular_encoder_imputer_submit(
+    dp_names = tabular_encoder_imputer_submit(
         submission=submission,
         cat_col_impute=cat_col_impute,
         num_col_impute=num_col_impute,
@@ -795,7 +1016,7 @@ def tabular_classification_columnwise_first_submit(
     )
     for dp in data_preprocessors:
         if dp == "drop_columns":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="drop_columns",
                 hyper_type="select_column",
@@ -803,8 +1024,9 @@ def tabular_classification_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         elif dp == "cat_target_encoding":
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor="cat_target_encoding",
                 hyper_type="select_column",
@@ -813,11 +1035,14 @@ def tabular_classification_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+            dp_names.append(dp_name)
         else:
-            tabular_data_preprocessor_submit(
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-    return {"created_submissions": [submission]}
+            dp_names.append(dp_name)
+    print(f"Submitted preprocessors: {dp_names}")
+    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
