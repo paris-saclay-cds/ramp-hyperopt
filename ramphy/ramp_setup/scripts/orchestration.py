@@ -6,7 +6,7 @@ import shutil
 import configparser
 from pathlib import Path
 from typing import Optional, List
-
+import ast
 import numpy as np
 import pandas as pd
 import ramphy as rh
@@ -468,14 +468,29 @@ def submit_best_submissions(
         )
 
 
-def save_config(save_path: Path, **kwargs):
+def save_config(save_path: Path, config_name: str = "config.ini", **kwargs):
+    with open(save_path / config_name, "w") as configfile:
+        for key, value in kwargs.items():
+            configfile.write(f"{key} = {value}\n")
+
+    print(f"Config file saved at {save_path / config_name}")
+
+
+def load_config(load_path: Path, config_name: str = "config.ini") -> dict:
     config = configparser.ConfigParser()
-    config["DEFAULT"] = kwargs
-
-    with open(save_path / "config.ini", "w") as configfile:
-        config.write(configfile)
-
-    print(f'Config file saved at {save_path / "config.ini"}')
+    with open(load_path / config_name, "r") as configfile:
+        # Add a dummy section header
+        file_content = "[dummy_section]\n" + configfile.read()
+    config.read_string(file_content)
+    config_dict = {}
+    for key, value in config["dummy_section"].items():
+        try:
+            # Try to evaluate the value to handle lists, dicts, etc.
+            config_dict[key] = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            # If evaluation fails, keep the value as a string
+            config_dict[key] = value
+    return config_dict
 
 
 def get_full_preprocessor_name(data_preprocessor: str, submitted_preprocessors: List[str]):
@@ -524,27 +539,6 @@ def hyperopt_race(
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
 
-    save_config(
-        ramp_kit=ramp_kit,
-        kit_root=kit_root,
-        version=version,
-        number=number,
-        resume=resume,
-        n_rounds=n_rounds,
-        n_trials_per_round=n_trials_per_round,
-        patience=patience,
-        n_folds_hyperopt=n_folds_hyperopt,
-        n_folds=n_folds,
-        base_predictors=base_predictors,
-        data_preprocessors=data_preprocessors,
-        preprocessors_to_hyperopt=preprocessors_to_hyperopt,
-        top_n_for_mean=top_n_for_mean,
-        n_sigma=n_sigma,
-        contributivity_floor=contributivity_floor,
-        no_growing_folds=no_growing_folds,
-        save_path=ramp_kit_dir,
-    )
-
     problem = rw.utils.assert_read_problem(str(ramp_kit_dir))
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
@@ -555,6 +549,7 @@ def hyperopt_race(
     # Dictionary of submissions: list of dictionary of run times and scores
     action_stats = {submission: [] for submission in base_predictors}
     if resume:
+        # TODO find the full names
         start_round, blended_submissions, action_stats, scores = resume_race(
             action_stats=action_stats,
             ramp_kit_dir=str(ramp_kit_dir),
@@ -562,6 +557,9 @@ def hyperopt_race(
             contributivity_floor=contributivity_floor,
             n_folds_hyperopt=n_folds_hyperopt,
         )
+        config = load_config(load_path=ramp_kit_dir)
+        dp_hyperopt_full_name = config["preprocessors_to_hyperopt"]
+        print(dp_hyperopt_full_name)
     else:
         start_round = 0
         blended_submissions = set()
@@ -588,10 +586,31 @@ def hyperopt_race(
         kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
 
-    dp_full_name = []
-    for dp in preprocessors_to_hyperopt:
-        dp_full_name += get_full_preprocessor_name(
-            data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
+        dp_hyperopt_full_name = []
+        for dp in preprocessors_to_hyperopt:
+            dp_hyperopt_full_name += get_full_preprocessor_name(
+                data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
+            )
+
+        save_config(
+            ramp_kit=ramp_kit,
+            kit_root=kit_root,
+            version=version,
+            number=number,
+            resume=resume,
+            n_rounds=n_rounds,
+            n_trials_per_round=n_trials_per_round,
+            patience=patience,
+            n_folds_hyperopt=n_folds_hyperopt,
+            n_folds=n_folds,
+            base_predictors=base_predictors,
+            data_preprocessors=data_preprocessors,
+            preprocessors_to_hyperopt=dp_hyperopt_full_name,
+            top_n_for_mean=top_n_for_mean,
+            n_sigma=n_sigma,
+            contributivity_floor=contributivity_floor,
+            no_growing_folds=no_growing_folds,
+            save_path=ramp_kit_dir,
         )
 
     blended_submissions = run_race(
@@ -609,7 +628,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyperopt=dp_full_name,
+        preprocessors_to_hyperopt=dp_hyperopt_full_name,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
