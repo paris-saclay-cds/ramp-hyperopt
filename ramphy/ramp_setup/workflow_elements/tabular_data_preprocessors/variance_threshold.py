@@ -41,6 +41,7 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
         # Saves the features
         self.features_set = set(self.selector.get_feature_names_out())
         self.dropped_features = list(set(X.columns) - self.features_set)
+        print(f"Variance Preprocessor - Dropping: {{self.dropped_features}}")
 
     def transform(
         self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[dict]

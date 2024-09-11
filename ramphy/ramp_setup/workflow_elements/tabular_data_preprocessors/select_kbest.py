@@ -15,7 +15,7 @@ from sklearn.feature_selection import (
 )
 
 # RAMP START HYPERPARAMETERS
-removed_features = Hyperparameter(dtype="int", default=-1, values=[-1, -2, -3, -5, -10, -15, -20, -25])
+removed_features = Hyperparameter(dtype="int", default=-5, values=[-5, -10, -15, -25, -50, -70])
 score_function = Hyperparameter(dtype="int", default=2, values=[1, 2, 3])
 # RAMP END HYPERPARAMETERS
 
@@ -76,6 +76,7 @@ class DataPreprocessor(rs.TransformerBaseDataPreprocessor):
         # Saves the features
         self.features_set = set(self.selector.get_feature_names_out())
         self.dropped_features = list(set(X.columns) - self.features_set)
+        print(f"SelectKBest Preprocessor - Dropping: {{self.dropped_features}}")
 
     def transform(
         self, X: pd.DataFrame, y: Optional[np.ndarray], metadata: Optional[dict]

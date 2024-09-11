@@ -74,7 +74,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             if feature_types[feature] == "text":
                 text_columns.append(feature)
 
-        print(f"Found the following text columns: {{text_columns}}")
+        print(f"Tokenizer - Found the following text columns: {{text_columns}}")
         # We store the idx so we can concat by ignoring them
         train_len = X_train.shape[0]
         train_idx = X_train.index
@@ -85,7 +85,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         new_feature_names = {{}}  # Needed for metadata update
         all_new_features = []  # Needed for imputing
         for feature in text_columns:
-            print(f"Encoding {{feature}}")
+            print(f"Tokenizer - Encoding {{feature}}")
             encoded_columns = self.encode_column(column_name=feature, dataset=all_data)
             all_data = pd.concat([all_data, encoded_columns], axis=1)
             new_feature_names[feature] = list(encoded_columns.columns)
