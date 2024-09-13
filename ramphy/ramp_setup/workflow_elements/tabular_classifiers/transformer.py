@@ -13,15 +13,15 @@ from tqdm import tqdm
 
 # NOTE This is only for BINARY CLASSIFICATION
 
+# RAMP START HYPERPARAMETERS
 num_layers = Hyperparameter(dtype="int", default=1, values=[1, 2, 3, 5])
 num_heads = Hyperparameter(dtype="int", default=1, values=[1, 2, 5, 10])
 ff_size = Hyperparameter(dtype="int", default=128, values=[128, 256, 512, 1024, 2056])
 activation = Hyperparameter(dtype="str", default="gelu", values=["gelu", "relu"])
 num_epochs = Hyperparameter(dtype="int", default=100, values=[50, 100, 300])
-input_scaling = Hyperparameter(
-    dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
-)
+input_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile"])
 optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
+# RAMP START HYPERPARAMETERS
 
 INPUT_SCALING = str(input_scaling)
 NUM_LAYERS = int(num_layers)
@@ -58,11 +58,7 @@ class SAM(optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                e_w = (
-                    (torch.pow(p, 2) if group["adaptive"] else 1.0)
-                    * p.grad
-                    * scale.to(p)
-                )
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 self.state[p]["e_w"] = e_w
 
@@ -84,12 +80,8 @@ class SAM(optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        assert (
-            closure is not None
-        ), "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(
-            closure
-        )  # the closure should do a full forward-backward pass
+        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
+        closure = torch.enable_grad()(closure)  # the closure should do a full forward-backward pass
 
         self.first_step(zero_grad=True)
         closure()
@@ -102,9 +94,7 @@ class SAM(optim.Optimizer):
         norm = torch.norm(
             torch.stack(
                 [
-                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad)
-                    .norm(p=2)
-                    .to(shared_device)
+                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
                     for group in self.param_groups
                     for p in group["params"]
                     if p.grad is not None
@@ -138,9 +128,7 @@ class Transformer(nn.Module):
             norm_first=True,  # Apparently this is better
             activation=activation,
         )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer=transformer_layer, num_layers=num_layers
-        )
+        self.transformer = nn.TransformerEncoder(encoder_layer=transformer_layer, num_layers=num_layers)
         self.output_layer = nn.Linear(in_features=input_size, out_features=output_size)
         self.softmax_out = softmax_out
 
@@ -166,13 +154,9 @@ class Classifier(BaseEstimator):
         feat_size = X.shape[1]
         output_size = len(self.metadata["data_description"]["target_cols"])
         if output_size > 1:
-            raise NotImplementedError(
-                "Multi-output classification is not yet supported."
-            )
+            raise NotImplementedError("Multi-output classification is not yet supported.")
         self.criterion = nn.BCEWithLogitsLoss()
-        softmax_out = (
-            False  # No softmax as from here https://jaykmody.com/blog/gpt-from-scratch
-        )
+        softmax_out = False  # No softmax as from here https://jaykmody.com/blog/gpt-from-scratch
 
         writer = SummaryWriter(log_dir="./tensorboard")
 
@@ -184,9 +168,7 @@ class Classifier(BaseEstimator):
         elif INPUT_SCALING == "quantile":
             self.feature_scaler = QuantileTransformer()
         else:
-            ValueError(
-                f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented"
-            )
+            ValueError(f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented")
         X = self.feature_scaler.fit_transform(X)
 
         X = torch.Tensor(X).to(self.device)  # type: ignore
@@ -230,9 +212,7 @@ class Classifier(BaseEstimator):
                 batch_y = y[batch_idx : batch_idx + BATCH_SIZE]
                 # Forward
                 output = self.transformer(batch_X)
-                loss = self.criterion(
-                    input=output.to(torch.float), target=batch_y.to(torch.float)
-                )
+                loss = self.criterion(input=output.to(torch.float), target=batch_y.to(torch.float))
 
                 if OPTIMIZER == "adam":
                     optimizer.zero_grad()
@@ -242,9 +222,7 @@ class Classifier(BaseEstimator):
                     loss.backward()
                     optimizer.first_step(zero_grad=True)
                     output = self.transformer(batch_X)
-                    loss = self.criterion(
-                        input=output.to(torch.float), target=batch_y.to(torch.float)
-                    )
+                    loss = self.criterion(input=output.to(torch.float), target=batch_y.to(torch.float))
                     loss.backward()
                     optimizer.second_step(zero_grad=True)
 

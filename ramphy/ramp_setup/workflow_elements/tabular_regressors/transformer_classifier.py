@@ -12,33 +12,26 @@ from sklearn.preprocessing import QuantileTransformer
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
-num_layers = Hyperparameter(dtype="int", default=1, values=[1, 2, 3, 5])
-num_heads = Hyperparameter(dtype="int", default=1, values=[1, 2, 5, 10])
-ff_size = Hyperparameter(dtype="int", default=128, values=[128, 256, 512, 1024, 2056])
-activation = Hyperparameter(dtype="str", default="gelu", values=["gelu", "relu"])
-num_epochs = Hyperparameter(
-    dtype="int", default=100, values=[50, 100, 300]
-)  # Maybe not necessary
-input_scaling = Hyperparameter(
-    dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
-)
+# RAMP START HYPERPARAMETERS
+num_layers = Hyperparameter(dtype="int", default=2, values=[2, 3, 5])
+num_heads = Hyperparameter(dtype="int", default=5, values=[1, 2, 5, 10])
+ff_size = Hyperparameter(dtype="int", default=256, values=[128, 256, 512, 1024, 2056])
+input_scaling = Hyperparameter(dtype="str", default="quantile", values=["standard", "minmax", "quantile", "none"])
 target_bins = Hyperparameter(dtype="int", default=10, values=[5, 10, 20])
-binning_strategy = Hyperparameter(
-    dtype="str", default="quantile", values=["uniform", "quantile", "kmeans"]
-)
-unbinning_strategy = Hyperparameter(
-    dtype="str", default="sampling", values=["sampling", "mean"]
-)
-optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
+binning_strategy = Hyperparameter(dtype="str", default="quantile", values=["uniform", "quantile", "kmeans"])
+unbinning_strategy = Hyperparameter(dtype="str", default="sampling", values=["sampling", "mean"])
+optimizer = Hyperparameter(dtype="str", default="sam", values=["sam", "adam"])
+# RAMP END HYPERPARAMETERS
+
 
 INPUT_SCALING = str(input_scaling)
 NUM_LAYERS = int(num_layers)
 NUM_HEADS = int(num_heads)
 FF_SIZE = int(ff_size)
-ACTIVATION = str(activation)
-NUM_EPOCHS = int(num_epochs)
+ACTIVATION = "gelu"
+NUM_EPOCHS = 300
 LEARNING_RATE = 0.001
-BATCH_SIZE = 10
+BATCH_SIZE = 512
 TARGET_BINS = int(target_bins)
 BINNING_STRATEGY = str(binning_strategy)
 UNBINNING_STRATEGY = str(unbinning_strategy)
@@ -69,11 +62,7 @@ class SAM(optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                e_w = (
-                    (torch.pow(p, 2) if group["adaptive"] else 1.0)
-                    * p.grad
-                    * scale.to(p)
-                )
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 self.state[p]["e_w"] = e_w
 
@@ -95,12 +84,8 @@ class SAM(optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        assert (
-            closure is not None
-        ), "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(
-            closure
-        )  # the closure should do a full forward-backward pass
+        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
+        closure = torch.enable_grad()(closure)  # the closure should do a full forward-backward pass
 
         self.first_step(zero_grad=True)
         closure()
@@ -113,9 +98,7 @@ class SAM(optim.Optimizer):
         norm = torch.norm(
             torch.stack(
                 [
-                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad)
-                    .norm(p=2)
-                    .to(shared_device)
+                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
                     for group in self.param_groups
                     for p in group["params"]
                     if p.grad is not None
@@ -149,9 +132,7 @@ class Transformer(nn.Module):
             norm_first=True,  # Apparently this is better
             activation=activation,
         )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer=transformer_layer, num_layers=num_layers
-        )
+        self.transformer = nn.TransformerEncoder(encoder_layer=transformer_layer, num_layers=num_layers)
         self.output_layer = nn.Linear(in_features=input_size, out_features=output_size)
         self.softmax_out = softmax_out
 
@@ -184,9 +165,7 @@ class Regressor(BaseEstimator):
                 # This is probably also done by the inverse_transform of the sklearn binner
                 unbinned_y.append(lower_edge + upper_edge / 2.0)
             else:
-                raise ValueError(
-                    f"Debinning strategy {{UNBINNING_STRATEGY}} not implemented"
-                )
+                raise ValueError(f"Debinning strategy {{UNBINNING_STRATEGY}} not implemented")
         return np.array(unbinned_y)
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
@@ -198,16 +177,12 @@ class Regressor(BaseEstimator):
             self.device = "cpu"
         feat_size = X.shape[1]
         self.criterion = nn.CrossEntropyLoss()
-        softmax_out = (
-            False  # No softmax as from here https://jaykmody.com/blog/gpt-from-scratch
-        )
+        softmax_out = False  # No softmax as from here https://jaykmody.com/blog/gpt-from-scratch
         output_size = TARGET_BINS
         writer = SummaryWriter(log_dir="./tensorboard")
 
         # Bin the target
-        self.y_binner = KBinsDiscretizer(
-            n_bins=TARGET_BINS, encode="ordinal", strategy=BINNING_STRATEGY
-        )
+        self.y_binner = KBinsDiscretizer(n_bins=TARGET_BINS, encode="ordinal", strategy=BINNING_STRATEGY)
         y = y.reshape(-1, 1)  # Reshape y to be a 2D array
         y = self.y_binner.fit_transform(y).astype(int).flatten()
 
@@ -218,11 +193,12 @@ class Regressor(BaseEstimator):
             self.feature_scaler = MinMaxScaler()
         elif INPUT_SCALING == "quantile":
             self.feature_scaler = QuantileTransformer()
+        elif INPUT_SCALING == "none":
+            self.feature_scaler = None
         else:
-            ValueError(
-                f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented"
-            )
-        X = self.feature_scaler.fit_transform(X)
+            ValueError(f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented")
+        if self.feature_scaler is not None:
+            X = self.feature_scaler.fit_transform(X)
 
         X = torch.Tensor(X).to(self.device)  # type: ignore
         y = torch.Tensor(y).to(torch.int64).to(self.device)  # type: ignore
@@ -265,9 +241,7 @@ class Regressor(BaseEstimator):
                 batch_y = y[batch_idx : batch_idx + BATCH_SIZE]
                 # Forward
                 output = self.transformer(batch_X)
-                loss = self.criterion(
-                    input=output.to(torch.float), target=batch_y.to(torch.float)
-                )
+                loss = self.criterion(input=output.to(torch.float), target=batch_y.to(torch.float))
 
                 if OPTIMIZER == "adam":
                     optimizer.zero_grad()
@@ -277,9 +251,7 @@ class Regressor(BaseEstimator):
                     loss.backward()
                     optimizer.first_step(zero_grad=True)
                     output = self.transformer(batch_X)
-                    loss = self.criterion(
-                        input=output.to(torch.float), target=batch_y.to(torch.float)
-                    )
+                    loss = self.criterion(input=output.to(torch.float), target=batch_y.to(torch.float))
                     loss.backward()
                     optimizer.second_step(zero_grad=True)
 
@@ -299,7 +271,8 @@ class Regressor(BaseEstimator):
         return y_pred
 
     def get_logits(self, X: np.ndarray) -> np.ndarray:
-        X = self.feature_scaler.transform(X)  # type: ignore
+        if self.feature_scaler is not None:
+            X = self.feature_scaler.transform(X)  # type: ignore
         with torch.no_grad():
             X = torch.Tensor(X).to(self.device)  # type: ignore
             y_pred = self.transformer(X).detach().cpu().numpy()

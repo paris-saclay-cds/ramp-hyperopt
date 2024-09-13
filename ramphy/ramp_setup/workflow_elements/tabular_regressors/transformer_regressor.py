@@ -11,26 +11,25 @@ from sklearn.preprocessing import QuantileTransformer
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm import tqdm
 
-num_layers = Hyperparameter(dtype="int", default=1, values=[1, 2, 3, 5])
-num_heads = Hyperparameter(dtype="int", default=1, values=[1, 2, 5, 10])
-ff_size = Hyperparameter(dtype="int", default=128, values=[128, 256, 512, 1024, 2056])
-activation = Hyperparameter(dtype="str", default="gelu", values=["gelu", "relu"])
-num_epochs = Hyperparameter(
-    dtype="int", default=100, values=[50, 100, 300]
-)  # Maybe not necessary
-input_scaling = Hyperparameter(
-    dtype="str", default="minmax", values=["standard", "minmax", "quantile"]
-)
-optimizer = Hyperparameter(dtype="str", default="adam", values=["sam", "adam"])
+# RAMP START HYPERPARAMETERS
+num_layers = Hyperparameter(dtype="int", default=2, values=[2, 3, 5])
+num_heads = Hyperparameter(dtype="int", default=5, values=[1, 2, 5, 10])
+ff_size = Hyperparameter(dtype="int", default=256, values=[256, 512, 1024, 2056])
+input_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
+output_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
+optimizer = Hyperparameter(dtype="str", default="sam", values=["sam", "adam"])
+# RAMP START HYPERPARAMETERS
+
 
 INPUT_SCALING = str(input_scaling)
+OUTPUT_SCALING = str(output_scaling)
 NUM_LAYERS = int(num_layers)
 NUM_HEADS = int(num_heads)
 FF_SIZE = int(ff_size)
-ACTIVATION = str(activation)
-NUM_EPOCHS = int(num_epochs)
+ACTIVATION = "gelu"
+NUM_EPOCHS = 300
 LEARNING_RATE = 0.001
-BATCH_SIZE = 10
+BATCH_SIZE = 2056 * 2
 OPTIMIZER = str(optimizer)
 
 
@@ -58,11 +57,7 @@ class SAM(optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                e_w = (
-                    (torch.pow(p, 2) if group["adaptive"] else 1.0)
-                    * p.grad
-                    * scale.to(p)
-                )
+                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 self.state[p]["e_w"] = e_w
 
@@ -84,12 +79,8 @@ class SAM(optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        assert (
-            closure is not None
-        ), "Sharpness Aware Minimization requires closure, but it was not provided"
-        closure = torch.enable_grad()(
-            closure
-        )  # the closure should do a full forward-backward pass
+        assert closure is not None, "Sharpness Aware Minimization requires closure, but it was not provided"
+        closure = torch.enable_grad()(closure)  # the closure should do a full forward-backward pass
 
         self.first_step(zero_grad=True)
         closure()
@@ -102,9 +93,7 @@ class SAM(optim.Optimizer):
         norm = torch.norm(
             torch.stack(
                 [
-                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad)
-                    .norm(p=2)
-                    .to(shared_device)
+                    ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
                     for group in self.param_groups
                     for p in group["params"]
                     if p.grad is not None
@@ -138,9 +127,7 @@ class Transformer(nn.Module):
             norm_first=True,  # Apparently this is better
             activation=activation,
         )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer=transformer_layer, num_layers=num_layers
-        )
+        self.transformer = nn.TransformerEncoder(encoder_layer=transformer_layer, num_layers=num_layers)
         self.output_layer = nn.Linear(in_features=input_size, out_features=output_size)
         self.softmax_out = softmax_out
 
@@ -176,11 +163,26 @@ class Regressor(BaseEstimator):
             self.feature_scaler = MinMaxScaler()
         elif INPUT_SCALING == "quantile":
             self.feature_scaler = QuantileTransformer()
+        elif INPUT_SCALING == "none":
+            self.feature_scaler = None
         else:
-            ValueError(
-                f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented"
-            )
-        X = self.feature_scaler.fit_transform(X)
+            ValueError(f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented")
+        if self.feature_scaler is not None:
+            X = self.feature_scaler.fit_transform(X)
+
+        # Scale the targets
+        if OUTPUT_SCALING == "standard":
+            self.target_scaler = StandardScaler()
+        elif OUTPUT_SCALING == "minmax":
+            self.target_scaler = MinMaxScaler()
+        elif OUTPUT_SCALING == "quantile":
+            self.target_scaler = QuantileTransformer()
+        elif OUTPUT_SCALING == "none":
+            self.target_scaler = None
+        else:
+            ValueError(f"Only minmax or standard scaling for target. {{OUTPUT_SCALING}} is not implemented")
+        if self.target_scaler is not None:
+            y = self.target_scaler.fit_transform(y)
 
         X = torch.Tensor(X).to(self.device)  # type: ignore
         y = torch.Tensor(y).to(self.device)  # type: ignore
@@ -250,8 +252,13 @@ class Regressor(BaseEstimator):
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         self.transformer.eval()
-        X = self.feature_scaler.transform(X)  # type: ignore
+        if self.feature_scaler is not None:
+            X = self.feature_scaler.transform(X)  # type: ignore
         with torch.no_grad():
             X = torch.Tensor(X).to(self.device)  # type: ignore
             y_pred = self.transformer(X).detach().cpu().numpy()
+
+        if self.target_scaler is not None:
+            y_pred = self.target_scaler.inverse_transform(y_pred)  # type: ignore
+
         return y_pred
