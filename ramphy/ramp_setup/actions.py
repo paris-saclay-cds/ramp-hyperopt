@@ -160,9 +160,6 @@ def download_file(download_url: str, destination: Path, config_values: dict):
         from selenium.webdriver import FirefoxOptions
         options = FirefoxOptions()
         options.add_argument("--headless")
-        options.set_preference("browser.download.folderList", 2)
-        options.set_preference("browser.download.manager.showWhenStarting", False)
-        options.set_preference("browser.download.dir", destination)
 
         service = Service(executable_path='/usr/bin/geckodriver')
         driver = webdriver.Firefox(
