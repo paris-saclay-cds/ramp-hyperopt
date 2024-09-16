@@ -18,7 +18,7 @@ ff_size = Hyperparameter(dtype="int", default=256, values=[256, 512, 1024, 2056]
 input_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
 output_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
 optimizer = Hyperparameter(dtype="str", default="sam", values=["sam", "adam"])
-# RAMP START HYPERPARAMETERS
+# RAMP END HYPERPARAMETERS
 
 
 INPUT_SCALING = str(input_scaling)
@@ -27,7 +27,7 @@ NUM_LAYERS = int(num_layers)
 NUM_HEADS = int(num_heads)
 FF_SIZE = int(ff_size)
 ACTIVATION = "gelu"
-NUM_EPOCHS = 300
+NUM_EPOCHS = 100
 LEARNING_RATE = 0.001
 BATCH_SIZE = 2056 * 2
 OPTIMIZER = str(optimizer)
@@ -119,14 +119,25 @@ class Transformer(nn.Module):
         if activation not in ["relu", "gelu"]:
             raise ValueError("Only use Relu or Gelu")
 
-        transformer_layer = nn.TransformerEncoderLayer(
-            d_model=input_size,
-            nhead=num_heads,
-            dim_feedforward=ff_size,
-            batch_first=True,
-            norm_first=True,  # Apparently this is better
-            activation=activation,
-        )
+        try:
+            transformer_layer = nn.TransformerEncoderLayer(
+                d_model=input_size,
+                nhead=num_heads,
+                dim_feedforward=ff_size,
+                batch_first=True,
+                norm_first=True,  # Apparently this is better
+                activation=activation,
+            )
+        except AssertionError as e:
+            print("Num head does not match. Resorting to attention heads == 1")
+            transformer_layer = nn.TransformerEncoderLayer(
+                d_model=input_size,
+                nhead=1,
+                dim_feedforward=ff_size,
+                batch_first=True,
+                norm_first=True,  # Apparently this is better
+                activation=activation,
+            )
         self.transformer = nn.TransformerEncoder(encoder_layer=transformer_layer, num_layers=num_layers)
         self.output_layer = nn.Linear(in_features=input_size, out_features=output_size)
         self.softmax_out = softmax_out
@@ -169,6 +180,8 @@ class Regressor(BaseEstimator):
             ValueError(f"Only minmax or standard scaling for features. {{INPUT_SCALING}} is not implemented")
         if self.feature_scaler is not None:
             X = self.feature_scaler.fit_transform(X)
+        else:
+            X = X.values
 
         # Scale the targets
         if OUTPUT_SCALING == "standard":
@@ -189,7 +202,7 @@ class Regressor(BaseEstimator):
 
         writer = SummaryWriter(log_dir="./tensorboard")
 
-        self.transformer = Transformer(
+        transformer = Transformer(
             num_layers=NUM_LAYERS,
             input_size=feat_size,
             num_heads=NUM_HEADS,
@@ -198,6 +211,7 @@ class Regressor(BaseEstimator):
             output_size=output_size,
             softmax_out=softmax_out,
         ).to(self.device)
+        self.transformer = torch.compile(transformer)
         self.transformer.train()
 
         if OPTIMIZER == "adam":
@@ -254,6 +268,8 @@ class Regressor(BaseEstimator):
         self.transformer.eval()
         if self.feature_scaler is not None:
             X = self.feature_scaler.transform(X)  # type: ignore
+        else:
+            X = X.values
         with torch.no_grad():
             X = torch.Tensor(X).to(self.device)  # type: ignore
             y_pred = self.transformer(X).detach().cpu().numpy()

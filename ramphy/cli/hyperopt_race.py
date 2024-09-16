@@ -73,7 +73,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     "--preprocessors_to_hyperopt",
     multiple=True,
     default=None,
-    help="A list of preprocessors to hyperopt.",
+    help="A list of preprocessors to hyperopt. When multiple instances of a data_preprocessor are given through the data_preprocessors option, if you specify the full name, it will only hyperopt that one, otherwise it will hyperopt all the instances of the data_preprocessor.",
 )
 @click_config_file.configuration_option()
 def main(
