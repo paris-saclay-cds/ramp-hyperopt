@@ -689,7 +689,8 @@ def tabular_regression_columnwise_last_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only"],
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
+                                     "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -743,9 +744,8 @@ def tabular_regression_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-            dp_names.append(dp_name)
-        else:
-            dp_name = tabular_data_preprocessor_submit(
+        elif dp != 'rm_constant_col':
+            tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -763,6 +763,17 @@ def tabular_regression_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if 'rm_constant_col' in data_preprocessors:
+        tabular_data_preprocessor_submit(
+                    submission=submission,
+                    data_preprocessor=dp,
+                    ramp_kit_dir=ramp_kit_dir,
+                    ramp_data_dir=ramp_data_dir,
+        )
+
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
@@ -772,7 +783,8 @@ def tabular_regression_columnwise_first_submit(
     submission: str | Path,
     regressor: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only"],
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
+                                     "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -921,14 +933,25 @@ def tabular_classification_ordered_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        else:
-            dp_name = tabular_data_preprocessor_submit(
+        elif dp != 'rm_constant_col':
+            tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
             dp_names.append(dp_name)
+
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if 'rm_constant_col' in data_preprocessors:
+        tabular_data_preprocessor_submit(
+                    submission=submission,
+                    data_preprocessor=dp,
+                    ramp_kit_dir=ramp_kit_dir,
+                    ramp_data_dir=ramp_data_dir,
+        )
+
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
@@ -938,7 +961,8 @@ def tabular_classification_columnwise_last_submit(
     submission: str | Path,
     classifier: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only"],
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
+                                     "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -992,9 +1016,8 @@ def tabular_classification_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-            dp_names.append(dp_name)
-        else:
-            dp_name = tabular_data_preprocessor_submit(
+        elif dp != 'rm_constant_col':
+            tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -1013,6 +1036,17 @@ def tabular_classification_columnwise_last_submit(
         ramp_kit_dir=ramp_kit_dir,
         ramp_data_dir=ramp_data_dir,
     )
+
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if 'rm_constant_col' in data_preprocessors:
+        tabular_data_preprocessor_submit(
+                    submission=submission,
+                    data_preprocessor=dp,
+                    ramp_kit_dir=ramp_kit_dir,
+                    ramp_data_dir=ramp_data_dir,
+        )
+
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
@@ -1022,7 +1056,8 @@ def tabular_classification_columnwise_first_submit(
     submission: str | Path,
     classifier: str = 'xgboost',
     feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only"],
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
+                                     "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -1085,14 +1120,24 @@ def tabular_classification_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-            dp_names.append(dp_name)
-        else:
-            dp_name = tabular_data_preprocessor_submit(
+        elif dp != 'rm_constant_col':
+            tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
             dp_names.append(dp_name)
+
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if 'rm_constant_col' in data_preprocessors:
+        tabular_data_preprocessor_submit(
+                    submission=submission,
+                    data_preprocessor=dp,
+                    ramp_kit_dir=ramp_kit_dir,
+                    ramp_data_dir=ramp_data_dir,
+        )
+
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
