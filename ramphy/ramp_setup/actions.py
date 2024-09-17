@@ -134,55 +134,59 @@ def download_file(download_url: str, destination: Path, config_values: dict):
         destination (str): The local path to save the downloaded file.
         config_values (dict): Configuration for Kaggle, read from ~/.kaggle/kaggle.json
     """
-    driver = 'firefox'
+    try:
+        driver = 'firefox'
 
-    if driver == 'chrome':
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--ignore-certificate-errors')
-        chrome_options.add_argument('--ignore-ssl-errors')
+        if driver == 'chrome':
+            chrome_options = Options()
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--ignore-certificate-errors')
+            chrome_options.add_argument('--ignore-ssl-errors')
 
-        prefs = {
-            "download.default_directory": destination.parent.absolute().as_posix(),
-            "download.prompt_for_download": False,
-            "directory_upgrade": True,
-            "safebrowsing.enabled": False
-        }
-        chrome_options.add_experimental_option("prefs", prefs)
-        chrome_driver_path = '/usr/bin/chromedriver'
-        service = Service(executable_path=chrome_driver_path)
-        driver = webdriver.Chrome(
-            service=service, options=chrome_options,
-            )
-    else:  # firefox
-        from selenium.webdriver import FirefoxOptions
-        options = FirefoxOptions()
-        options.add_argument("--headless")
+            prefs = {
+                "download.default_directory": destination.parent.absolute().as_posix(),
+                "download.prompt_for_download": False,
+                "directory_upgrade": True,
+                "safebrowsing.enabled": False
+            }
+            chrome_options.add_experimental_option("prefs", prefs)
+            chrome_driver_path = '/usr/bin/chromedriver'
+            service = Service(executable_path=chrome_driver_path)
+            driver = webdriver.Chrome(
+                service=service, options=chrome_options,
+                )
+        else:  # firefox
+            from selenium.webdriver import FirefoxOptions
+            options = FirefoxOptions()
+            options.add_argument("--headless")
 
-        service = Service(executable_path='/usr/bin/geckodriver')
-        driver = webdriver.Firefox(
-            service=service,
-            options=options)
+            service = Service(executable_path='/usr/bin/geckodriver')
+            driver = webdriver.Firefox(
+                service=service,
+                options=options)
 
-    login_url = 'https://www.kaggle.com/account/login?phase=emailSignIn'
-    driver.get(login_url)
-    if driver.page_source == '<html><head></head><body></body></html>':
-        raise ValueError("Issue loading the page, Most likely a Proxy error.")
-    username_field = driver.find_element(By.ID, ':r0:')
-    username_field.send_keys(config_values['login_email'])
-    password_field = driver.find_element(By.ID, ':r1:')
-    password_field.send_keys(config_values['login_password'])
-    login_button = driver.find_element(By.XPATH, "//button[span[text()='Sign In']]")
-    driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
-    login_button.click()
-    time.sleep(1)
+        login_url = 'https://www.kaggle.com/account/login?phase=emailSignIn'
+        driver.get(login_url)
+        if driver.page_source == '<html><head></head><body></body></html>':
+            raise ValueError("Issue loading the page, Most likely a Proxy error.")
+        username_field = driver.find_element(By.ID, ':r0:')
+        username_field.send_keys(config_values['login_email'])
+        password_field = driver.find_element(By.ID, ':r1:')
+        password_field.send_keys(config_values['login_password'])
+        login_button = driver.find_element(By.XPATH, "//button[span[text()='Sign In']]")
+        driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+        login_button.click()
+        time.sleep(1)
 
-    # relying on requests as it could be tricky, even if feasible, to make sure the
-    # download ended before terminating the script.
-    # passing cookies to request
-    cookies = driver.get_cookies()
+        # relying on requests as it could be tricky, even if feasible, to make sure the
+        # download ended before terminating the script.
+        # passing cookies to request
+        cookies = driver.get_cookies()
+    finally:
+        driver.quit()
+
     session_cookies = {cookie['name']: cookie['value'] for cookie in cookies}
     response = requests.get(
         download_url, stream=True, verify=False, cookies=session_cookies)
