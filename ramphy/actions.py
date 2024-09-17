@@ -269,7 +269,7 @@ def hyperopt(
                 max_concurrent_runs=1,
                 n_cpu_per_run=None,
                 n_gpu_per_run=torch.cuda.device_count(),
-                verbose=1,
+                verbose=0,
             )
             n_trained_submissions = len(created_submissions)
             existing_submissions = existing_submissions + created_submissions
