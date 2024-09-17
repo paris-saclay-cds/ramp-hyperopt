@@ -55,6 +55,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
     
                 transformer = OneHotEncoder(
                     handle_unknown="infrequent_if_exist",
+                    drop='if_binary',
                     feature_name_combiner=feature_name_combiner)
             elif ENCODING_STRATEGY == "Count":
                 transformer = CountEncoder(handle_unknown=0, min_group_size=1, cols=[self.col])
