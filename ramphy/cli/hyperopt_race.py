@@ -47,7 +47,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     "--patience",
     default=-1,
     show_default=True,
-    help="The number of rounds after wwhich we stop if score does not improve.",
+    help="The number of rounds after which we stop if score does not improve.",
+)
+@click.option(
+    "--n-folds-hyperopt",
+    default=3,
+    show_default=True,
+    help="The number of folds used in hyperopt.",
 )
 @click.option(
     "--no-growing-folds",
@@ -57,26 +63,26 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Do not run the growing fold submission at the end.",
 )
 @click.option(
-    "--additional_preprocessors",
+    "--additional-preprocessors",
     multiple=True,
     default=["drop_id", "drop_columns"],
     help="A list of data_preprocessors to use other than the base col encoding and inputing.",
 )
 @click.option(
-    "--columnwise_first",
+    "--columnwise-first",
     is_flag=True,
     default=False,
     show_default=True,
     help="If given adds columnwise preprocessors first. Otherwise adds them after other preprocessors",
 )
 @click.option(
-    "--preprocessors_to_hyper",
+    "--preprocessors-to-hyper",
     multiple=True,
     default=None,
     help="A list of preprocessors to hyperopt.",
 )
 @click.option(
-    "--base_predictors",
+    "--base-predictors",
     multiple=True,
     default=["lgbm", "xgboost", "catboost"],
     help="A list of base predictors.",
@@ -89,6 +95,7 @@ def main(
     resume,
     n_rounds,
     n_trials_per_round,
+    n_folds_hyperopt,
     patience,
     no_growing_folds,
     additional_preprocessors,
@@ -106,6 +113,7 @@ def main(
         n_rounds=n_rounds,
         n_trials_per_round=n_trials_per_round,
         patience=patience,
+        n_folds_hyperopt=n_folds_hyperopt,
         no_growing_folds=no_growing_folds,
         preprocessors_to_hyper=list(preprocessors_to_hyper),
         base_predictors=list(base_predictors),
