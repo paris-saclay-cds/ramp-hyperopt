@@ -72,7 +72,8 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option(
     "--data-preprocessors",
     multiple=True,
-    default=["drop_id", "drop_columns", "base_columnwise"],
+    default=["drop_id", "drop_columns", "base_columnwise", "col_in_train_only",
+             "rm_constant_col"],
     help="A list of data_preprocessors to use. base_columnwise are the base col encoding and inputing",
 )
 @click.option(
