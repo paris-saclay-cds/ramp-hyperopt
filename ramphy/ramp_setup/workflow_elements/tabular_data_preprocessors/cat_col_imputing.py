@@ -66,6 +66,7 @@ class Classifier(BaseEstimator):
     def __init__(self, metadata):
         self.metadata = metadata
         self.only_one_label = False
+        self.to_cache = True
 
     def fit(self, X, y):
         labels = y.unique()

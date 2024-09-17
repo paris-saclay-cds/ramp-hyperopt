@@ -99,6 +99,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 
     def __init__(self, col={str_col}):
         self.col = col
+        self.to_cache = True
 
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
