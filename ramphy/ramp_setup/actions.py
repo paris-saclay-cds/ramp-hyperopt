@@ -14,6 +14,11 @@ import rampwf as rw
 import requests
 from kaggle.api.kaggle_api_extended import KaggleApi
 
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+
 import ramphy as rh
 from ramphy import ramp_setup as rs
 
@@ -119,26 +124,87 @@ def find_best(submission: str, ramp_kit_dir: Path | str) -> str:
     raise ValueError(f"No hyperopted best submission {submission}")
 
 
-def download_file(url: str, destination: Path):
+def download_file(download_url: str, destination: Path, config_values: dict):
     """Downloads a file from the specified URL
 
     Saves the file to the provided destination path.
 
     Args:
-        url (str): The URL to download the file from.
+        download_url (str): The URL to download the file from.
         destination (str): The local path to save the downloaded file.
+        config_values (dict): Configuration for Kaggle, read from ~/.kaggle/kaggle.json
     """
     try:
-        response = requests.get(url, stream=True, verify=False)
-        response.raise_for_status()  # raises an HTTPError for bad responses
+        driver = 'firefox'
 
-        with open(destination, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
+        if driver == 'chrome':
+            chrome_options = Options()
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--ignore-certificate-errors')
+            chrome_options.add_argument('--ignore-ssl-errors')
 
-        print("Download complete. File saved to:", destination)
-    except requests.RequestException as e:
-        print("Error downloading the file:", e)
+            prefs = {
+                "download.default_directory": destination.parent.absolute().as_posix(),
+                "download.prompt_for_download": False,
+                "directory_upgrade": True,
+                "safebrowsing.enabled": False
+            }
+            chrome_options.add_experimental_option("prefs", prefs)
+            chrome_driver_path = '/usr/bin/chromedriver'
+            service = Service(executable_path=chrome_driver_path)
+            driver = webdriver.Chrome(
+                service=service, options=chrome_options,
+                )
+        else:  # firefox
+            from selenium.webdriver import FirefoxOptions
+            options = FirefoxOptions()
+            options.add_argument("--headless")
+
+            service = Service(executable_path='/usr/bin/geckodriver')
+            driver = webdriver.Firefox(
+                service=service,
+                options=options)
+
+        login_url = 'https://www.kaggle.com/account/login?phase=emailSignIn'
+        driver.get(login_url)
+        if driver.page_source == '<html><head></head><body></body></html>':
+            raise ValueError("Issue loading the page, Most likely a Proxy error.")
+        username_field = driver.find_element(By.ID, ':r0:')
+        username_field.send_keys(config_values['login_email'])
+        password_field = driver.find_element(By.ID, ':r1:')
+        password_field.send_keys(config_values['login_password'])
+        login_button = driver.find_element(By.XPATH, "//button[span[text()='Sign In']]")
+        driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+        login_button.click()
+        time.sleep(1)
+
+        # relying on requests as it could be tricky, even if feasible, to make sure the
+        # download ended before terminating the script.
+        # passing cookies to request
+        cookies = driver.get_cookies()
+    finally:
+        driver.quit()
+
+    session_cookies = {cookie['name']: cookie['value'] for cookie in cookies}
+    response = requests.get(
+        download_url, stream=True, verify=False, cookies=session_cookies)
+    response.raise_for_status()  # raises an HTTPError for bad responses
+
+    with open(destination, "wb") as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            file.write(chunk)
+
+    print("Download complete. File saved to:", destination)
+
+    # download with selenium
+    # driver.get(download_url)
+    # download_button = WebDriverWait(driver, 10).until(
+    #     EC.presence_of_element_located((By.XPATH, '//button[@title="Download Leaderboard"]'))
+    # )
+    # driver.execute_script("arguments[0].click();", download_button)
+    # time.sleep(1)
 
 
 def download_leaderboard(
@@ -174,10 +240,9 @@ def download_leaderboard(
         if competition["url"] == competition_url:
             break
     num_id = competition["id"]
-
     download_file(
         f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/{phase}",
-        zip_destination,
+        zip_destination, kaggle_api.config_values
     )
 
 

@@ -1,5 +1,6 @@
 import ramphy.ramp_setup as rs
 import click
+import click_config_file
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -63,30 +64,24 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="Do not run the growing fold submission at the end.",
 )
 @click.option(
-    "--additional-preprocessors",
-    multiple=True,
-    default=["drop_id", "drop_columns"],
-    help="A list of data_preprocessors to use other than the base col encoding and inputing.",
-)
-@click.option(
-    "--columnwise-first",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="If given adds columnwise preprocessors first. Otherwise adds them after other preprocessors",
-)
-@click.option(
-    "--preprocessors-to-hyper",
-    multiple=True,
-    default=None,
-    help="A list of preprocessors to hyperopt.",
-)
-@click.option(
     "--base-predictors",
     multiple=True,
     default=["lgbm", "xgboost", "catboost"],
     help="A list of base predictors.",
 )
+@click.option(
+    "--data-preprocessors",
+    multiple=True,
+    default=["drop_id", "drop_columns", "base_columnwise"],
+    help="A list of data_preprocessors to use. base_columnwise are the base col encoding and inputing",
+)
+@click.option(
+    "--preprocessors-to-hyperopt",
+    multiple=True,
+    default=None,
+    help="A list of preprocessors to hyperopt. When multiple instances of a data_preprocessor are given through the data_preprocessors option, if you specify the full name, it will only hyperopt that one, otherwise it will hyperopt all the instances of the data_preprocessor.",
+)
+@click_config_file.configuration_option()
 def main(
     ramp_kit,
     kit_root,
@@ -98,13 +93,12 @@ def main(
     n_folds_hyperopt,
     patience,
     no_growing_folds,
-    additional_preprocessors,
-    columnwise_first,
-    preprocessors_to_hyper,
     base_predictors,
+    data_preprocessors,
+    preprocessors_to_hyperopt,
 ):
     rs.orchestration.hyperopt_race(
-        additional_preprocessors=list(additional_preprocessors),
+        data_preprocessors=list(data_preprocessors),
         ramp_kit=ramp_kit,
         kit_root=kit_root,
         version=version,
@@ -115,9 +109,8 @@ def main(
         patience=patience,
         n_folds_hyperopt=n_folds_hyperopt,
         no_growing_folds=no_growing_folds,
-        preprocessors_to_hyper=list(preprocessors_to_hyper),
+        preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),
-        columnwise_first=columnwise_first,
     )
 
 
