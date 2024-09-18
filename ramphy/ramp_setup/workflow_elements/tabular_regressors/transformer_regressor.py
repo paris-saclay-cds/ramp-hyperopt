@@ -15,14 +15,16 @@ from tqdm import tqdm
 num_layers = Hyperparameter(dtype="int", default=2, values=[2, 3, 5])
 num_heads = Hyperparameter(dtype="int", default=5, values=[1, 2, 5, 10])
 ff_size = Hyperparameter(dtype="int", default=256, values=[256, 512, 1024, 2056])
-input_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
-output_scaling = Hyperparameter(dtype="str", default="minmax", values=["standard", "minmax", "quantile", "none"])
 optimizer = Hyperparameter(dtype="str", default="sam", values=["sam", "adam"])
+n_quantiles_input_scaling = Hyperparameter(dtype="int", default=1000, values=[1000, 5000, 10000])
+quantile_subsamples = Hyperparameter(dtype="int", default=10000, values=[10000, 5000, 20000])
+out_quantile_distr = Hyperparameter(dtype="str", default="normal", values=["uniform", "normal"])
+ignore_implicit_zeros = Hyperparameter(dtype="bool", default=False, values=[False, True])
 # RAMP END HYPERPARAMETERS
 
 
-INPUT_SCALING = str(input_scaling)
-OUTPUT_SCALING = str(output_scaling)
+INPUT_SCALING = "quantile"
+OUTPUT_SCALING = "standard"
 NUM_LAYERS = int(num_layers)
 NUM_HEADS = int(num_heads)
 FF_SIZE = int(ff_size)
@@ -31,6 +33,10 @@ NUM_EPOCHS = 100
 LEARNING_RATE = 0.001
 BATCH_SIZE = 2056 * 2
 OPTIMIZER = str(optimizer)
+N_QUANTILES = int(n_quantiles_input_scaling)
+OUT_QUANTILE_DISTR = str(out_quantile_distr)
+IGNORE_IMPLICIT_ZEROS = bool(ignore_implicit_zeros)
+QUANTILE_SUBSAMPLES = int(quantile_subsamples)
 
 
 class SAM(optim.Optimizer):
@@ -173,7 +179,12 @@ class Regressor(BaseEstimator):
         elif INPUT_SCALING == "minmax":
             self.feature_scaler = MinMaxScaler()
         elif INPUT_SCALING == "quantile":
-            self.feature_scaler = QuantileTransformer()
+            self.feature_scaler = QuantileTransformer(
+                n_quantiles=N_QUANTILES,
+                output_distribution=OUT_QUANTILE_DISTR,
+                ignore_implicit_zeros=IGNORE_IMPLICIT_ZEROS,
+                subsample=QUANTILE_SUBSAMPLES,
+            )
         elif INPUT_SCALING == "none":
             self.feature_scaler = None
         else:
