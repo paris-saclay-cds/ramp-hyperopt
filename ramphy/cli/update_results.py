@@ -141,24 +141,21 @@ def main(
             pass
         available_phases = kaggle_scores.keys()
         print(f"Available kaggle scores are {available_phases}")
-
         failure_count = 0
         no_growing_folds = False
         for blend_type in ["growing_folds", "last_blend", "bagged_then_blended"]:
             submission_file_name = f"auto_{kit_suffix}_{blend_type}_{str(stop_fold_idx).zfill(3)}.csv"
-            last_kaggle_actions = [
-                ra
-                for ra in kaggle_actions
-                if str(kaggle_submissions_path / submission_file_name) in str(ra.kwargs["submission_target_f_name"])
-            ]
-            if len(last_kaggle_actions) == 0:
+            last_kaggle_action = None
+            for ra in kaggle_actions:
+                if ra.kwargs["submission_target_f_name"] == str(kaggle_submissions_path / submission_file_name):
+                    last_kaggle_action = ra
+            if last_kaggle_action is None:
                 if blend_type == "growing_folds":
                     no_growing_folds = True
                 else:
                     results_summary_df.loc[row_i, "run_finished"] = 0
                 failure_count += 1
                 continue
-            last_kaggle_action = last_kaggle_actions[0]
             if blend_type == "growing_folds":
                 growing_folds_stop_time = last_kaggle_action.start_time
             else:
@@ -223,20 +220,18 @@ def main(
                 np.array(submission_hyperopt_actions).sum()
             )
             results_summary_df.loc[row_i, f"rounds_hyperopt_{submission}"] = len(submission_hyperopt_actions)
-
-            last_kaggle_actions = [
-                ra
-                for ra in kaggle_actions
-                if str(kaggle_submissions_path / submission_file_name) in str(ra.kwargs["submission_target_f_name"])
-            ]
-            if len(last_kaggle_actions) == 0:
+    
+            last_kaggle_action = None
+            for ra in kaggle_actions:
+                if ra.kwargs["submission_target_f_name"] == str(kaggle_submissions_path / submission_file_name):
+                    last_kaggle_action = ra
+            if last_kaggle_action is None:
                 # if contributivity is zero, it is normal not having the kaggle action
                 if results_summary_df.loc[row_i, f"contributivity_last_blend_{submission}"] != 0:
                     results_summary_df.loc[row_i, "run_finished"] = 0
                 else:
                     n_kaggle_files -= len(available_phases)
                 continue
-            last_kaggle_action = last_kaggle_actions[0]
             select_top_hyperopt_action = [ra for ra in select_top_hyperopt_actions if ra.start_time <= last_kaggle_action.start_time][-1]
             train_actions = [ra for ra in train_actions if ra.kwargs["submission"] == select_top_hyperopt_action.selected_submissions[0]]
             if len(train_actions) == 0:

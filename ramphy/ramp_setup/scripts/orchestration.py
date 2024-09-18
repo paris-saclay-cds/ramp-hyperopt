@@ -54,6 +54,7 @@ def run_race(
     contributivity_floor: int,
     blended_submissions: set[str],
     preprocessors_to_hyperopt: Optional[list[str]] = None,
+    hyperopt_all_at_once: bool = False,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
     improvement_speed_df = pd.DataFrame(columns=["round"] + base_predictors)
@@ -68,10 +69,6 @@ def run_race(
     # base_we_names = [predictor_we_name, "data_preprocessor_1_drop_columns", "data_preprocessor_2_cat_target_encoding"]
 
     # The WEs the orchestrator needs to choose from in every round
-    # element_types = ["model"]
-    # if preprocessors_to_hyper is not None:
-    #     element_types.append("data_preprocessor")
-
     base_we_names = [predictor_we_name]
     if preprocessors_to_hyperopt is not None:
         base_we_names += preprocessors_to_hyperopt
@@ -110,15 +107,17 @@ def run_race(
         print(f"selected predictor : {predictor}")
         #    input("Press Enter to continue...")
         n_trials = n_trials_per_round * n_folds_hyperopt
-        # element_type_to_hyperopt = random.sample(element_types, 1)[0]
-        # print(f"Choosen workflow element: {element_type_to_hyperopt}")
-        # if element_type_to_hyperopt == "model":
-        #     wes_to_hyperopt = predictor_we_name
-        # elif element_type_to_hyperopt == "data_preprocessor":
-        #     wes_to_hyperopt = preprocessors_to_hyper
-        # print(f"Hyperopting: {wes_to_hyperopt}")
-        wes_to_hyperopt = base_we_names
-        print(f"Hyperopting: {wes_to_hyperopt}")
+        if hyperopt_all_at_once:
+            wes_to_hyperopt = base_we_names
+            print(f"Hyperopting: {wes_to_hyperopt}")
+        else:
+            element_type_to_hyperopt = random.sample(["model", "data_preprocessor"], 1)[0]
+            print(f"Choosen workflow element: {element_type_to_hyperopt}")
+            if element_type_to_hyperopt == "model":
+                wes_to_hyperopt = predictor_we_name
+            elif element_type_to_hyperopt == "data_preprocessor":
+                wes_to_hyperopt = preprocessors_to_hyperopt
+            print(f"Hyperopting: {wes_to_hyperopt}")
 
         submission_to_hyperopt = predictor  # default: hyperopt one of the base submissions
         blended_submissions_of_predictor = [
@@ -177,9 +176,7 @@ def run_race(
                 )
             else:
                 print("something wrong: no blended score")
-                exit(0)
-                blended_score = hyperopt_action.mean_score
-                contributivities = {s: 1000 / len(predictors) for s in base_predictors}
+                raise RuntimeError("something wrong: no blended score")
             scores.append(blended_score)
             action_stats[predictor].append(
                 {
@@ -229,7 +226,9 @@ def resume_race(
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     # we only need race blend actions
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 903)]
+    blend_actions = [
+        ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)
+    ]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
     start_round = len(hyperopt_actions)
     scores = []
@@ -486,7 +485,6 @@ def hyperopt_race(
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
-
     problem = rw.utils.assert_read_problem(str(ramp_kit_dir))
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"
@@ -497,7 +495,6 @@ def hyperopt_race(
     # Dictionary of submissions: list of dictionary of run times and scores
     action_stats = {submission: [] for submission in base_predictors}
     if resume:
-        # TODO find the full names
         start_round, blended_submissions, action_stats, scores = resume_race(
             action_stats=action_stats,
             ramp_kit_dir=str(ramp_kit_dir),
@@ -505,9 +502,18 @@ def hyperopt_race(
             contributivity_floor=contributivity_floor,
             n_folds_hyperopt=n_folds_hyperopt,
         )
-        config = rs.utils.load_config(load_path=ramp_kit_dir)
-        dp_hyperopt_full_name = config["preprocessors_to_hyperopt"]
-        print(dp_hyperopt_full_name)
+        try:
+            config = rs.utils.load_config(load_path=ramp_kit_dir)
+            dp_hyperopt_full_name = config["preprocessors_to_hyperopt"]
+            print(dp_hyperopt_full_name)
+        except FileNotFoundError:
+            print("No config file, resuming with command-line parameters.")
+            print("Happens only on early versions that crashed without saving the config.")
+            print("You have to specify the full names of preprocessors.")
+            for dp in preprocessors_to_hyperopt:
+                if "data_preprocessor_" not in dp:
+                    raise ValueError(f"Preprocessor {dp} is not specified with full instantiated name!")
+            dp_hyperopt_full_name = preprocessors_to_hyperopt
     else:
         start_round = 0
         blended_submissions = set()
@@ -535,10 +541,11 @@ def hyperopt_race(
         kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
 
         dp_hyperopt_full_name = []
-        for dp in preprocessors_to_hyperopt:
-            dp_hyperopt_full_name += rs.utils.get_full_preprocessor_name(
-                data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
-            )
+        if preprocessors_to_hyperopt is not None:
+            for dp in preprocessors_to_hyperopt:
+                dp_hyperopt_full_name += rs.utils.get_full_preprocessor_name(
+                    data_preprocessor=dp, submitted_preprocessors=submitted_elements["submitted_data_preprocessors"]
+                )
 
         rs.utils.save_config(
             ramp_kit=ramp_kit,
@@ -576,7 +583,7 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyperopt=dp_hyperopt_full_name,
+        preprocessors_to_hyper=dp_hyperopt_full_name,
     )
 
     # Run the growing folds algorithm: select best of each base submission within

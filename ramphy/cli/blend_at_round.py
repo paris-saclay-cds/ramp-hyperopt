@@ -32,11 +32,18 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The number of folds to bag",
 )
+@click.option(
+    "--n-folds-hyperopt",
+    default=3,
+    show_default=True,
+    help="The number of folds used in hyperopt.",
+)
 def main(
     ramp_kit,
     version,
     number,
     n_folds,
+    n_folds_hyperopt,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
@@ -58,7 +65,6 @@ def main(
     blend_actions = [ra for ra in ramp_program if ra.name == "blend"]
     train_actions = [ra for ra in ramp_program if ra.name == "train"]
 
-    n_folds_hyperopt = 3
     n_rounds = 1
     for blend_action in blend_actions:
         if blend_action.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt):

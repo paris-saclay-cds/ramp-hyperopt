@@ -45,17 +45,15 @@ def setup(
 
     if "regression" in metadata["prediction_type"]:
         rs.scripts.tabular.tabular_regression_columnwise_last_submit(
-            ramp_kit_dir=ramp_kit_dir,
-            submission="starting_kit",
-            regressor="lgbm",
-            text_col_encode=False,
+            ramp_kit_dir = ramp_kit_dir,
+            submission = 'starting_kit',
+            regressor = 'lgbm',
         )
     elif "classification" in metadata["prediction_type"]:
         rs.scripts.tabular.tabular_classification_columnwise_last_submit(
-            ramp_kit_dir=ramp_kit_dir,
-            submission="starting_kit",
-            classifier="lgbm",
-            text_col_encode=False,
+            ramp_kit_dir = ramp_kit_dir,
+            submission = 'starting_kit',
+            classifier = 'lgbm',
         )
 
     rh.actions.train(
