@@ -583,7 +583,8 @@ def hyperopt_race(
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
-        preprocessors_to_hyper=dp_hyperopt_full_name,
+        preprocessors_to_hyperopt=dp_hyperopt_full_name,
+        hyperopt_all_at_once=True,
     )
 
     # Run the growing folds algorithm: select best of each base submission within
