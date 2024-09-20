@@ -66,7 +66,10 @@ def num_data_preprocessors(submission, ramp_kit_dir):
 def save_config(save_path: Path, config_name: str = "config.ini", **kwargs):
     with open(save_path / config_name, "w") as configfile:
         for key, value in kwargs.items():
-            configfile.write(f"{key} = {value}\n")
+            if isinstance(value, str):
+                configfile.write(f"{key} = '{value}'\n")
+            else:
+                configfile.write(f"{key} = {value}\n")
 
     print(f"Config file saved at {save_path / config_name}")
 
