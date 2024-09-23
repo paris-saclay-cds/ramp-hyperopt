@@ -268,7 +268,8 @@ def tabular_data_preprocessor_submit(
             id_name = metadata["id_col"]
             hs = [
                 rh.Hyperparameter(dtype="bool", default=False, values=[False, True], name=f"{col}_{hyper_suffix}")
-                for col in cols if not col == id_name
+                for col in cols
+                if not col == id_name
             ]
             rh.write_hyperparameters_per_element(submission_path, submission_path, hs, wen)
     return wen
@@ -277,7 +278,7 @@ def tabular_data_preprocessor_submit(
 @ramp_action
 def tabular_data_preprocessors_submit(
     submission: str | Path,
-    data_preprocessors: list[str] = ['drop_id', 'col_in_train_only'],
+    data_preprocessors: list[str] = ["drop_id", "col_in_train_only"],
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
 ) -> List[str]:
@@ -493,7 +494,7 @@ def tabular_add_holidays_submit(
     submission: str | Path,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
-) -> None:
+) -> List[str]:
     """Submit add holidays column if we have a date and country column.
 
     Args:
@@ -519,13 +520,19 @@ def tabular_add_holidays_submit(
             contains_location_type += 1
             location_col = col
 
+    dp_names = []
     if contains_date_type == 1 and contains_location_type == 1:
-        dp_code_formatted = dp_code.format_map(metadata | {"date_col": f'"{date_col}"', "location_col": f'"{location_col}"'})
+        dp_name = f"data_preprocessor_{dp_idx}_{date_col}{location_col}_add_holidays"
+        dp_code_formatted = dp_code.format_map(
+            metadata | {"date_col": f'"{date_col}"', "location_col": f'"{location_col}"'}
+        )
         with open(
-            ramp_kit_dir / "submissions" / submission / f"data_preprocessor_{dp_idx}_{date_col}{location_col}_add_holidays.py",
+            ramp_kit_dir / "submissions" / submission / f"{dp_name}.py",
             "w",
         ) as f_out:
             f_out.write(dp_code_formatted)
+        dp_names.append(dp_name)
+    return dp_names
 
 
 def tabular_encoder_imputer_submit(
@@ -567,7 +574,7 @@ def tabular_encoder_imputer_submit(
     if add_holidays:
         # call before date_col_encode and cat_col_encode which removes
         # the potential date and location columns which are needed to compute holidays
-        tabular_add_holidays_submit(
+        dp_names += tabular_add_holidays_submit(
             submission=submission,
             ramp_kit_dir=ramp_kit_dir,
             ramp_data_dir=ramp_data_dir,
@@ -613,6 +620,7 @@ def tabular_regression_ordered_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with ordered preprocessors.
     The cat_col encoders and imputers are put in the place where base_columnwise is in the list
@@ -672,6 +680,10 @@ def tabular_regression_ordered_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
         else:
             dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
@@ -680,6 +692,16 @@ def tabular_regression_ordered_submit(
                 ramp_data_dir=ramp_data_dir,
             )
             dp_names.append(dp_name)
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
+        dp_names.append(dp_name)
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
@@ -687,10 +709,9 @@ def tabular_regression_ordered_submit(
 @ramp_action
 def tabular_regression_columnwise_last_submit(
     submission: str | Path,
-    regressor: str = 'xgboost',
-    feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
-                                     "rm_constant_col"],
+    regressor: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -699,6 +720,7 @@ def tabular_regression_columnwise_last_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with columnwise last.
 
@@ -744,8 +766,12 @@ def tabular_regression_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        elif dp != 'rm_constant_col':
-            tabular_data_preprocessor_submit(
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
+        else:
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -766,13 +792,14 @@ def tabular_regression_columnwise_last_submit(
 
     # this needs to be at the end for the constant columns to be used elsewhere
     # location column for instance
-    if 'rm_constant_col' in data_preprocessors:
-        tabular_data_preprocessor_submit(
-                    submission=submission,
-                    data_preprocessor=dp,
-                    ramp_kit_dir=ramp_kit_dir,
-                    ramp_data_dir=ramp_data_dir,
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
         )
+        dp_names.append(dp_name)
 
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
@@ -781,10 +808,9 @@ def tabular_regression_columnwise_last_submit(
 @ramp_action
 def tabular_regression_columnwise_first_submit(
     submission: str | Path,
-    regressor: str = 'xgboost',
-    feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
-                                     "rm_constant_col"],
+    regressor: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -793,6 +819,7 @@ def tabular_regression_columnwise_first_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with columnwise first.
 
@@ -848,6 +875,10 @@ def tabular_regression_columnwise_first_submit(
                 ramp_data_dir=ramp_data_dir,
             )
             dp_names.append(dp_name)
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
         else:
             dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
@@ -856,6 +887,16 @@ def tabular_regression_columnwise_first_submit(
                 ramp_data_dir=ramp_data_dir,
             )
             dp_names.append(dp_name)
+    # this needs to be at the end for the constant columns to be used elsewhere
+    # location column for instance
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
+        )
+        dp_names.append(dp_name)
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
 
@@ -874,6 +915,7 @@ def tabular_classification_ordered_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with ordered preprocessors.
     The cat_col encoders and imputers are put in the place where base_columnwise is in the list
@@ -933,8 +975,12 @@ def tabular_classification_ordered_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        elif dp != 'rm_constant_col':
-            tabular_data_preprocessor_submit(
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
+        else:
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -944,13 +990,14 @@ def tabular_classification_ordered_submit(
 
     # this needs to be at the end for the constant columns to be used elsewhere
     # location column for instance
-    if 'rm_constant_col' in data_preprocessors:
-        tabular_data_preprocessor_submit(
-                    submission=submission,
-                    data_preprocessor=dp,
-                    ramp_kit_dir=ramp_kit_dir,
-                    ramp_data_dir=ramp_data_dir,
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
         )
+        dp_names.append(dp_name)
 
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
@@ -959,10 +1006,9 @@ def tabular_classification_ordered_submit(
 @ramp_action
 def tabular_classification_columnwise_last_submit(
     submission: str | Path,
-    classifier: str = 'xgboost',
-    feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
-                                     "rm_constant_col"],
+    classifier: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -971,6 +1017,7 @@ def tabular_classification_columnwise_last_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with columnwise last.
 
@@ -1016,8 +1063,12 @@ def tabular_classification_columnwise_last_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        elif dp != 'rm_constant_col':
-            tabular_data_preprocessor_submit(
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
+        else:
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -1039,13 +1090,14 @@ def tabular_classification_columnwise_last_submit(
 
     # this needs to be at the end for the constant columns to be used elsewhere
     # location column for instance
-    if 'rm_constant_col' in data_preprocessors:
-        tabular_data_preprocessor_submit(
-                    submission=submission,
-                    data_preprocessor=dp,
-                    ramp_kit_dir=ramp_kit_dir,
-                    ramp_data_dir=ramp_data_dir,
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
         )
+        dp_names.append(dp_name)
 
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
@@ -1054,10 +1106,9 @@ def tabular_classification_columnwise_last_submit(
 @ramp_action
 def tabular_classification_columnwise_first_submit(
     submission: str | Path,
-    classifier: str = 'xgboost',
-    feature_extractor: str = 'empty',
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only",
-                                     "rm_constant_col"],
+    classifier: str = "xgboost",
+    feature_extractor: str = "empty",
+    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -1066,6 +1117,7 @@ def tabular_classification_columnwise_first_submit(
     text_col_encode: bool = True,
     ramp_kit_dir: str | Path = ".",
     ramp_data_dir: Optional[str | Path] = None,
+    strict_order: bool = False,
 ) -> Dict[str, list]:
     """Make new submission with columnwise first.
 
@@ -1120,8 +1172,12 @@ def tabular_classification_columnwise_first_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        elif dp != 'rm_constant_col':
-            tabular_data_preprocessor_submit(
+        elif dp == "rm_constant_col":
+            if strict_order:
+                raise ValueError(f"{dp} is not in last position!")
+            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
+        else:
+            dp_name = tabular_data_preprocessor_submit(
                 submission=submission,
                 data_preprocessor=dp,
                 ramp_kit_dir=ramp_kit_dir,
@@ -1131,13 +1187,14 @@ def tabular_classification_columnwise_first_submit(
 
     # this needs to be at the end for the constant columns to be used elsewhere
     # location column for instance
-    if 'rm_constant_col' in data_preprocessors:
-        tabular_data_preprocessor_submit(
-                    submission=submission,
-                    data_preprocessor=dp,
-                    ramp_kit_dir=ramp_kit_dir,
-                    ramp_data_dir=ramp_data_dir,
+    if "rm_constant_col" in data_preprocessors:
+        dp_name = tabular_data_preprocessor_submit(
+            submission=submission,
+            data_preprocessor=dp,
+            ramp_kit_dir=ramp_kit_dir,
+            ramp_data_dir=ramp_data_dir,
         )
+        dp_names.append(dp_name)
 
     print(f"Submitted preprocessors: {dp_names}")
     return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
