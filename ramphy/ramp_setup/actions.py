@@ -162,9 +162,7 @@ def download_file(download_url: str, destination: Path, config_values: dict):
             options = FirefoxOptions()
             options.add_argument("--headless")
 
-            service = Service(executable_path='/usr/bin/geckodriver')
             driver = webdriver.Firefox(
-                service=service,
                 options=options)
 
         login_url = 'https://www.kaggle.com/account/login?phase=emailSignIn'
@@ -184,6 +182,8 @@ def download_file(download_url: str, destination: Path, config_values: dict):
         # download ended before terminating the script.
         # passing cookies to request
         cookies = driver.get_cookies()
+    except Exception as e:
+        print(f"{e}")
     finally:
         driver.quit()
 
