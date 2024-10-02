@@ -153,17 +153,17 @@ def run_race(
                     + np.array([c for sh, c in blend_action.contributivities.items() if sh[: len(s)] == s]).sum()
                     for s in base_predictors
                 }
-                submission_source_f_name = (
-                    Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-                )
-                submission_target_f_name = (
-                    Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
-                )
-                kaggle_submit_file(
-                    submission_source_f_name=str(submission_source_f_name),
-                    submission_target_f_name=str(submission_target_f_name),
-                    ramp_kit_dir=ramp_kit_dir,
-                )
+#                submission_source_f_name = (
+#                    Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
+#                )
+#                submission_target_f_name = (
+#                    Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
+#                )
+#                kaggle_submit_file(
+#                    submission_source_f_name=str(submission_source_f_name),
+#                    submission_target_f_name=str(submission_target_f_name),
+#                    ramp_kit_dir=ramp_kit_dir,
+#                )
             else:
                 print("something wrong: no blended score")
                 raise RuntimeError("something wrong: no blended score")
@@ -230,7 +230,12 @@ def resume_race(
         if "hyperopt" in submission:
             predictor = submission[:-20]
         if len(hyperopt_action.mean_scores) > 0:
-            blend_action = blend_actions[blend_action_idx]
+            try:
+                blend_action = blend_actions[blend_action_idx]
+            except IndexError:
+                print(f"blend_actions[{blend_action_idx}] does not exist, possibly corrupted actions")
+                blend_action_idx += 1
+                continue
             blend_action_idx += 1  # if hyperopt did not return with any submissions, there was no blend
             blended_score = blend_action.blended_score
             scores.append(blended_score)
