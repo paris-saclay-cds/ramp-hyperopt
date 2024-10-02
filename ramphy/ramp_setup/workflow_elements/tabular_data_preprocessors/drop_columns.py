@@ -10,7 +10,7 @@ from ramphy import Hyperparameter
 # RAMP END HYPERPARAMETERS
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
-    """Drops column."""
+    """Drops columns."""
 
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
