@@ -78,7 +78,7 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
         y_pred_block = y_pred[:, first_col_index:first_col_index + len(target_values)]
         if score_name in ['nll'] and len(target_values) > 2:
             for tv_i, tv in enumerate(target_values):
-                if len(target_cols) == 1:
+                if tv in df.columns:
                     df[f"{{tv}}"] = y_pred_block[:, tv_i]
                 else:
                     df[f"{{target_col}}_{{tv}}"] = y_pred_block[:, tv_i]
