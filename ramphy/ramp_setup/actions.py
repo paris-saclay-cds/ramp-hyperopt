@@ -186,6 +186,8 @@ def download_leaderboard(
         if competition["url"] == competition_url:
             break
     num_id = competition["id"]
+    url = f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/{phase}"
+    print(url)
     download_file(
         f"https://www.kaggle.com/competitions/{num_id}/leaderboard/download/{phase}",
         zip_destination, kaggle_api.config_values
