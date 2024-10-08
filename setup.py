@@ -59,11 +59,8 @@ setup(
         'console_scripts': [
             'ramp-hyperopt = ramphy.cli.hyperopt:start',
             'ramp-setup = ramphy.cli.setup:start',
-            'ramp-download-leaderboards = ramphy.cli.download_leaderboards:start',
             'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
-            'ramp-update-results = ramphy.cli.update_results:start',
             'ramp-register-experiment = ramphy.cli.register_experiment:start',
-            'ramp-submit-to-kaggle = ramphy.cli.submit_to_kaggle:start',
             'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
         ]
     }
