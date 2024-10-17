@@ -24,7 +24,7 @@ def last_action(ramp_kit_dir: str, name: str, n_folds_hyperopt: Optional[int] = 
 
 
 @rh.actions.ramp_action
-def kaggle_submit_file(
+def submit_final_test_predictions(
     submission_source_f_name: str,
     submission_target_f_name: str,
     ramp_kit_dir: str,
@@ -153,17 +153,6 @@ def run_race(
                     + np.array([c for sh, c in blend_action.contributivities.items() if sh[: len(s)] == s]).sum()
                     for s in base_predictors
                 }
-#                submission_source_f_name = (
-#                    Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
-#                )
-#                submission_target_f_name = (
-#                    Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_{str(round_idx).zfill(3)}.csv"
-#                )
-#                kaggle_submit_file(
-#                    submission_source_f_name=str(submission_source_f_name),
-#                    submission_target_f_name=str(submission_target_f_name),
-#                    ramp_kit_dir=ramp_kit_dir,
-#                )
             else:
                 print("something wrong: no blended score")
                 raise RuntimeError("something wrong: no blended score")
@@ -298,10 +287,10 @@ def final_blend_growing_folds(
         )
         submission_target_f_name = (
             Path(ramp_kit_dir)
-            / "kaggle_submissions"
+            / "final_test_predictions"
             / f"auto_{kit_suffix}_growing_folds_{str(stop_fold_idx).zfill(3)}.csv"
         )
-        kaggle_submit_file(
+        submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
             submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
@@ -347,7 +336,7 @@ def final_blend_then_bag(
     """Blend then bag and submit after each fold.
 
     To potentially recover the learning curve. Typically we only submit the last one,
-    but we save all in <ramp_kit_dir>/kaggle_submissions.
+    but we save all in <ramp_kit_dir>/final_test_predictions.
     """
     for stop_fold_idx in range(901, 900 + n_folds + 1):
         rh.actions.blend(
@@ -361,16 +350,16 @@ def final_blend_then_bag(
         if n_rounds > 0:
             submission_target_f_name = (
                 Path(ramp_kit_dir)
-                / "kaggle_submissions"
+                / "final_test_predictions"
                 / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}_r{n_rounds}.csv"
             )
         else:
             submission_target_f_name = (
                 Path(ramp_kit_dir)
-                / "kaggle_submissions"
+                / "final_test_predictions"
                 / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}.csv"
             )
-        kaggle_submit_file(
+        submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
             submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
@@ -401,16 +390,16 @@ def final_bag_then_blend(
         if n_rounds > 0:
             submission_target_f_name = (
                 Path(ramp_kit_dir)
-                / "kaggle_submissions"
+                / "final_test_predictions"
                 / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}_r{n_rounds}.csv"
             )
         else:
             submission_target_f_name = (
                 Path(ramp_kit_dir)
-                / "kaggle_submissions"
+                / "final_test_predictions"
                 / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}.csv"
             )
-        kaggle_submit_file(
+        submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
             submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
@@ -424,7 +413,7 @@ def submit_best_submissions(
     n_folds: int,
 ):
     """Submit the best of each submission (classical hyperopt) in
-    <ramp_kit_dir>/kaggle_submissions.
+    <ramp_kit_dir>/final_test_predictions.
     """
     for submission in base_predictors:
         best_submissions = rh.actions.select_top_hyperopt(
@@ -450,9 +439,9 @@ def submit_best_submissions(
                 bag=True,
             )
         submission_target_f_name = (
-            Path(ramp_kit_dir) / "kaggle_submissions" / f"auto_{kit_suffix}_best_{submission}.csv"
+            Path(ramp_kit_dir) / "final_test_predictions" / f"auto_{kit_suffix}_best_{submission}.csv"
         )
-        kaggle_submit_file(
+        submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
             submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
@@ -528,8 +517,8 @@ def hyperopt_race(
                     text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
-        kaggle_submissions_path = ramp_kit_dir / "kaggle_submissions"
-        kaggle_submissions_path.mkdir(parents=False, exist_ok=True)
+        final_test_predictions_path = ramp_kit_dir / "final_test_predictions"
+        final_test_predictions_path.mkdir(parents=False, exist_ok=True)
 
         dp_hyperopt_full_name = []
         if preprocessors_to_hyperopt is not None:
