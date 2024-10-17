@@ -460,7 +460,13 @@ def hyperopt_race(
     n_folds_hyperopt: int = 3,
     n_folds: int = 31,
     base_predictors: list[str] = ["lgbm", "xgboost", "catboost"],
-    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    data_preprocessors: list[str] = [
+        "drop_id",
+        "drop_columns",
+        "col_in_train_only",
+        "base_columnwise",
+        "rm_constant_col",
+    ],
     preprocessors_to_hyperopt: Optional[list[str]] = None,
     top_n_for_mean: int = 10,
     n_sigma: float = 1.0,
@@ -505,7 +511,6 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     regressor=submission,
-                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
 
@@ -514,7 +519,6 @@ def hyperopt_race(
                     ramp_kit_dir=ramp_kit_dir,
                     submission=submission,
                     classifier=submission,
-                    text_col_encode=False,
                     data_preprocessors=data_preprocessors,
                 )
         final_test_predictions_path = ramp_kit_dir / "final_test_predictions"

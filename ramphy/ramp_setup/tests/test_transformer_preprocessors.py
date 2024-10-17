@@ -29,31 +29,31 @@ def _preprocessor_tester(path_kit: str, preprocessor_name: str):
     )
 
     submission = f'xgboost_{preprocessor_name}'
-    rh.ramp_setup.tabular_regression_columnwise_first_submit(
-        submission = submission,
-        regressor = 'xgboost',
-        feature_extractor = 'empty',
-        data_preprocessors=['drop_id', preprocessor_name],
-        ramp_kit_dir = ramp_kit_dir,
-        ramp_data_dir = ramp_data_dir,
+    rh.ramp_setup.tabular_regression_ordered_submit(
+        submission=submission,
+        regressor="xgboost",
+        feature_extractor="empty",
+        data_preprocessors=["drop_id", preprocessor_name],
+        ramp_kit_dir=ramp_kit_dir,
+        ramp_data_dir=ramp_data_dir,
     )
 
     rh.actions.train(
         submission=submission,
         fold_idxs=[900, 901],
-        ramp_kit_dir=str(ramp_kit_dir), 
-        ramp_data_dir=str(ramp_data_dir), 
+        ramp_kit_dir=str(ramp_kit_dir),
+        ramp_data_dir=str(ramp_data_dir),
     )
 
     n_trials = 9
 
     # hyperopt
     rh.actions.hyperopt(
-        submission=submission, 
-        n_trials=n_trials, 
+        submission=submission,
+        n_trials=n_trials,
         fold_idxs=range(900, 903),
-        ramp_kit_dir=str(ramp_kit_dir), 
-        ramp_data_dir=str(ramp_data_dir), 
+        ramp_kit_dir=str(ramp_kit_dir),
+        ramp_data_dir=str(ramp_data_dir),
         resume=True
     )
 
