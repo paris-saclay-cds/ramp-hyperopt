@@ -11,14 +11,15 @@ import ramphy.ramp_setup as rs
 import rampwf as rw
 
 
-def last_action(ramp_kit_dir: str, name: str) -> rh.actions.RampAction | None:
+def last_action(ramp_kit_dir: str, name: str, n_folds_hyperopt: Optional[int] = None) -> rh.actions.RampAction | None:
     """Last action of a given action name."""
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
     action_f_names.sort(reverse=True)
     for i in range(len(action_f_names)):
         ramp_action_object = rh.actions.load_ramp_action(Path(action_f_names[i]))
         if ramp_action_object.name == name:
-            return ramp_action_object
+            if n_folds_hyperopt is None or ramp_action_object.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt):
+                return ramp_action_object
     return None
 
 
@@ -30,8 +31,7 @@ def kaggle_submit_file(
 ):
     """Copy a submission file into a submission folder.
 
-    Typically into <ramp_kit_dir>/kaggle_submissions.
-    Can be used outside Kaggle but the name stuck.
+    Typically into <ramp_kit_dir>/final_test_predictions.
     The main function of this is to save the action so we can recover what was
     submitted.
     """
@@ -139,13 +139,13 @@ def run_race(
             # The blended score improvement is wrt the previous blended score. If it doesn't exist
             # (in the first iteration, or if no submission was blended for a reason) use the mean
             # score.
-            previous_blend_action = last_action(ramp_kit_dir, "blend")
+            previous_blend_action = last_action(ramp_kit_dir, "blend", n_folds_hyperopt=n_folds_hyperopt)
             rh.actions.blend(
                 ramp_kit_dir=ramp_kit_dir,
                 submissions=list(blended_submissions),
                 fold_idxs=range(900, 900 + n_folds_hyperopt),
             )
-            blend_action = last_action(ramp_kit_dir, "blend")
+            blend_action = last_action(ramp_kit_dir, "blend", n_folds_hyperopt=n_folds_hyperopt)
             if hasattr(blend_action, "blended_score"):
                 blended_score = blend_action.blended_score
                 contributivities = {
