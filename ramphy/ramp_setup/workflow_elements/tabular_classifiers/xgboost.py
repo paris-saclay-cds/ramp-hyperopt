@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.base import BaseEstimator
+from sklearn.preprocessing import LabelEncoder
 import xgboost as xb
 from ramphy import Hyperparameter
 
@@ -34,7 +35,7 @@ class Classifier(BaseEstimator):
         self.metadata = metadata
         target_cols = metadata["data_description"]["target_cols"]
         if len(target_cols) > 1:
-            raise NotImplementedError("Multi-output classification is not yet supported.")            
+            raise NotImplementedError("Multi-output classification is not yet supported.")
         target_value_dict = metadata["data_description"]["target_values"]
         target_values = target_value_dict[target_cols[0]]
         if len(target_values) == 2:
@@ -57,6 +58,8 @@ class Classifier(BaseEstimator):
             reg_lambda=REG_LAMBDA,
             objective=self.objective,
         )
+        # xgboost requires labels ot be encoded
+        y = LabelEncoder().fit_transform(y.ravel())
         self.clf.fit(X, y)
 
     def predict_proba(self, X):

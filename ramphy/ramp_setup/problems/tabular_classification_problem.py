@@ -27,8 +27,8 @@ n_targets = len(target_cols)
 problem_title = f"{{title}} tabular {{prediction_type}}"
 
 Predictions = rw.prediction_types.make_combined([
-    rw.prediction_types.make_multiclass(label_names=range(len(target_values)))
-    for _, target_values in target_value_dict.items()
+    rw.prediction_types.make_multiclass(label_names=target_values)
+    for target_values in target_value_dict.values()
 ])
 
 workflow = rw.workflows.TabularClassifier()
@@ -91,7 +91,7 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
             df[target_col] = y_pred_block[:, positive_value_index]
         else:
             y_pred_indices = np.argmax(y_pred_block, axis=1)
-            df[target_col] = [target_values[i] for i in y_pred_indices]       
+            df[target_col] = [target_values[i] for i in y_pred_indices]
         first_col_index += len(target_values)
     output_f_name = Path(output_path) / f"submission_{{suffix}}.csv"
     print(f"Writing submissions into {{output_f_name}}")
