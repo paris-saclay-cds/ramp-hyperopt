@@ -57,6 +57,18 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="The number of folds used in hyperopt.",
 )
 @click.option(
+    "--n-folds-final-blend",
+    default=30,
+    show_default=True,
+    help="The number of folds used in the final blend.",
+)
+@click.option(
+    "--first-fold-idx",
+    default=0,
+    show_default=True,
+    help="The index of the first fold of problem.get_cv.",
+)
+@click.option(
     "--no-growing-folds",
     is_flag=True,
     default=True,
@@ -92,6 +104,8 @@ def main(
     n_rounds,
     n_trials_per_round,
     n_folds_hyperopt,
+    n_folds_final_blend,
+    first_fold_idx,
     patience,
     no_growing_folds,
     base_predictors,
@@ -109,6 +123,8 @@ def main(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         n_folds_hyperopt=n_folds_hyperopt,
+        n_folds_final_blend=n_folds_final_blend,
+        first_fold_idx=first_fold_idx,
         no_growing_folds=no_growing_folds,
         preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),

@@ -69,6 +69,8 @@ class Regressor(BaseEstimator):
     def predict(self, X):
         X_new = X.copy()
         for col in X_new.columns:
+            print(col)
+            print(len(X_new[col].isnull()))
             if col in self.spline_transformers.keys():
                 transformer = self.spline_transformers[col]
                 X_tr = transformer.transform(X_new[[col]])

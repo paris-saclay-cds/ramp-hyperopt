@@ -11,14 +11,18 @@ import ramphy.ramp_setup as rs
 import rampwf as rw
 
 
-def last_action(ramp_kit_dir: str, name: str, n_folds_hyperopt: Optional[int] = None) -> rh.actions.RampAction | None:
+def last_action(
+    ramp_kit_dir: str,
+    name: str,
+    fold_idxs: range = None,
+) -> rh.actions.RampAction | None:
     """Last action of a given action name."""
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
     action_f_names.sort(reverse=True)
     for i in range(len(action_f_names)):
         ramp_action_object = rh.actions.load_ramp_action(Path(action_f_names[i]))
         if ramp_action_object.name == name:
-            if n_folds_hyperopt is None or ramp_action_object.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt):
+            if fold_idxs is None or ramp_action_object.kwargs["fold_idxs"] == fold_idxs:
                 return ramp_action_object
     return None
 
@@ -48,6 +52,7 @@ def run_race(
     n_trials_per_round: int,
     patience: int,
     n_folds_hyperopt: int,
+    first_fold_idx: int,
     start_round: int,
     scores: list[float],
     is_lower_the_better: bool,
@@ -122,7 +127,7 @@ def run_race(
             submission=submission_to_hyperopt,
             workflow_element_names=wes_to_hyperopt,
             n_trials=n_trials,
-            fold_idxs=range(900, 900 + n_folds_hyperopt),
+            fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             resume=True,
             subtract_existing=False,
         )
@@ -139,13 +144,13 @@ def run_race(
             # The blended score improvement is wrt the previous blended score. If it doesn't exist
             # (in the first iteration, or if no submission was blended for a reason) use the mean
             # score.
-            previous_blend_action = last_action(ramp_kit_dir, "blend", n_folds_hyperopt=n_folds_hyperopt)
+            previous_blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
             rh.actions.blend(
                 ramp_kit_dir=ramp_kit_dir,
                 submissions=list(blended_submissions),
-                fold_idxs=range(900, 900 + n_folds_hyperopt),
+                fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             )
-            blend_action = last_action(ramp_kit_dir, "blend", n_folds_hyperopt=n_folds_hyperopt)
+            blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
             if hasattr(blend_action, "blended_score"):
                 blended_score = blend_action.blended_score
                 contributivities = {
@@ -183,6 +188,7 @@ def resume_race(
     base_predictors: list[str],
     contributivity_floor: int,
     n_folds_hyperopt: int,
+    first_fold_idx: int,
 ) -> tuple[int, set[str], dict, list[float]]:
     print("Loading actions...")
     action_f_names = glob.glob(f"{ramp_kit_dir}/actions/*")
@@ -192,7 +198,7 @@ def resume_race(
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     blend_actions = [
-        ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)
+        ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
     ]
     stop_time = blend_actions[-1].stop_time
     print(f"Last blending action at {stop_time}, deleting all actions after...")
@@ -207,7 +213,7 @@ def resume_race(
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     # we only need race blend actions
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt)]
+    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
     start_round = len(hyperopt_actions)
     scores = []
@@ -248,8 +254,9 @@ def final_blend_growing_folds(
     base_predictors: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
-    n_folds: int,
+    n_folds_final_blend: int,
     n_folds_hyperopt: int,
+    first_fold_idx: int,
     top_n_for_mean: int,
     n_sigma: float,
 ):
@@ -258,21 +265,21 @@ def final_blend_growing_folds(
     We'll probably drop this since blend_and_bag and bag_and_blend work better,
     but keep it for early versions to experiment.
     """
-    for stop_fold_idx in range(900 + n_folds_hyperopt + 1, 900 + n_folds + 1):
+    for stop_fold_idx in range(first_fold_idx + n_folds_hyperopt + 1, first_fold_idx + n_folds_final_blend + 1):
         selected_submissions = []
         for submission in base_predictors:
             rh.actions.select_top_hyperopt_and_train(
                 ramp_kit_dir=ramp_kit_dir,
                 submission=submission,
-                fold_idxs=range(900, stop_fold_idx),
-                trained_fold_idxs=range(900, stop_fold_idx - 1),
+                fold_idxs=range(first_fold_idx, stop_fold_idx),
+                trained_fold_idxs=range(first_fold_idx, stop_fold_idx - 1),
                 top_n=top_n_for_mean,
                 n_sigma=n_sigma,
             )
             top_hyperopt_dict = rh.actions.select_top_hyperopt(
                 ramp_kit_dir=ramp_kit_dir,
                 submission=submission,
-                fold_idxs=range(900, stop_fold_idx),
+                fold_idxs=range(first_fold_idx, stop_fold_idx),
                 n_sigma=n_sigma,
             )
             if "selected_submissions" in top_hyperopt_dict:
@@ -280,7 +287,7 @@ def final_blend_growing_folds(
         rh.actions.blend(
             ramp_kit_dir=ramp_kit_dir,
             submissions=selected_submissions,
-            fold_idxs=range(900, stop_fold_idx),
+            fold_idxs=range(first_fold_idx, stop_fold_idx),
         )
         submission_source_f_name = (
             Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
@@ -315,14 +322,15 @@ def update_hyperopt_summary(
 def train_on_all_folds(
     submissions: list[str],
     ramp_kit_dir: str,
-    n_folds: int,
+    n_folds_final_blend: int,
+    first_fold_idx: int,
 ):
     """We retrain the final blend on all folds."""
     for submission in submissions:
         rh.actions.train(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
-            fold_idxs=range(900, 900 + n_folds),
+            fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_final_blend),
         )
 
 
@@ -330,7 +338,8 @@ def final_blend_then_bag(
     submissions: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
-    n_folds: int,
+    n_folds_final_blend: int,
+    first_fold_idx: int,
     n_rounds: int = -1,
 ):
     """Blend then bag and submit after each fold.
@@ -338,11 +347,11 @@ def final_blend_then_bag(
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all in <ramp_kit_dir>/final_test_predictions.
     """
-    for stop_fold_idx in range(901, 900 + n_folds + 1):
+    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.blend(
             ramp_kit_dir=ramp_kit_dir,
             submissions=submissions,
-            fold_idxs=range(900, stop_fold_idx),
+            fold_idxs=range(first_fold_idx, stop_fold_idx),
         )
         submission_source_f_name = (
             Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_test.csv"
@@ -370,7 +379,8 @@ def final_bag_then_blend(
     submissions: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
-    n_folds: int,
+    n_folds_final_blend: int,
+    first_fold_idx: int,
     n_rounds: int = -1,
 ):
     """Bag then blend and submit after each fold.
@@ -378,11 +388,11 @@ def final_bag_then_blend(
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all.
     """
-    for stop_fold_idx in range(901, 900 + n_folds + 1):
+    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.bag_then_blend(
             ramp_kit_dir=ramp_kit_dir,
             submissions=submissions,
-            fold_idxs=range(900, stop_fold_idx),
+            fold_idxs=range(first_fold_idx, stop_fold_idx),
         )
         submission_source_f_name = (
             Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_bagged_then_blended_test.csv"
@@ -410,7 +420,8 @@ def submit_best_submissions(
     base_predictors: list[str],
     ramp_kit_dir: str,
     kit_suffix: str,
-    n_folds: int,
+    n_folds_final_blend: int,
+    first_fold_idx: int,
 ):
     """Submit the best of each submission (classical hyperopt) in
     <ramp_kit_dir>/final_test_predictions.
@@ -419,7 +430,7 @@ def submit_best_submissions(
         best_submissions = rh.actions.select_top_hyperopt(
             ramp_kit_dir=ramp_kit_dir,
             submission=submission,
-            fold_idxs=range(900, 900 + n_folds),
+            fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_final_blend),
             top_n=1,
         )["selected_submissions"]
         if len(best_submissions) == 0:
@@ -435,7 +446,7 @@ def submit_best_submissions(
             rh.actions.train(
                 ramp_kit_dir=ramp_kit_dir,
                 submission=best_submission,
-                fold_idxs=range(900, 900 + n_folds),
+                fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_final_blend),
                 bag=True,
             )
         submission_target_f_name = (
@@ -458,7 +469,8 @@ def hyperopt_race(
     n_trials_per_round: int = 5,
     patience: int = -1,
     n_folds_hyperopt: int = 3,
-    n_folds: int = 31,
+    n_folds_final_blend: int = 30,
+    first_fold_idx: int = 0,
     base_predictors: list[str] = ["lgbm", "xgboost", "catboost"],
     data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
     preprocessors_to_hyperopt: Optional[list[str]] = None,
@@ -485,6 +497,7 @@ def hyperopt_race(
             base_predictors=base_predictors,
             contributivity_floor=contributivity_floor,
             n_folds_hyperopt=n_folds_hyperopt,
+            first_fold_idx=first_fold_idx,
         )
         try:
             config = rs.utils.load_config(load_path=ramp_kit_dir)
@@ -537,7 +550,8 @@ def hyperopt_race(
             n_trials_per_round=n_trials_per_round,
             patience=patience,
             n_folds_hyperopt=n_folds_hyperopt,
-            n_folds=n_folds,
+            n_folds_final_blend=n_folds_final_blend,
+            first_fold_idx=first_fold_idx,
             base_predictors=base_predictors,
             data_preprocessors=data_preprocessors,
             preprocessors_to_hyperopt=dp_hyperopt_full_name,
@@ -558,6 +572,7 @@ def hyperopt_race(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         n_folds_hyperopt=n_folds_hyperopt,
+        first_fold_idx=first_fold_idx,
         start_round=start_round,
         scores=scores,
         is_lower_the_better=is_lower_the_better,
@@ -576,8 +591,9 @@ def hyperopt_race(
             base_predictors=base_predictors,
             ramp_kit_dir=str(ramp_kit_dir),
             kit_suffix=kit_suffix,
-            n_folds=n_folds,
+            n_folds_final_blend=n_folds_final_blend,
             n_folds_hyperopt=n_folds_hyperopt,
+            first_fold_idx=first_fold_idx,
             top_n_for_mean=top_n_for_mean,
             n_sigma=n_sigma,
         )
@@ -585,7 +601,8 @@ def hyperopt_race(
     train_on_all_folds(
         submissions=list(blended_submissions),
         ramp_kit_dir=str(ramp_kit_dir),
-        n_folds=n_folds,
+        n_folds_final_blend=n_folds_final_blend,
+        first_fold_idx=first_fold_idx,
     )
     # Whenever hyperopt submissions are trained outside of hyperopt, we need to update the summary.
     update_hyperopt_summary(
@@ -597,19 +614,22 @@ def hyperopt_race(
         submissions=list(blended_submissions),
         ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
-        n_folds=n_folds,
+        n_folds_final_blend=n_folds_final_blend,
+        first_fold_idx=first_fold_idx,
     )
     # Bag then blend the final blend of the hyperopt race on all the folds
     final_bag_then_blend(
         submissions=list(blended_submissions),
         ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
-        n_folds=n_folds,
+        n_folds_final_blend=n_folds_final_blend,
+        first_fold_idx=first_fold_idx,
     )
     # Submit the best of each base submission (classical hyperopt)
     submit_best_submissions(
         base_predictors=base_predictors,
         ramp_kit_dir=str(ramp_kit_dir),
         kit_suffix=kit_suffix,
-        n_folds=n_folds,
+        n_folds_final_blend=n_folds_final_blend,
+        first_fold_idx=first_fold_idx,
     )
