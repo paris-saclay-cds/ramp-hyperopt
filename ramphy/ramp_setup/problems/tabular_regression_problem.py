@@ -57,8 +57,10 @@ def get_metadata(path=".", data_label=None) -> dict:
 
 def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     if "test" not in suffix:
-        return  # we don't care about saving the training predictions
-    df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
+        df = pd.DataFrame()
+#        return  # we don't care about saving the training predictions
+    else:
+        df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
     df[target_cols] = y_pred
     output_f_name = Path(output_path) / f"submission_{{suffix}}.csv"
     print(f"Writing submissions into {{output_f_name}}")

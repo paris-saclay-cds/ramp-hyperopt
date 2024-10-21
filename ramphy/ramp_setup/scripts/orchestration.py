@@ -347,7 +347,8 @@ def final_blend_then_bag(
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all in <ramp_kit_dir>/final_test_predictions.
     """
-    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+#    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+    for stop_fold_idx in range(first_fold_idx + n_folds_final_blend, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.blend(
             ramp_kit_dir=ramp_kit_dir,
             submissions=submissions,
@@ -373,6 +374,26 @@ def final_blend_then_bag(
             submission_target_f_name=str(submission_target_f_name),
             ramp_kit_dir=ramp_kit_dir,
         )
+        submission_source_f_name = (
+            Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_combined_bagged_valid.csv"
+        )
+        if n_rounds > 0:
+            submission_target_f_name = (
+                Path(ramp_kit_dir)
+                / "final_test_predictions"
+                / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}_r{n_rounds}_valid.csv"
+            )
+        else:
+            submission_target_f_name = (
+                Path(ramp_kit_dir)
+                / "final_test_predictions"
+                / f"auto_{kit_suffix}_last_blend_{str(stop_fold_idx).zfill(3)}_valid.csv"
+            )
+        submit_final_test_predictions(
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
+            ramp_kit_dir=ramp_kit_dir,
+        )
 
 
 def final_bag_then_blend(
@@ -388,7 +409,8 @@ def final_bag_then_blend(
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all.
     """
-    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+#    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+    for stop_fold_idx in range(first_fold_idx + n_folds_final_blend, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.bag_then_blend(
             ramp_kit_dir=ramp_kit_dir,
             submissions=submissions,
@@ -408,6 +430,26 @@ def final_bag_then_blend(
                 Path(ramp_kit_dir)
                 / "final_test_predictions"
                 / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}.csv"
+            )
+        submit_final_test_predictions(
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
+            ramp_kit_dir=ramp_kit_dir,
+        )
+        submission_source_f_name = (
+            Path(ramp_kit_dir) / "submissions" / "training_output" / "submission_bagged_then_blended_valid.csv"
+        )
+        if n_rounds > 0:
+            submission_target_f_name = (
+                Path(ramp_kit_dir)
+                / "final_test_predictions"
+                / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}_r{n_rounds}_valid.csv"
+            )
+        else:
+            submission_target_f_name = (
+                Path(ramp_kit_dir)
+                / "final_test_predictions"
+                / f"auto_{kit_suffix}_bagged_then_blended_{str(stop_fold_idx).zfill(3)}_valid.csv"
             )
         submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
@@ -451,6 +493,17 @@ def submit_best_submissions(
             )
         submission_target_f_name = (
             Path(ramp_kit_dir) / "final_test_predictions" / f"auto_{kit_suffix}_best_{submission}.csv"
+        )
+        submit_final_test_predictions(
+            submission_source_f_name=str(submission_source_f_name),
+            submission_target_f_name=str(submission_target_f_name),
+            ramp_kit_dir=ramp_kit_dir,
+        )
+        submission_source_f_name = (
+            Path(ramp_kit_dir) / "submissions" / best_submission / "training_output" / "submission_bagged_valid.csv"
+        )
+        submission_target_f_name = (
+            Path(ramp_kit_dir) / "final_test_predictions" / f"auto_{kit_suffix}_best_{submission}_valid.csv"
         )
         submit_final_test_predictions(
             submission_source_f_name=str(submission_source_f_name),
