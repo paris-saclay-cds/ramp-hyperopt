@@ -62,6 +62,7 @@ setup(
             'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
             'ramp-register-experiment = ramphy.cli.register_experiment:start',
             'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
+            'ramp-foundation-models = ramphy.cli.foundation_models:start',
         ]
     }
 )

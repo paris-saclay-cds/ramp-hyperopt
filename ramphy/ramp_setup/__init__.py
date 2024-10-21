@@ -1,5 +1,6 @@
 from . import actions
 from . import utils
+from .scripts import foundation
 from .scripts import orchestration
 from .scripts import tabular
 from .scripts.setup import setup
@@ -14,7 +15,7 @@ from .workflow_elements.tabular_data_preprocessors.base_data_preprocessor import
 from .workflow_elements.tabular_data_preprocessors.transformer_base_preprocessor import TransformerBaseDataPreprocessor
 
 __all__ = [
-    "orchestration",
+    "foundation",
     "tabular",
     "tabular_setup",
     "tabular_regression_submit",

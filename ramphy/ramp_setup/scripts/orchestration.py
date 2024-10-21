@@ -245,7 +245,8 @@ def resume_race(
                     "contributivities": contributivities,
                 }
             )
-            blended_submissions = set([sh for sh, c in blend_action.contributivities.items() if c > 0])
+    blend_action = blend_actions[-1]
+    blended_submissions = set([sh for sh, c in blend_action.contributivities.items() if c > 0])
     print(f"Blended submissions: {blended_submissions}")
     return start_round, blended_submissions, action_stats, scores
 
@@ -512,6 +513,34 @@ def submit_best_submissions(
         )
 
 
+def submit_base_submissions(
+    ramp_kit_dir: str,
+    metadata: dict,
+    base_predictors: list[str],
+    data_preprocessors: list[str],
+) -> list[str]:
+    for submission in base_predictors:
+        if "regression" in metadata["prediction_type"]:
+            submitted_elements = rs.scripts.tabular.tabular_regression_ordered_submit(
+                ramp_kit_dir=ramp_kit_dir,
+                submission=submission,
+                regressor=submission,
+                data_preprocessors=data_preprocessors,
+            )
+
+        elif "classification" in metadata["prediction_type"]:
+            submitted_elements = rs.scripts.tabular.tabular_classification_ordered_submit(
+                ramp_kit_dir=ramp_kit_dir,
+                submission=submission,
+                classifier=submission,
+                data_preprocessors=data_preprocessors,
+            )
+    final_test_predictions_path = ramp_kit_dir / "final_test_predictions"
+    final_test_predictions_path.mkdir(parents=False, exist_ok=True)
+    print(submitted_elements)
+    return submitted_elements
+
+
 def hyperopt_race(
     ramp_kit: str,
     kit_root: str,
@@ -571,25 +600,12 @@ def hyperopt_race(
         blended_submissions = set()
         scores = []
         # submit base submissions
-        for submission in base_predictors:
-            if "regression" in metadata["prediction_type"]:
-                submitted_elements = rs.scripts.tabular.tabular_regression_ordered_submit(
-                    ramp_kit_dir=ramp_kit_dir,
-                    submission=submission,
-                    regressor=submission,
-                    data_preprocessors=data_preprocessors,
-                )
-
-            elif "classification" in metadata["prediction_type"]:
-                submitted_elements = rs.scripts.tabular.tabular_classification_ordered_submit(
-                    ramp_kit_dir=ramp_kit_dir,
-                    submission=submission,
-                    classifier=submission,
-                    data_preprocessors=data_preprocessors,
-                )
-        final_test_predictions_path = ramp_kit_dir / "final_test_predictions"
-        final_test_predictions_path.mkdir(parents=False, exist_ok=True)
-
+        submitted_elements = submit_base_submissions(
+            ramp_kit_dir=ramp_kit_dir,
+            metadata=metadata,
+            base_predictors=base_predictors,
+            data_preprocessors=data_preprocessors,
+        )
         dp_hyperopt_full_name = []
         if preprocessors_to_hyperopt is not None:
             for dp in preprocessors_to_hyperopt:
