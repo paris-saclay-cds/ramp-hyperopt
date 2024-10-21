@@ -1,23 +1,7 @@
-import csv
 import json
-import os
 import subprocess
-import time
-import zipfile
-from io import StringIO
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
-
-import numpy as np
-import pandas as pd
-import rampwf as rw
-import requests
-from kaggle.api.kaggle_api_extended import KaggleApi
-
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+from typing import Callable, Dict, Optional
 
 import ramphy as rh
 from ramphy import ramp_setup as rs
