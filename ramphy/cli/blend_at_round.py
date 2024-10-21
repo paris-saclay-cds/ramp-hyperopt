@@ -27,8 +27,8 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="The program number (repeated within version)",
 )
 @click.option(
-    "--n-folds",
-    default=15,
+    "--n-folds-final-blend",
+    default=30,
     show_default=True,
     help="The number of folds to bag",
 )
@@ -38,12 +38,19 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The number of folds used in hyperopt.",
 )
+@click.option(
+    "--first-fold-idx",
+    default=0,
+    show_default=True,
+    help="The index of the first fold of problem.get_cv.",
+)
 def main(
     ramp_kit,
     version,
     number,
-    n_folds,
+    n_folds_final_blend,
     n_folds_hyperopt,
+    first_fold_idx,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = f"{ramp_kit}_{kit_suffix}"
@@ -67,7 +74,7 @@ def main(
 
     n_rounds = 1
     for blend_action in blend_actions:
-        if blend_action.kwargs["fold_idxs"] == range(900, 900 + n_folds_hyperopt):
+        if blend_action.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt):
             n_rounds += 1
             last_race_blend_action = blend_action
     last_race_blended_submissions = [key for key, value in last_race_blend_action.contributivities.items() if value > 0]
@@ -76,14 +83,16 @@ def main(
     rs.orchestration.train_on_all_folds(
         submissions = last_race_blended_submissions,
         ramp_kit_dir = ramp_kit_dir,
-        n_folds = n_folds + 1,
+        n_folds_final_blend = n_folds_final_blend,
+        first_fold_idx = first_fold_idx,
     )
     # Blend then bag the final blend of the hyperopt race on all the folds
     rs.orchestration.final_blend_then_bag(
         submissions = last_race_blended_submissions,
         ramp_kit_dir = ramp_kit_dir,
         kit_suffix = kit_suffix,
-        n_folds = n_folds,
+        n_folds_final_blend = n_folds_final_blend,
+        first_fold_idx = first_fold_idx,
         n_rounds = n_rounds,
     )
     # Bag then blend the final blend of the hyperopt race on all the folds
@@ -91,7 +100,8 @@ def main(
         submissions = last_race_blended_submissions,
         ramp_kit_dir = ramp_kit_dir,
         kit_suffix = kit_suffix,
-        n_folds = n_folds,
+        n_folds_final_blend = n_folds_final_blend,
+        first_fold_idx = first_fold_idx,
         n_rounds = n_rounds,
     )
 
