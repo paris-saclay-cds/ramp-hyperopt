@@ -74,7 +74,13 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
         df = pd.DataFrame()
 #        return  # we don't care about saving the training predictions
     else:
-        df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
+        sample_submission_path = Path(data_path) / "data" / "sample_submission.csv"
+        if sample_submission_path.exists():
+            df = pd.read_csv(sample_submission_path)
+        else:
+            test_path = Path(data_path) / "data" / "test.csv"
+            df = pd.read_csv(test_path)
+            df = df[[id_col]]
     first_col_index = 0
     for target_col in target_cols:
         target_values = target_value_dict[target_col]

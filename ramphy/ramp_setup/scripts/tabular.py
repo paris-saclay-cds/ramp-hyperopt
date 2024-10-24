@@ -60,7 +60,6 @@ def tabular_setup(
     problem_f_name = ramp_kit_dir / "problem.py"
     train_data = pd.read_csv(download_dir / "train.csv")
     test_data = pd.read_csv(download_dir / "test.csv")
-    sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
 
     metadata = json.load(open(download_dir / "metadata.json"))
     feature_types = metadata["data_description"]["feature_types"]
@@ -108,6 +107,11 @@ def tabular_setup(
         f_out.write(problem_code)
     (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
     (ramp_kit_dir / "submissions").mkdir(parents=True, exist_ok=True)
+
+    sample_submission_path = download_dir / "sample_submission.csv"
+    if sample_submission_path.exists():
+        shutil.copy(
+            sample_submission_path, ramp_data_dir / "data" / "sample_submission.csv")
 
     feature_values = {}
     missing_data_count = {}
@@ -158,7 +162,6 @@ def tabular_setup(
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
-    sample_submission.to_csv(ramp_data_dir / "data" / "sample_submission.csv", index=False)
 
     #    metadata.save(ramp_data_dir)
     json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"), indent=4)
