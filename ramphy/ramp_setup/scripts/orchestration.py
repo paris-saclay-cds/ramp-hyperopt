@@ -100,7 +100,7 @@ def run_race(
             else:
                 speed = np.finfo(float).max
             improvement_speeds[predictor] = speed
-        print(f"improvement_speeds:\n{improvement_speeds}")
+
         row = pd.DataFrame(dict({"round_idx": round_idx}, **improvement_speeds), index=[round_idx])
         improvement_speed_df = pd.concat([improvement_speed_df, row], ignore_index=True)
         improvement_speed_df.to_csv("improvement_speeds.csv")
