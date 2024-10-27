@@ -12,6 +12,34 @@ from ramphy import ramp_setup as rs
 from ramphy.actions import ramp_action
 
 
+def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
+    """Mock test labels if they do not exist.
+
+    This is for compatibility between rampwf which expects targets for the test and
+    Kaggle challenges for which we do not have the targets for the test:
+    """
+    # use mean and sigma from training set
+    np.random.seed(43)
+    if prediction_type == "regression":
+        for target_col in target_cols:
+            if target_col not in test_data.columns:
+                test_data[target_col] = np.random.normal(
+                    train_data[target_col].mean(),
+                    train_data[target_col].std(),
+                    size=len(test_data),
+                )
+    elif "classification" in prediction_type:
+        for target_col in target_cols:
+            if target_col not in test_data.columns:
+                target_values = train_data[target_col].unique()
+                counts = train_data[target_col].value_counts()
+                weights = counts / counts.sum()
+                test_data[target_col] = np.random.choice(
+                    target_values, size=len(test_data), p=weights
+                )
+    return test_data
+
+
 @ramp_action
 def tabular_setup(
     download_dir: str | Path,
@@ -32,7 +60,6 @@ def tabular_setup(
     problem_f_name = ramp_kit_dir / "problem.py"
     train_data = pd.read_csv(download_dir / "train.csv")
     test_data = pd.read_csv(download_dir / "test.csv")
-    sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
 
     metadata = json.load(open(download_dir / "metadata.json"))
     feature_types = metadata["data_description"]["feature_types"]
@@ -81,6 +108,11 @@ def tabular_setup(
     (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
     (ramp_kit_dir / "submissions").mkdir(parents=True, exist_ok=True)
 
+    sample_submission_path = download_dir / "sample_submission.csv"
+    if sample_submission_path.exists():
+        shutil.copy(
+            sample_submission_path, ramp_data_dir / "data" / "sample_submission.csv")
+
     feature_values = {}
     missing_data_count = {}
     unique_value_count = {}
@@ -125,28 +157,11 @@ def tabular_setup(
     metadata["data_description"]["missing_data_count"] = missing_data_count
     metadata["data_description"]["unique_value_count"] = unique_value_count
 
-    # mock test labels
-    # matching mean and sigma from training set
-    np.random.seed(43)
-    if prediction_type == "regression":
-        for target_col in target_cols:
-            test_data[target_col] = np.random.normal(
-                train_data[target_col].mean(), train_data[target_col].std(), size=len(test_data)
-            )
-    elif "classification" in prediction_type:
-        for target_col in target_cols:
-            target_values = list(train_data[target_col].unique())
-            new_target_values = list(range(len(target_values)))
-            binary_transf = dict(zip(target_values, new_target_values))
-            train_data = train_data.replace({target_col: binary_transf})
-            test_data = test_data.replace({target_col: binary_transf})
-            counts = train_data[target_col].value_counts()
-            p = [counts[t] / len(train_data) for t in new_target_values]
-            test_data[target_col] = np.random.choice(new_target_values, len(test_data), p=p)
+    test_data = create_dummy_targets(
+        train_data, test_data, target_cols, prediction_type)
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
-    sample_submission.to_csv(ramp_data_dir / "data" / "sample_submission.csv", index=False)
 
     #    metadata.save(ramp_data_dir)
     json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"), indent=4)

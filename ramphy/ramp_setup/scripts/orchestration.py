@@ -103,7 +103,7 @@ def run_race(
         print(f"improvement_speeds:\n{improvement_speeds}")
         row = pd.DataFrame(dict({"round_idx": round_idx}, **improvement_speeds), index=[round_idx])
         improvement_speed_df = pd.concat([improvement_speed_df, row], ignore_index=True)
-        improvement_speed_df.to_csv("improvement_speeds.csv")
+
         max_speed = max(improvement_speeds.values())
         best_predictors = [predictor for predictor, speed in improvement_speeds.items() if speed == max_speed]
         predictor = random.choice(best_predictors)  # in case of tie (at zero typically), or eps greedy, random choice
