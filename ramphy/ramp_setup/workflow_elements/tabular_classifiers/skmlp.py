@@ -48,7 +48,6 @@ class Classifier(BaseEstimator):
                 new_cols = [f"{{col}}_spline_{{i}}" for i in range(n_new_cols)]
                 X_new[new_cols] = X_tr
                 X_new = X_new.drop(columns=[col])
-        print(X_new.shape)
         self.clf = MLPClassifier(
             hidden_layer_sizes=LAYERS,
             early_stopping=True,
@@ -74,7 +73,6 @@ class Classifier(BaseEstimator):
                 new_cols = [f"{{col}}_spline_{{i}}" for i in range(n_new_cols)]
                 X_new[new_cols] = X_tr
                 X_new = X_new.drop(columns=[col])
-        print(X_new.shape)
         n_chunks = X_new.shape[0] * X_new.shape[1] / 10 ** 7
         n_rows = int(X_new.shape[0] / n_chunks)
         return np.concatenate([

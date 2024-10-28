@@ -44,21 +44,22 @@ def setup(
     metadata = json.load(open(Path(ramp_kit_dir) / "data" / "metadata.json"))
 
     if "regression" in metadata["prediction_type"]:
-        rs.scripts.tabular.tabular_regression_columnwise_last_submit(
-            ramp_kit_dir = ramp_kit_dir,
-            submission = 'starting_kit',
-            regressor = 'lgbm',
+        rs.scripts.tabular.tabular_regression_ordered_submit(
+            ramp_kit_dir=ramp_kit_dir,
+            submission="starting_kit",
+            regressor="lgbm",
         )
     elif "classification" in metadata["prediction_type"]:
-        rs.scripts.tabular.tabular_classification_columnwise_last_submit(
+        rs.scripts.tabular.tabular_classification_ordered_submit(
             ramp_kit_dir = ramp_kit_dir,
             submission = 'starting_kit',
             classifier = 'lgbm',
         )
 
     rh.actions.train(
-        ramp_kit_dir=ramp_kit_dir,
-        submission="starting_kit",
-        fold_idxs=range(900, 903),
-        force_retrain=True,
+        ramp_kit_dir = ramp_kit_dir,
+        submission = 'starting_kit',
+#        fold_idxs = range(900, 903),
+        fold_idxs = range(3),
+        force_retrain = True,
     )

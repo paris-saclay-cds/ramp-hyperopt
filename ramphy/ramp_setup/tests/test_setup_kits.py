@@ -25,7 +25,7 @@ def test_submission(ramp_kit):
     kit_root = Path(PATH) / 'ramp_kits'
     setup_root = Path(PATH) / 'ramp_setup_kits'
     ramp_kit_dir = kit_root / f"{ramp_kit}_v0_n0"
-    
+
     # cleaning up
     if ramp_kit_dir.is_dir():
         shutil.rmtree(ramp_kit_dir)
@@ -42,36 +42,36 @@ def test_submission(ramp_kit):
         kit_root = kit_root,
         version = "0",
         number = 0,
-    )    
-
-    rs.orchestration.hyperopt_race(
-        ramp_kit = ramp_kit,
-        kit_root = kit_root,
-        version = "0",
-        number = 0,
-        resume = False,
-        n_rounds = 1,
-        n_trials_per_round = 3,
-        n_folds_hyperopt = 3,
-        n_folds = 7,
-        base_submissions = ["lgbm", "xgboost", "catboost"],
-        top_n_for_mean = 2,
-        n_sigma = 1.0,    
     )
 
     rs.orchestration.hyperopt_race(
-        ramp_kit = ramp_kit,
-        kit_root = kit_root,
-        version = "0",
-        number = 0,
-        resume = True,
-        n_rounds = 1,
-        n_trials_per_round = 3,
-        n_folds_hyperopt = 3,
-        n_folds = 7,
-        base_submissions = ["lgbm", "xgboost", "catboost"],
-        top_n_for_mean = 2,
-        n_sigma = 1.0,    
+        ramp_kit=ramp_kit,
+        kit_root=kit_root,
+        version="0",
+        number=0,
+        resume=False,
+        n_rounds=1,
+        n_trials_per_round=3,
+        n_folds_hyperopt=3,
+        n_folds_final_blend=7,
+        base_predictors=["lgbm", "xgboost", "catboost"],
+        top_n_for_mean=2,
+        n_sigma=1.0,
+    )
+
+    rs.orchestration.hyperopt_race(
+        ramp_kit=ramp_kit,
+        kit_root=kit_root,
+        version="0",
+        number=0,
+        resume=True,
+        n_rounds=1,
+        n_trials_per_round=3,
+        n_folds_hyperopt=3,
+        n_folds_final_blend=7,
+        base_predictors=["lgbm", "xgboost", "catboost"],
+        top_n_for_mean=2,
+        n_sigma=1.0,
     )
 
     # cleaning up

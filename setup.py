@@ -34,7 +34,7 @@ CLASSIFIERS = ['Intended Audience :: Science/Research',
                'Operating System :: MacOS']
 INSTALL_REQUIRES = ['numpy', 'scipy', 'pandas', 'scikit-learn>=0.22', 'joblib',
                     'cloudpickle', 'click', 'ray[tune]', 'ramp-workflow',
-                    'xarray', 'category_encoders', 'xgboost', 'lightgbm', 'catboost', 'kaggle', 'skrub', 'selenium', 'click_config_file', 'holidays']
+                    'xarray', 'category_encoders', 'xgboost', 'lightgbm', 'catboost', 'kaggle', 'skrub', 'click_config_file', 'holidays']
 EXTRAS_REQUIRE = {
     'tests': ['pytest', 'pytest-cov'],
     'docs': ['sphinx', 'sphinx_rtd_theme', 'numpydoc', 'sphinx-click']
@@ -59,12 +59,10 @@ setup(
         'console_scripts': [
             'ramp-hyperopt = ramphy.cli.hyperopt:start',
             'ramp-setup = ramphy.cli.setup:start',
-            'ramp-download-leaderboards = ramphy.cli.download_leaderboards:start',
             'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
-            'ramp-update-results = ramphy.cli.update_results:start',
             'ramp-register-experiment = ramphy.cli.register_experiment:start',
-            'ramp-submit-to-kaggle = ramphy.cli.submit_to_kaggle:start',
             'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
+            'ramp-foundation-models = ramphy.cli.foundation_models:start',
         ]
     }
 )

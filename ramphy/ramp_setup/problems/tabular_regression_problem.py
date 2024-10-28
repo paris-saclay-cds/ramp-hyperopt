@@ -26,7 +26,8 @@ workflow = rw.workflows.TabularRegressor()
 score_types = [
     rs.score_name_type_map[score_name](name=score_name, precision=4),
 ]
-get_cv = rw.cvs.GrowingFolds().get_cv
+#get_cv = rw.cvs.GrowingFolds().get_cv
+get_cv = rw.cvs.RTimesK().get_cv
 
 def _read_data(path, f_name, data_label, target_cols):
     if data_label is None:
@@ -56,8 +57,16 @@ def get_metadata(path=".", data_label=None) -> dict:
 
 def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
     if "test" not in suffix:
-        return  # we don't care about saving the training predictions
-    df = pd.read_csv(Path(data_path) / "data" / "sample_submission.csv")
+        df = pd.DataFrame()
+#        return  # we don't care about saving the training predictions
+    else:
+        sample_submission_path = Path(data_path) / "data" / "sample_submission.csv"
+        if sample_submission_path.exists():
+            df = pd.read_csv(sample_submission_path)
+        else:
+            test_path = Path(data_path) / "data" / "test.csv"
+            df = pd.read_csv(test_path)
+            df = df[[id_col]]
     df[target_cols] = y_pred
     output_f_name = Path(output_path) / f"submission_{{suffix}}.csv"
     print(f"Writing submissions into {{output_f_name}}")

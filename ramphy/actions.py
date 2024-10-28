@@ -643,7 +643,9 @@ def update_hyperopt_score_summary(
         The name of the original hyperopted submission.
     """
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
-    summary_fname = ramp_kit_dir / "submissions" / submission / "hyperopt_output" / "summary.csv"
+    hyperopt_output_dir = ramp_kit_dir / "submissions" / submission / "hyperopt_output"
+    hyperopt_output_dir.mkdir(parents=False, exist_ok=True)
+    summary_fname = hyperopt_output_dir / "summary.csv"
     print(f"Updating {summary_fname} from score files...")
     summary_df = get_hyperopt_score_summary(
         ramp_kit_dir=ramp_kit_dir,
@@ -1399,9 +1401,10 @@ def select_top_hyperopt_and_submit_hybrid(
         submission_path = Path(ramp_kit_dir) / "submissions" / "__new_submission__"
         if keep_hypers:
             orig_submission_path = Path(ramp_kit_dir) / "submissions" / submission
-            hypers_per_workflow_element = {}
-            for wen in problem.workflow.element_names:
-                hypers_per_workflow_element[wen] = parse_hyperparameters(orig_submission_path, wen)
+            hypers_per_workflow_element = {
+                wen: parse_hyperparameters(orig_submission_path, wen)
+                for wen in problem.workflow.element_names
+            }
             write_hyperparameters(submission_path, submission_path, hypers_per_workflow_element)
         hypers = parse_all_hyperparameters(submission_path, problem.workflow)
         hyper_indices = [h.default_index for h in hypers]

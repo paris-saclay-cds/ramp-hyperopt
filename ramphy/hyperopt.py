@@ -422,7 +422,7 @@ class HyperparameterOptimization(object):
         try:
             self.workflow.metadata = self.problem.get_metadata(ramp_data_dir, data_label)
         except AttributeError:
-            print("No metadata")    
+            print("No metadata")
         self.workflow.set_element_names(submission_path)
         if workflow_element_names is None:
             self.workflow_element_names = self.workflow.element_names
@@ -919,8 +919,8 @@ def init_hyperopt(
             # non-bulletproof test for submissions that have all folds trained
             mean_df = mean_df[mean_df["fold_idx"] == np.array(hyperparameter_experiment.fold_idxs).mean()]
             mean_df = mean_df.rename(columns={f"hyper_{h.name}_i": h.name for h in hyperparameters})
-            for h in hyperparameters:
-                mean_df[h.name] = mean_df[h.name].astype(int)
+            mean_df = mean_df.astype({h.name: 'int' for h in hyperparameters})
+
             evaluated_rewards = list(mean_df[valid_score_name].to_numpy())
             points_to_evaluate = mean_df[[h.name for h in hyperparameters]].to_dict('records')
             print(f"Found {len(points_to_evaluate)} existing subissions, resuming.")

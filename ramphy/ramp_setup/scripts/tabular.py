@@ -12,6 +12,34 @@ from ramphy import ramp_setup as rs
 from ramphy.actions import ramp_action
 
 
+def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
+    """Mock test labels if they do not exist.
+
+    This is for compatibility between rampwf which expects targets for the test and
+    Kaggle challenges for which we do not have the targets for the test:
+    """
+    # use mean and sigma from training set
+    np.random.seed(43)
+    if prediction_type == "regression":
+        for target_col in target_cols:
+            if target_col not in test_data.columns:
+                test_data[target_col] = np.random.normal(
+                    train_data[target_col].mean(),
+                    train_data[target_col].std(),
+                    size=len(test_data),
+                )
+    elif "classification" in prediction_type:
+        for target_col in target_cols:
+            if target_col not in test_data.columns:
+                target_values = train_data[target_col].unique()
+                counts = train_data[target_col].value_counts()
+                weights = counts / counts.sum()
+                test_data[target_col] = np.random.choice(
+                    target_values, size=len(test_data), p=weights
+                )
+    return test_data
+
+
 @ramp_action
 def tabular_setup(
     download_dir: str | Path,
@@ -32,7 +60,6 @@ def tabular_setup(
     problem_f_name = ramp_kit_dir / "problem.py"
     train_data = pd.read_csv(download_dir / "train.csv")
     test_data = pd.read_csv(download_dir / "test.csv")
-    sample_submission = pd.read_csv(download_dir / "sample_submission.csv")
 
     metadata = json.load(open(download_dir / "metadata.json"))
     feature_types = metadata["data_description"]["feature_types"]
@@ -81,6 +108,11 @@ def tabular_setup(
     (ramp_data_dir / "data").mkdir(parents=True, exist_ok=True)
     (ramp_kit_dir / "submissions").mkdir(parents=True, exist_ok=True)
 
+    sample_submission_path = download_dir / "sample_submission.csv"
+    if sample_submission_path.exists():
+        shutil.copy(
+            sample_submission_path, ramp_data_dir / "data" / "sample_submission.csv")
+
     feature_values = {}
     missing_data_count = {}
     unique_value_count = {}
@@ -125,28 +157,11 @@ def tabular_setup(
     metadata["data_description"]["missing_data_count"] = missing_data_count
     metadata["data_description"]["unique_value_count"] = unique_value_count
 
-    # mock test labels
-    # matching mean and sigma from training set
-    np.random.seed(43)
-    if prediction_type == "regression":
-        for target_col in target_cols:
-            test_data[target_col] = np.random.normal(
-                train_data[target_col].mean(), train_data[target_col].std(), size=len(test_data)
-            )
-    elif "classification" in prediction_type:
-        for target_col in target_cols:
-            target_values = list(train_data[target_col].unique())
-            new_target_values = list(range(len(target_values)))
-            binary_transf = dict(zip(target_values, new_target_values))
-            train_data = train_data.replace({target_col: binary_transf})
-            test_data = test_data.replace({target_col: binary_transf})
-            counts = train_data[target_col].value_counts()
-            p = [counts[t] / len(train_data) for t in new_target_values]
-            test_data[target_col] = np.random.choice(new_target_values, len(test_data), p=p)
+    test_data = create_dummy_targets(
+        train_data, test_data, target_cols, prediction_type)
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
-    sample_submission.to_csv(ramp_data_dir / "data" / "sample_submission.csv", index=False)
 
     #    metadata.save(ramp_data_dir)
     json.dump(metadata, open(ramp_data_dir / "data" / "metadata.json", "w"), indent=4)
@@ -611,7 +626,13 @@ def tabular_regression_ordered_submit(
     submission: str | Path,
     regressor: str = "xgboost",
     feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    data_preprocessors: list[str] = [
+        "drop_id",
+        "drop_columns",
+        "col_in_train_only",
+        "base_columnwise",
+        "rm_constant_col",
+    ],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -680,201 +701,6 @@ def tabular_regression_ordered_submit(
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
-        elif dp == "rm_constant_col":
-            if strict_order:
-                raise ValueError(f"{dp} is not in last position!")
-            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
-        else:
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor=dp,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-    # this needs to be at the end for the constant columns to be used elsewhere
-    # location column for instance
-    if "rm_constant_col" in data_preprocessors:
-        dp_name = tabular_data_preprocessor_submit(
-            submission=submission,
-            data_preprocessor=dp,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
-        )
-        dp_names.append(dp_name)
-    print(f"Submitted preprocessors: {dp_names}")
-    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
-
-
-@ramp_action
-def tabular_regression_columnwise_last_submit(
-    submission: str | Path,
-    regressor: str = "xgboost",
-    feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
-    cat_col_impute: bool = True,
-    num_col_impute: bool = True,
-    cat_col_encode: bool = True,
-    num_col_encode: bool = True,
-    date_col_encode: bool = True,
-    text_col_encode: bool = True,
-    ramp_kit_dir: str | Path = ".",
-    ramp_data_dir: Optional[str | Path] = None,
-    strict_order: bool = False,
-) -> Dict[str, list]:
-    """Make new submission with columnwise last.
-
-    Args:
-        submission (str | Path): Submission name
-        regressor (str, optional): Regressor. Defaults to 'xgboost'.
-        feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
-        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
-        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
-        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
-        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
-        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
-        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
-        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
-    """
-    print(submission)
-    tabular_regression_submit(
-        submission=submission,
-        regressor=regressor,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    dp_names = []
-    for dp in data_preprocessors:
-        if dp == "drop_columns":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="drop_columns",
-                hyper_type="select_column",
-                hyper_suffix="to_drop",
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-        elif dp == "cat_target_encoding":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="cat_target_encoding",
-                hyper_type="select_column",
-                hyper_suffix="to_target_encode",
-                column_types=["cat", "num"],
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-        elif dp == "rm_constant_col":
-            if strict_order:
-                raise ValueError(f"{dp} is not in last position!")
-            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
-        else:
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor=dp,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-    dp_names += tabular_encoder_imputer_submit(
-        submission=submission,
-        cat_col_impute=cat_col_impute,
-        num_col_impute=num_col_impute,
-        cat_col_encode=cat_col_encode,
-        num_col_encode=num_col_encode,
-        date_col_encode=date_col_encode,
-        text_col_encode=text_col_encode,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-
-    # this needs to be at the end for the constant columns to be used elsewhere
-    # location column for instance
-    if "rm_constant_col" in data_preprocessors:
-        dp_name = tabular_data_preprocessor_submit(
-            submission=submission,
-            data_preprocessor=dp,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
-        )
-        dp_names.append(dp_name)
-
-    print(f"Submitted preprocessors: {dp_names}")
-    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
-
-
-@ramp_action
-def tabular_regression_columnwise_first_submit(
-    submission: str | Path,
-    regressor: str = "xgboost",
-    feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
-    cat_col_impute: bool = True,
-    num_col_impute: bool = True,
-    cat_col_encode: bool = True,
-    num_col_encode: bool = True,
-    date_col_encode: bool = True,
-    text_col_encode: bool = True,
-    ramp_kit_dir: str | Path = ".",
-    ramp_data_dir: Optional[str | Path] = None,
-    strict_order: bool = False,
-) -> Dict[str, list]:
-    """Make new submission with columnwise first.
-
-    Args:
-        submission (str | Path): Submission name
-        regressor (str, optional): Regressor. Defaults to 'xgboost'.
-        feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
-        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
-        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
-        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
-        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
-        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
-        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
-        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
-    """
-    tabular_regression_submit(
-        submission=submission,
-        regressor=regressor,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    dp_names = tabular_encoder_imputer_submit(
-        submission=submission,
-        cat_col_impute=cat_col_impute,
-        num_col_impute=num_col_impute,
-        cat_col_encode=cat_col_encode,
-        num_col_encode=num_col_encode,
-        date_col_encode=date_col_encode,
-        text_col_encode=text_col_encode,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    for dp in data_preprocessors:
-        if dp == "drop_columns":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="drop_columns",
-                hyper_type="select_column",
-                hyper_suffix="to_drop",
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-        elif dp == "cat_target_encoding":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="cat_target_encoding",
-                hyper_type="select_column",
-                hyper_suffix="to_target_encode",
-                column_types=["cat", "num"],
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
         elif dp == "rm_constant_col":
             if strict_order:
                 raise ValueError(f"{dp} is not in last position!")
@@ -906,7 +732,13 @@ def tabular_classification_ordered_submit(
     submission: str | Path,
     classifier: str = "xgboost",
     feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "base_columnwise"],
+    data_preprocessors: list[str] = [
+        "drop_id",
+        "drop_columns",
+        "col_in_train_only",
+        "base_columnwise",
+        "rm_constant_col",
+    ],
     cat_col_impute: bool = True,
     num_col_impute: bool = True,
     cat_col_encode: bool = True,
@@ -972,203 +804,6 @@ def tabular_classification_ordered_submit(
                 num_col_encode=num_col_encode,
                 date_col_encode=date_col_encode,
                 text_col_encode=text_col_encode,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-        elif dp == "rm_constant_col":
-            if strict_order:
-                raise ValueError(f"{dp} is not in last position!")
-            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
-        else:
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor=dp,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-
-    # this needs to be at the end for the constant columns to be used elsewhere
-    # location column for instance
-    if "rm_constant_col" in data_preprocessors:
-        dp_name = tabular_data_preprocessor_submit(
-            submission=submission,
-            data_preprocessor=dp,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
-        )
-        dp_names.append(dp_name)
-
-    print(f"Submitted preprocessors: {dp_names}")
-    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
-
-
-@ramp_action
-def tabular_classification_columnwise_last_submit(
-    submission: str | Path,
-    classifier: str = "xgboost",
-    feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
-    cat_col_impute: bool = True,
-    num_col_impute: bool = True,
-    cat_col_encode: bool = True,
-    num_col_encode: bool = True,
-    date_col_encode: bool = True,
-    text_col_encode: bool = True,
-    ramp_kit_dir: str | Path = ".",
-    ramp_data_dir: Optional[str | Path] = None,
-    strict_order: bool = False,
-) -> Dict[str, list]:
-    """Make new submission with columnwise last.
-
-    Args:
-        submission (str | Path): Submission name
-        classifier (str, optional): Classifier. Defaults to 'xgboost'.
-        feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id'].
-        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
-        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
-        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
-        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
-        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
-        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
-        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
-    """
-    print(submission)
-    tabular_classification_submit(
-        submission=submission,
-        classifier=classifier,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    dp_names = []
-    for dp in data_preprocessors:
-        if dp == "drop_columns":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="drop_columns",
-                hyper_type="select_column",
-                hyper_suffix="to_drop",
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-        elif dp == "cat_target_encoding":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="cat_target_encoding",
-                hyper_type="select_column",
-                hyper_suffix="to_target_encode",
-                column_types=["cat", "num"],
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-        elif dp == "rm_constant_col":
-            if strict_order:
-                raise ValueError(f"{dp} is not in last position!")
-            print(f"ATTENTION! - {dp} is not in last position! It will be added last!")
-        else:
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor=dp,
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-
-    dp_names += tabular_encoder_imputer_submit(
-        submission=submission,
-        cat_col_impute=cat_col_impute,
-        num_col_impute=num_col_impute,
-        cat_col_encode=cat_col_encode,
-        num_col_encode=num_col_encode,
-        date_col_encode=date_col_encode,
-        text_col_encode=text_col_encode,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-
-    # this needs to be at the end for the constant columns to be used elsewhere
-    # location column for instance
-    if "rm_constant_col" in data_preprocessors:
-        dp_name = tabular_data_preprocessor_submit(
-            submission=submission,
-            data_preprocessor=dp,
-            ramp_kit_dir=ramp_kit_dir,
-            ramp_data_dir=ramp_data_dir,
-        )
-        dp_names.append(dp_name)
-
-    print(f"Submitted preprocessors: {dp_names}")
-    return {"created_submissions": [submission], "submitted_data_preprocessors": dp_names}
-
-
-@ramp_action
-def tabular_classification_columnwise_first_submit(
-    submission: str | Path,
-    classifier: str = "xgboost",
-    feature_extractor: str = "empty",
-    data_preprocessors: list[str] = ["drop_id", "drop_columns", "col_in_train_only", "rm_constant_col"],
-    cat_col_impute: bool = True,
-    num_col_impute: bool = True,
-    cat_col_encode: bool = True,
-    num_col_encode: bool = True,
-    date_col_encode: bool = True,
-    text_col_encode: bool = True,
-    ramp_kit_dir: str | Path = ".",
-    ramp_data_dir: Optional[str | Path] = None,
-    strict_order: bool = False,
-) -> Dict[str, list]:
-    """Make new submission with columnwise first.
-
-    Args:
-        submission (str | Path): Submission name
-        classifier (str, optional): Classifier. Defaults to 'xgboost'.
-        feature_extractor (str, optional): FE. Defaults to 'empty'.
-        data_preprocessors (list[str], optional): List of data preprocessor. Defaults to ['drop_id', 'col_in_train_only'].
-        cat_col_impute (bool, optional): If True appends a cat_col_imputer to the list of preprocessors. Defaults to True.
-        num_col_impute (bool, optional): If True appends a num_col_impute to the list of preprocessors. Defaults to True.
-        cat_col_encode (bool, optional): If True appends a cat_col_encode to the list of preprocessors. Defaults to True.
-        num_col_encode (bool, optional): If True appends a num_col_encode to the list of preprocessors. Defaults to True.
-        date_col_encode (bool, optional): If True appends a date_col_encode to the list of preprocessors. Defaults to True.
-        ramp_kit_dir (str | Path, optional): Path of kit dir. Defaults to ".".
-        ramp_data_dir (Optional[str  |  Path], optional): Path of data dir. Defaults to None.
-    """
-    tabular_classification_submit(
-        submission=submission,
-        classifier=classifier,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    dp_names = tabular_encoder_imputer_submit(
-        submission=submission,
-        cat_col_impute=cat_col_impute,
-        num_col_impute=num_col_impute,
-        cat_col_encode=cat_col_encode,
-        num_col_encode=num_col_encode,
-        date_col_encode=date_col_encode,
-        text_col_encode=text_col_encode,
-        ramp_kit_dir=ramp_kit_dir,
-        ramp_data_dir=ramp_data_dir,
-    )
-    for dp in data_preprocessors:
-        if dp == "drop_columns":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="drop_columns",
-                hyper_type="select_column",
-                hyper_suffix="to_drop",
-                ramp_kit_dir=ramp_kit_dir,
-                ramp_data_dir=ramp_data_dir,
-            )
-            dp_names.append(dp_name)
-        elif dp == "cat_target_encoding":
-            dp_name = tabular_data_preprocessor_submit(
-                submission=submission,
-                data_preprocessor="cat_target_encoding",
-                hyper_type="select_column",
-                hyper_suffix="to_target_encode",
-                column_types=["cat", "num"],
                 ramp_kit_dir=ramp_kit_dir,
                 ramp_data_dir=ramp_data_dir,
             )
