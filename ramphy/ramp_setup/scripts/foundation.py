@@ -16,7 +16,7 @@ def submit_foundation_submissions(
     ramp_kit_dir: str,
     base_predictors: list[str],
     workflow: rw.workflows.BaseWorkflow,
-    foundation_predictors_dir: str = "best_predictor_arms",
+    foundation_predictors_dir: str = "best_predictor_arms/hand_selection",
 ) -> list[str]:
     foundation_submissions = []
     for base_predictor in base_predictors:
@@ -49,11 +49,16 @@ def submit_foundation_submissions(
                     foundation_submission_path = Path(f"{submission_path}_hyperopt_{hyper_hash}")
                     foundation_submission = foundation_submission_path.name
                     foundation_submissions.append(foundation_submission)
-                    rh.write_hyperparameters(
-                        submission_path,
-                        foundation_submission_path,
-                        hypers_per_workflow_element,
-                    )
+                    try:
+                        rh.write_hyperparameters(
+                            submission_path,
+                            foundation_submission_path,
+                            hypers_per_workflow_element,
+                        )
+                    except IndexError as e:
+                        print(submission_path)
+                        print(arm)
+                        raise e
     return foundation_submissions
 
 
