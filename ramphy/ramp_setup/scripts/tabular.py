@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
 import ramphy as rh
 from ramphy import actions as ra
 from ramphy import ramp_setup as rs
@@ -38,6 +39,14 @@ def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
                     target_values, size=len(test_data), p=weights
                 )
     return test_data
+
+
+def label_encoding(train_data, test_data, target_cols):
+    for target_col in target_cols:
+        le = LabelEncoder().fit(train_data[target_col])
+        train_data[target_col] = le.transform(train_data[target_col])
+        test_data[target_col] = le.transform(test_data[target_col])
+    return train_data, test_data
 
 
 @ramp_action
@@ -159,6 +168,9 @@ def tabular_setup(
 
     test_data = create_dummy_targets(
         train_data, test_data, target_cols, prediction_type)
+
+    if "classification" in prediction_type:
+        train_data, test_data = label_encoding(train_data, test_data, target_cols)
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)

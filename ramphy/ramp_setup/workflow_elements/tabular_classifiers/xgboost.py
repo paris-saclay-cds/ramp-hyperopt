@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.base import BaseEstimator
-from sklearn.preprocessing import LabelEncoder
 import xgboost as xb
 from ramphy import Hyperparameter
 
@@ -58,8 +57,6 @@ class Classifier(BaseEstimator):
             reg_lambda=REG_LAMBDA,
             objective=self.objective,
         )
-        # xgboost requires labels ot be encoded
-        y = LabelEncoder().fit_transform(y.ravel())
         self.clf.fit(X, y)
 
     def predict_proba(self, X):
