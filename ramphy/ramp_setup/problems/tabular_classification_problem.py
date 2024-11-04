@@ -27,8 +27,8 @@ n_targets = len(target_cols)
 problem_title = f"{{title}} tabular {{prediction_type}}"
 
 Predictions = rw.prediction_types.make_combined([
-    rw.prediction_types.make_multiclass(label_names=target_values)
-    for target_values in target_value_dict.values()
+    rw.prediction_types.make_multiclass(label_names=range(len(target_values)))
+    for _, target_values in target_value_dict.items()
 ])
 
 workflow = rw.workflows.TabularClassifier()
