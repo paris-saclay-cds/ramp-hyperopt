@@ -26,8 +26,7 @@ def submit_foundation_submissions(
             submission_path = Path(ramp_kit_dir) / "submissions" / base_predictor
             workflow.set_element_names(submission_path)
             hypers_per_workflow_element = {
-                wen: rh.parse_hyperparameters(submission_path, wen)
-                for wen in workflow.element_names
+                wen: rh.parse_hyperparameters(submission_path, wen) for wen in workflow.element_names
             }
             if "classifier" in workflow.element_names:
                 predictor_type = "classifier"
@@ -36,7 +35,7 @@ def submit_foundation_submissions(
             else:
                 raise ValueError("unknown predictor type, can't find classifier or regressor")
             predictor_hyperparameters = hypers_per_workflow_element[predictor_type]
-                 
+
             for arm_i, arm in predictor_hypers_df.iterrows():
                 if not pd.isna(arm["contributivity"]):
                     for h in predictor_hyperparameters:
@@ -78,6 +77,7 @@ def foundation_models(
         "base_columnwise",
         "rm_constant_col",
     ],
+    foundation_predictors_dir: str = "best_predictor_arms/hand_selection",
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -94,7 +94,9 @@ def foundation_models(
         ramp_kit_dir=ramp_kit_dir,
         base_predictors=base_predictors,
         workflow=problem.workflow,
+        foundation_predictors_dir=foundation_predictors_dir,
     )
+    print(f"Got the following foundation submissions: {foundation_submissions}")
     rs.orchestration.train_on_all_folds(
         submissions=foundation_submissions,
         ramp_kit_dir=ramp_kit_dir,

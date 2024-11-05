@@ -53,9 +53,14 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 @click.option(
     "--data-preprocessors",
     multiple=True,
-    default=["drop_id", "drop_columns", "base_columnwise", "col_in_train_only",
-             "rm_constant_col"],
+    default=["drop_id", "drop_columns", "base_columnwise", "col_in_train_only", "rm_constant_col"],
     help="A list of data_preprocessors to use. base_columnwise are the base col encoding and inputing",
+)
+@click.option(
+    "--foundation-predictors-dir",
+    default="best_predictor_arms/hand_selection",
+    help="Directory where the foundation models are stored",
+    show_default=True,
 )
 @click_config_file.configuration_option()
 def main(
@@ -68,6 +73,7 @@ def main(
     first_fold_idx,
     base_predictors,
     data_preprocessors,
+    foundation_predictors_dir,
 ):
     print(version, number)
     rs.foundation.foundation_models(
@@ -80,6 +86,7 @@ def main(
         first_fold_idx=first_fold_idx,
         base_predictors=list(base_predictors),
         data_preprocessors=list(data_preprocessors),
+        foundation_predictors_dir=foundation_predictors_dir,
     )
 
 
