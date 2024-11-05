@@ -34,12 +34,29 @@ def test_label_encoding():
     )
     # deepcopy for test as otherwise it will modify inplace
     train_data_new, test_data_new = rs.tabular.label_encoding(
-        copy.deepcopy(train_data), copy.deepcopy(test_data), ['y'])
+        copy.deepcopy(train_data), copy.deepcopy(test_data), ['y'], "")
     # non target columns are not touched
     pd.testing.assert_frame_equal(train_data_new.iloc[:, :-1], train_data.iloc[:, :-1])
     pd.testing.assert_frame_equal(test_data_new.iloc[:, :-1], test_data.iloc[:, :-1])
     assert train_data_new.iloc[:, -1].isin(list(range(len(unique_labels)))).all()
     assert test_data_new.iloc[:, -1].isin(list(range(len(unique_labels)))).all()
+
+    # testing positive target values
+    train_data_new, test_data_new = rs.tabular.label_encoding(
+        copy.deepcopy(train_data), copy.deepcopy(test_data), ["y"], {"y": "y2"}
+    )
+    # non target columns are not touched
+    pd.testing.assert_frame_equal(train_data_new.iloc[:, :-1], train_data.iloc[:, :-1])
+    pd.testing.assert_frame_equal(test_data_new.iloc[:, :-1], test_data.iloc[:, :-1])
+    assert train_data_new.iloc[:, -1].isin(list(range(len(unique_labels)))).all()
+    assert test_data_new.iloc[:, -1].isin(list(range(len(unique_labels)))).all()
+    train_positive_mask = train_data['y'] == "y2"
+    test_positive_mask = test_data['y'] == "y2"
+    assert train_data_new.loc[train_positive_mask, "y"].isin([1]).all()
+    assert test_data_new.loc[test_positive_mask, "y"].isin([1]).all()
+    assert train_data_new.loc[~train_positive_mask, "y"].isin([0, 2]).all()
+    assert test_data_new.loc[~test_positive_mask, "y"].isin([0, 2]).all()
+
 
 def test_create_dummy_targets_regression():
     # without targets in the test set
