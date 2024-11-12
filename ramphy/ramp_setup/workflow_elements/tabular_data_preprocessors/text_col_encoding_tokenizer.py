@@ -44,8 +44,9 @@ ENCODING_MODE = str(encoding_mode_tokenizer)
 
 
 class DataPreprocessor(rs.BaseDataPreprocessor):
-    def __init__(self):
+    def __init__(self, col={str_col}):
         self.to_cache = True
+        self.col = col
 
         if "pca" in ENCODING_MODE:
             self.scaler: Dict[str, StandardScaler] = {{}}
@@ -67,14 +68,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         metadata: dict,
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
         self.load_tokenizer()  # Load it here so we don't load it when caching
-        # Find text columns
-        feature_types = metadata["data_description"]["feature_types"]
-        text_columns = []
-        for feature in feature_types:
-            if feature_types[feature] == "text":
-                text_columns.append(feature)
 
-        print(f"Tokenizer - Found the following text columns: {{text_columns}}")
         # We store the idx so we can concat by ignoring them
         train_len = X_train.shape[0]
         train_idx = X_train.index
@@ -82,46 +76,44 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         all_data = pd.concat([X_train, X_test], axis=0, ignore_index=True)
 
         # Encode columns
-        new_feature_names = {{}}  # Needed for metadata update
-        all_new_features = []  # Needed for imputing
-        for feature in text_columns:
-            print(f"Tokenizer - Encoding {{feature}}")
-            encoded_columns = self.encode_column(column_name=feature, dataset=all_data)
-            all_data = pd.concat([all_data, encoded_columns], axis=1)
-            new_feature_names[feature] = list(encoded_columns.columns)
-            all_new_features += new_feature_names[feature]
+        encoded_columns = self.encode_column(column_name=self.col, dataset=all_data)
+        all_data = pd.concat([all_data, encoded_columns], axis=1)
+        new_feature_names = list(encoded_columns.columns)
 
         # Drop text columns from datasets
-        all_data.drop(columns=text_columns, inplace=True)
+        all_data.drop(columns=self.col, inplace=True)
         # We split and restore the original inputs
         X_train = all_data[:train_len]
         X_train.index = train_idx
         X_test = all_data[train_len:]
         X_test.index = test_idx
 
-        for new_col in all_new_features:
+        for new_col in new_feature_names:
             X_train, X_test = self.impute_column(col_name=new_col, X_train=X_train, X_test=X_test)
 
         # Update metadata
         metadata = deepcopy(metadata)
-        for feat in text_columns:
-            try:
-                metadata["data_description"]["feature_values"].pop(feat)
-            except KeyError:
-                pass
-            try:
-                metadata["data_description"]["feature_types"].pop(feat)
-            except KeyError:
-                pass
-            missing_count = None
-            if feat in metadata["data_description"]["missing_data_count"]:
-                missing_count = metadata["data_description"]["missing_data_count"][feat]
-                metadata["data_description"]["missing_data_count"].pop(feat)
+        try:
+            metadata["data_description"]["feature_values"].pop(self.col)
+        except KeyError:
+            pass
+        try:
+            metadata["data_description"]["feature_types"].pop(self.col)
+        except KeyError:
+            pass
+        try:
+            metadata["data_description"]["features"].pop(self.col)
+        except KeyError:
+            pass
+        missing_count = None
+        if self.col in metadata["data_description"]["missing_data_count"]:
+            missing_count = metadata["data_description"]["missing_data_count"][self.col]
+            metadata["data_description"]["missing_data_count"].pop(self.col)
 
-            for new_column in new_feature_names[feat]:
-                metadata["data_description"]["feature_types"][new_column] = "num"
-                if missing_count is not None:
-                    metadata["data_description"]["missing_data_count"][new_column] = missing_count
+        for new_column in new_feature_names:
+            metadata["data_description"]["feature_types"][new_column] = "num"
+            if missing_count is not None:
+                metadata["data_description"]["missing_data_count"][new_column] = missing_count
 
         return X_train, y_train, X_test, metadata
 
