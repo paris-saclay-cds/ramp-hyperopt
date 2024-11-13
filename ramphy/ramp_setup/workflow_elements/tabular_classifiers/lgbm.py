@@ -78,7 +78,7 @@ class Classifier(BaseEstimator):
             objective=self.objective,
             verbose=-1,
         )
-        self.clf.fit(X, y)
+        self.clf.fit(X, y.ravel())
 
     def predict_proba(self, X):
         y_proba = self.clf.predict_proba(X)
