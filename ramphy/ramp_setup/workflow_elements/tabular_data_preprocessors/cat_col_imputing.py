@@ -140,7 +140,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 # One-hot encode categoric variables
                 def feature_name_combiner(input_feature, category):
                     output_feature = input_feature + '_' + str(category)
-                    output_feature = re.sub(r'[^a-zA-Z0-9_]', '_', output_feature)
+#                    output_feature = re.sub(r'[^a-zA-Z0-9_]', '_', output_feature)
                     return output_feature
     
                 transformer = OneHotEncoder(
@@ -157,6 +157,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 X_tr_imputed = pd.concat((X_tr_imputed, X_tr_transformed), axis=1)
                 for col in new_columns:
                     X_tr_imputed[col] = pd.to_numeric(X_tr_imputed[col], downcast="integer")
+
 
             # Fit the classifier on X_tr
             self.classifier.fit(X_tr_imputed.drop(columns=[self.col]), X_tr_imputed[self.col])

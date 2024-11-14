@@ -37,7 +37,7 @@ class RampAction():
         self.name = name
         self.args = args
         self.kwargs = kwargs
-       
+
     @property
     def runtime(self):
         return self.stop_time - self.start_time
@@ -49,7 +49,7 @@ class RampAction():
 
     def save(self, f_name):
         f_name = f'{f_name}.pkl'
-        with open(f_name, 'wb') as f: 
+        with open(f_name, 'wb') as f:
             pickle.dump(self, f)
 
 def load_ramp_action(f_name: Path) -> RampAction:
@@ -140,7 +140,7 @@ def convert_ramp_dirs(
 ) -> Tuple[Path, Path]:
     """Convert ramp dirs to Path.
 
-    Remember that ramp_data_dir does not include the 
+    Remember that ramp_data_dir does not include the
     /data subfolder, it is usually the same as ramp_kit_dir,
     but can point to an alternative data source for the same
     kit.
@@ -204,7 +204,7 @@ def hyperopt(
         like all elements are hyperopted, except that hypers of the
         unselected elements cannot "move".
     resume : bool, default=True
-        If True, we resume from existing submissions hyperopted on 
+        If True, we resume from existing submissions hyperopted on
         all the folds in fold_idxs.
     subtract_existing : bool, default=False
         If True, we discount len(fold_idxs) x len(hyperopted submssions)
@@ -215,9 +215,9 @@ def hyperopt(
     Returns
     -------
     scores : dict
-        Dictionary containing "created_submissions": list(str) - all the 
+        Dictionary containing "created_submissions": list(str) - all the
         submissions created in this round of hyperopt;
-        "mean_scores": list(float) - all the scores of created submissions; 
+        "mean_scores": list(float) - all the scores of created submissions;
         "mean_score": float - the score of the best submission, given that
         at least one submission was successfully trained.
     """
@@ -356,7 +356,7 @@ def train(
     Returns
     -------
     scores : dict
-        Dictionary of mean score (if training is successful) and bagged score 
+        Dictionary of mean score (if training is successful) and bagged score
         (if bag is True).
     """
     ramp_kit_dir, ramp_data_dir = convert_ramp_dirs(ramp_kit_dir, ramp_data_dir)
@@ -455,7 +455,7 @@ def blend(
         Fold indices to blend.
         If None, we will blend all folds.
     output_path : str, default=None.
-        The folder where bagged_scores_combined.csv and 
+        The folder where bagged_scores_combined.csv and
         submission_combined_bagged_test.csv are saved. If None, defaults
         to <ramp_kit_dir>/submissions/training_output.
     ramp_data_dir : str, default=None.
@@ -517,7 +517,7 @@ def bag_then_blend(
         Fold indices to blend.
         If None, we will blend all folds.
     output_path : str, default=None.
-        The folder where bagged_then_blended_scores.csv and 
+        The folder where bagged_then_blended_scores.csv and
         submission_bagged_then_blended_scores_test.csv are saved. If None, defaults
         to <ramp_kit_dir>/submissions/training_output.
     ramp_data_dir : str, default=None.
@@ -993,7 +993,7 @@ def select_top_hyperopt(
     means_df = get_hyperopt_score_means(summary_df, fold_idxs)
     if len(means_df) == 0:
         return {"selected_submissions": [], "score_cutoff": None}
-    
+
     if n_sigma is not None:
         # foldwise means for unbiasing
         summary_df = filter_full_folds(summary_df, fold_idxs)
@@ -1128,7 +1128,7 @@ def rename_best_hyperopt_submissions(
             left_index=True,
             right_index=True,
         )
-    
+
         for hyperopt_submission_i, hyperopt_submission in enumerate(
             contributivites_df.sort_values(
                 valid_score_name, ascending=is_lower_the_better

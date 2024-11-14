@@ -127,7 +127,7 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
                 # One-hot encode categoric variables
                 def feature_name_combiner(input_feature, category):
                     output_feature = input_feature + '_' + str(category)
-                    output_feature = re.sub(r'[^a-zA-Z0-9_]', '_', output_feature)
+#                    output_feature = re.sub(r'[^a-zA-Z0-9_]', '_', output_feature)
                     return output_feature
     
                 transformer = OneHotEncoder(
