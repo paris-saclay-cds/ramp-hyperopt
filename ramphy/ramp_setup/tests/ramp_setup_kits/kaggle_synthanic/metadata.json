@@ -8,7 +8,7 @@
             "Survived"
         ],
         "positive_target_values" : {
-            "target": "1"
+            "Survived": "1"
         },
         "description": "",
         "feature_types": {
