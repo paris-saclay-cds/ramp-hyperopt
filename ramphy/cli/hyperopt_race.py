@@ -1,3 +1,4 @@
+import numpy as np
 import ramphy.ramp_setup as rs
 import click
 import click_config_file
@@ -94,6 +95,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     default=None,
     help="A list of preprocessors to hyperopt. When multiple instances of a data_preprocessor are given through the data_preprocessors option, if you specify the full name, it will only hyperopt that one, otherwise it will hyperopt all the instances of the data_preprocessor.",
 )
+@click.option(
+    "--max-time",
+    default=1000000.0,
+    show_default=True,
+    help="Optional total running time in hours.",
+)
 @click_config_file.configuration_option()
 def main(
     ramp_kit,
@@ -111,6 +118,7 @@ def main(
     base_predictors,
     data_preprocessors,
     preprocessors_to_hyperopt,
+    max_time,
 ):
     rs.orchestration.hyperopt_race(
         data_preprocessors=list(data_preprocessors),
@@ -128,6 +136,7 @@ def main(
         no_growing_folds=no_growing_folds,
         preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),
+        max_time=max_time,
     )
 
 
