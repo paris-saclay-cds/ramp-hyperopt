@@ -1,4 +1,5 @@
 import click
+import click_config_file
 import glob
 import json
 import shutil
@@ -44,6 +45,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="The index of the first fold of problem.get_cv.",
 )
+@click_config_file.configuration_option()
 def main(
     ramp_kit,
     version,
