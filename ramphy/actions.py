@@ -665,6 +665,7 @@ def get_hyperopt_score_summary(
     ramp_data_dir: Optional[str] = None,
     force_reload: Optional[bool] = False,
     test: Optional[bool] = False,
+    data_label: Optional[str] = None,
 ) -> pd.DataFrame:
     """Returns a summary DataFrame.
 
@@ -698,7 +699,8 @@ def get_hyperopt_score_summary(
         return pd.read_csv(summary_fname, index_col=0)
 
     problem = rw.utils.assert_read_problem(ramp_kit_dir)
-    X_train, y_train, X_test, y_test = rw.utils.assert_data(ramp_kit_dir, ramp_data_dir)
+    X_train, y_train, X_test, y_test = rw.utils.assert_data(
+        ramp_kit_dir=ramp_kit_dir, ramp_data_dir=ramp_data_dir, data_label=data_label)
     cv = rw.utils.assert_cv(ramp_kit_dir, ramp_data_dir, fold_idxs=fold_idxs)
     score_names = [st.name for st in problem.score_types]
     valid_score_name = f"valid_{score_names[0]}"

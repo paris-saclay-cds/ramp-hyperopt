@@ -41,11 +41,42 @@ def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
     return test_data
 
 
-def label_encoding(train_data, test_data, target_cols):
-    for target_col in target_cols:
-        le = LabelEncoder().fit(train_data[target_col])
-        train_data[target_col] = le.transform(train_data[target_col])
-        test_data[target_col] = le.transform(test_data[target_col])
+def label_encoding(train_data, test_data, target_cols, positive_target_values):
+    if positive_target_values != "":
+        # XXX this should only be done for binary classification
+        for target_col in target_cols:
+            # for auc-type scores we need to assign 1 to the corresponding label
+            labels = train_data[target_col]
+            unique_labels = labels.unique()
+            label_to_map_to_1 = positive_target_values[target_col]
+            # labels are encoded as strings in the metadata.json, we check whether
+            # we should convert to an int.
+            if label_to_map_to_1 in unique_labels:
+                pass
+            elif int(label_to_map_to_1) in unique_labels:
+                label_to_map_to_1 = int(label_to_map_to_1)
+            else:
+                raise ValueError("Cannot infer the type of the label.")
+
+            # Get the unique labels and remove the label_to_map_to_1
+            unique_labels_without_1 = [
+                label for label in unique_labels if label != label_to_map_to_1
+            ]
+
+            label_mapping = {label_to_map_to_1: 1}
+            remaining_labels = [0] + list(range(2, len(unique_labels_without_1)+1))
+            other_labels_mapping = {
+                label: idx
+                for idx, label in zip(remaining_labels, unique_labels_without_1)
+            }
+            label_mapping.update(other_labels_mapping)
+            train_data[target_col] = train_data[target_col].map(label_mapping)
+            test_data[target_col] = test_data[target_col].map(label_mapping)
+    else:
+        for target_col in target_cols:
+            le = LabelEncoder().fit(train_data[target_col])
+            train_data[target_col] = le.transform(train_data[target_col])
+            test_data[target_col] = le.transform(test_data[target_col])
     return train_data, test_data
 
 
@@ -170,7 +201,9 @@ def tabular_setup(
         train_data, test_data, target_cols, prediction_type)
 
     if "classification" in prediction_type:
-        train_data, test_data = label_encoding(train_data, test_data, target_cols)
+        positive_target_values = metadata["data_description"]["positive_target_values"]
+        train_data, test_data = label_encoding(
+            train_data, test_data, target_cols, positive_target_values)
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)

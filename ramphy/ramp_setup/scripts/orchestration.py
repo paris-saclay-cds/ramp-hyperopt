@@ -52,12 +52,15 @@ def run_race(
     n_trials_per_round: int,
     patience: int,
     n_folds_hyperopt: int,
+    n_folds_final_blend: int,
     first_fold_idx: int,
     start_round: int,
     scores: list[float],
     is_lower_the_better: bool,
     contributivity_floor: int,
     blended_submissions: set[str],
+    max_time: float,
+    elapsed_time: float,  # in hours
     preprocessors_to_hyperopt: Optional[list[str]] = None,
     hyperopt_all_at_once: bool = False,
 ) -> set[str]:
@@ -142,6 +145,7 @@ def run_race(
             subtract_existing=False,
         )
         hyperopt_action = last_action(ramp_kit_dir, "hyperopt")
+        elapsed_time += hyperopt_action.runtime.total_seconds() / 3600
         if hyperopt_action is None:
             continue
         elif len(hyperopt_action.mean_scores) > 0:
@@ -161,6 +165,7 @@ def run_race(
                 fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             )
             blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
+            elapsed_time += blend_action.runtime.total_seconds() / 3600
             if hasattr(blend_action, "blended_score"):
                 blended_score = blend_action.blended_score
                 contributivities = {
@@ -186,6 +191,20 @@ def run_race(
             print(f"non-contributive submissions: {non_contributive_submissions}")
             blended_submissions = blended_submissions - non_contributive_submissions
             print(f"new blended submissions: {blended_submissions}")
+            if max_time > 0:
+                estimated_runtime_for_final_blend = 0
+                for submission in blended_submissions:
+                    scores_df = pd.read_csv(f"{ramp_kit_dir}/submissions/{submission}/training_output/fold_{first_fold_idx}/scores.csv")
+                    estimated_runtime_for_final_blend += scores_df["time"].sum()
+                estimated_runtime_for_final_blend *= n_folds_final_blend / 3600
+                estimated_final_blending_time = 2 * blend_action.runtime.total_seconds() * n_folds_final_blend / n_folds_hyperopt / 3600
+                with open(f"{ramp_kit_dir}/timing.txt", "w") as file:
+                    file.write(f"Elapsed time: {elapsed_time:.2f} hours")
+                    file.write(f"\nEstimated runtime (train + valid + test) for final blend: {estimated_runtime_for_final_blend:.2f} hours")
+                    file.write(f"\nEstimated final blending time: {estimated_final_blending_time:.2f} hours")
+                if elapsed_time + estimated_runtime_for_final_blend + estimated_final_blending_time > max_time:
+                    print("Stopping for time limit")
+                    break
         #    input("Press Enter to continue...")
     return blended_submissions
 
@@ -570,6 +589,7 @@ def hyperopt_race(
         "rm_constant_col",
     ],
     preprocessors_to_hyperopt: Optional[list[str]] = None,
+    max_time: float = 1000000,
     top_n_for_mean: int = 10,
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
@@ -637,6 +657,7 @@ def hyperopt_race(
             n_folds_hyperopt=n_folds_hyperopt,
             n_folds_final_blend=n_folds_final_blend,
             first_fold_idx=first_fold_idx,
+            max_time=max_time,
             base_predictors=base_predictors,
             data_preprocessors=data_preprocessors,
             preprocessors_to_hyperopt=dp_hyperopt_full_name,
@@ -657,12 +678,15 @@ def hyperopt_race(
         n_trials_per_round=n_trials_per_round,
         patience=patience,
         n_folds_hyperopt=n_folds_hyperopt,
+        n_folds_final_blend=n_folds_final_blend,
         first_fold_idx=first_fold_idx,
         start_round=start_round,
         scores=scores,
         is_lower_the_better=is_lower_the_better,
         contributivity_floor=contributivity_floor,
         blended_submissions=blended_submissions,
+        max_time=max_time,
+        elapsed_time=0.0,
         preprocessors_to_hyperopt=dp_hyperopt_full_name,
         hyperopt_all_at_once=True,
     )

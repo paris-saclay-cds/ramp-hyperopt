@@ -22,6 +22,7 @@ score_name_type_map = {
     "smape": rw.score_types.SMAPE,
     # classification
     "auc": rw.score_types.ROCAUC,
+    "gini": rw.score_types.Gini,
     "ngini": rw.score_types.NormalizedGini,
     "accuracy": rw.score_types.Accuracy,
     "nll": rw.score_types.NegativeLogLikelihood,
