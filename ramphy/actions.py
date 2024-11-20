@@ -474,9 +474,6 @@ def blend(
             output_path = ramp_kit_dir / "submissions" / "training_output"
         else:
             output_path = Path(output_path)
-        bag_ranks = False
-        if problem.score_types[0].name in ["auc", "ngini"]:
-            bag_ranks=True
         rw.utils.testing.blend_submissions(
             submissions,
             ramp_kit_dir=ramp_kit_dir,
@@ -484,7 +481,7 @@ def blend(
             save_output=True,
             output_path=str(output_path),
             fold_idxs=fold_idxs,
-            bag_ranks=bag_ranks,
+            bag_ranks=problem.score_types[0].is_rank_based,
         )
         r = {}
         bagged_f_name = output_path / "bagged_scores_combined.csv"
@@ -698,7 +695,6 @@ def get_hyperopt_score_summary(
             score_f_names.append(glob.glob(f"{str(ramp_kit_dir)}/submissions/{ss}/training_output/fold*/scores.csv"))
     row_dicts = []
     for score_f_name in score_f_names:
-        print(score_f_name)
         row_dict = {}
         fold_idx = int(Path(score_f_name).parent.name.split("_")[1])
         if fold_idxs is None or fold_idx in fold_idxs:
