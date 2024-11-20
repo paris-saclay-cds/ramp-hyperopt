@@ -188,7 +188,7 @@ def run_race(
                 for submission in blended_submissions:
                     scores_df = pd.read_csv(f"{ramp_kit_dir}/submissions/{submission}/training_output/fold_{first_fold_idx}/scores.csv")
                     estimated_runtime_for_final_blend += scores_df["time"].sum()
-                estimated_runtime_for_final_blend *= n_folds_final_blend / 3600
+                estimated_runtime_for_final_blend *= (n_folds_final_blend - n_folds_hyperopt) / 3600
                 estimated_final_blending_time = 2 * blend_action.runtime.total_seconds() * n_folds_final_blend / n_folds_hyperopt / 3600
                 with open(f"{ramp_kit_dir}/timing.txt", "w") as file:
                     file.write(f"Elapsed time: {elapsed_time:.2f} hours")
