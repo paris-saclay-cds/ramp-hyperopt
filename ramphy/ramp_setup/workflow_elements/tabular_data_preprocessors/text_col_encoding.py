@@ -45,14 +45,16 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             hashing=HASHING,
             minmax_hash=MINMAX_HASH,
         )
-        transformer.fit(X[self.col])
+        X[self.col] = X[self.col].astype(str)
+        transformer.fit(X[[self.col]])
         new_columns = transformer.get_feature_names_out()
         converted_columns = [re.sub(r'[^a-zA-Z0-9_]', '_', col) + f"_{{i}}" for i, col in enumerate(new_columns)]
-        X_transformed_df = transformer.transform(X[self.col])
-        col_rename = {{
-            name: new_name
-            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
-        X_transformed_df = X_transformed_df.rename(columns=col_rename, errors='raise')
+        X_transformed_df = transformer.transform(X[[self.col]])
+#        col_rename = {{
+#            name: new_name
+#            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
+#        X_transformed_df = X_transformed_df.rename(columns=col_rename, errors='raise')
+        X_transformed_df = pd.DataFrame(X_transformed_df, columns=converted_columns, index=X.index)
         X = pd.concat((X, X_transformed_df), axis=1)
 
         metadata["data_description"]["feature_types"].pop(self.col)
