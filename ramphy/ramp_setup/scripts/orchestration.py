@@ -79,7 +79,7 @@ def run_race(
     base_we_names = [predictor_we_name]
     if preprocessors_to_hyper is not None:
         base_we_names += preprocessors_to_hyper
-
+    round_datetime = None
     for round_idx in range(start_round, n_rounds):
         if patience >= 0 and len(scores) > patience:
             if is_lower_the_better:
@@ -155,6 +155,7 @@ def run_race(
                 fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             )
             blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
+            round_datetime = blend_action.start_time
             elapsed_time += blend_action.runtime.total_seconds() / 3600
             if hasattr(blend_action, "blended_score"):
                 blended_score = blend_action.blended_score
@@ -198,7 +199,7 @@ def run_race(
                     print("Stopping for time limit")
                     break
         #    input("Press Enter to continue...")
-    return blended_submissions
+    return blended_submissions, round_datetime
 
 
 def resume_race(
@@ -354,6 +355,7 @@ def train_on_all_folds(
         )
 
 
+@rh.actions.ramp_action
 def final_blend_then_bag(
     submissions: list[str],
     ramp_kit_dir: str,
@@ -361,6 +363,7 @@ def final_blend_then_bag(
     n_folds_final_blend: int,
     first_fold_idx: int,
     n_rounds: int = -1,
+    round_datetime = None,  # for recording in the action, not used in the function
 ):
     """Blend then bag and submit after each fold.
 
@@ -416,6 +419,7 @@ def final_blend_then_bag(
         )
 
 
+@rh.actions.ramp_action
 def final_bag_then_blend(
     submissions: list[str],
     ramp_kit_dir: str,
@@ -423,6 +427,7 @@ def final_bag_then_blend(
     n_folds_final_blend: int,
     first_fold_idx: int,
     n_rounds: int = -1,
+    round_datetime = None,  # for recording in the action, not used in the function
 ):
     """Bag then blend and submit after each fold.
 
@@ -656,7 +661,7 @@ def hyperopt_race(
             save_path=ramp_kit_dir,
         )
 
-    blended_submissions = run_race(
+    blended_submissions, round_datetime = run_race(
         base_predictors=base_predictors,
         action_stats=action_stats,
         ramp_kit_dir=str(ramp_kit_dir),
@@ -713,6 +718,7 @@ def hyperopt_race(
         kit_suffix=kit_suffix,
         n_folds_final_blend=n_folds_final_blend,
         first_fold_idx=first_fold_idx,
+        round_datetime=round_datetime,
     )
     # Bag then blend the final blend of the hyperopt race on all the folds
     final_bag_then_blend(
@@ -721,6 +727,7 @@ def hyperopt_race(
         kit_suffix=kit_suffix,
         n_folds_final_blend=n_folds_final_blend,
         first_fold_idx=first_fold_idx,
+        round_datetime=round_datetime,
     )
     # Submit the best of each base submission (classical hyperopt)
     submit_best_submissions(
