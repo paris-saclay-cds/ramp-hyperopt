@@ -42,7 +42,7 @@ def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
 
 
 def label_encoding(train_data, test_data, target_cols, positive_target_values):
-    if positive_target_values != "":
+    if positive_target_values != {}:
         # XXX this should only be done for binary classification
         for target_col in target_cols:
             # for auc-type scores we need to assign 1 to the corresponding label
