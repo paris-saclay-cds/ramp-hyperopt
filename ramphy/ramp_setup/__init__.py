@@ -2,6 +2,7 @@ from . import actions
 from . import utils
 from .scripts import foundation
 from .scripts import orchestration
+from .scripts import blend_at_round
 from .scripts import tabular
 from .scripts.setup import setup
 from .scripts.tabular import tabular_cat_col_encoders_submit
