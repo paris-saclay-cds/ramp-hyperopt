@@ -13,8 +13,9 @@ from ramphy import ramp_setup as rs
 from ramphy.actions import ramp_action
 
 
-def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
-    """Mock test labels if they do not exist.
+def create_dummy_targets_and_encode_labels(
+    train_data, test_data, target_cols, prediction_type):
+    """Mock test labels if they do not exist and encode train and test labels.
 
     This is for compatibility between rampwf which expects targets for the test and
     Kaggle challenges for which we do not have the targets for the test:
@@ -31,52 +32,18 @@ def create_dummy_targets(train_data, test_data, target_cols, prediction_type):
                 )
     elif "classification" in prediction_type:
         for target_col in target_cols:
-            if target_col not in test_data.columns:
-                target_values = train_data[target_col].unique()
-                counts = train_data[target_col].value_counts()
-                weights = counts / counts.sum()
-                test_data[target_col] = np.random.choice(
-                    target_values, size=len(test_data), p=weights
-                )
-    return test_data
+                target_values = list(train_data[target_col].unique())
+                new_target_values = list(range(len(target_values)))
+                binary_transf = dict(zip(target_values, new_target_values))
+                train_data = train_data.replace({target_col: binary_transf})
+                test_data = test_data.replace({target_col: binary_transf})
+                if target_col not in test_data.columns:
+                    counts = train_data[target_col].value_counts()
+                    p = [counts[t] / len(train_data) for t in new_target_values]
+                    test_data[target_col] = np.random.choice(
+                        new_target_values, len(test_data), p=p
+                    )
 
-
-def label_encoding(train_data, test_data, target_cols, positive_target_values):
-    if positive_target_values != {}:
-        # XXX this should only be done for binary classification
-        for target_col in target_cols:
-            # for auc-type scores we need to assign 1 to the corresponding label
-            labels = train_data[target_col]
-            unique_labels = labels.unique()
-            label_to_map_to_1 = positive_target_values[target_col]
-            # labels are encoded as strings in the metadata.json, we check whether
-            # we should convert to an int.
-            if label_to_map_to_1 in unique_labels:
-                pass
-            elif int(label_to_map_to_1) in unique_labels:
-                label_to_map_to_1 = int(label_to_map_to_1)
-            else:
-                raise ValueError("Cannot infer the type of the label.")
-
-            # Get the unique labels and remove the label_to_map_to_1
-            unique_labels_without_1 = [
-                label for label in unique_labels if label != label_to_map_to_1
-            ]
-
-            label_mapping = {label_to_map_to_1: 1}
-            remaining_labels = [0] + list(range(2, len(unique_labels_without_1)+1))
-            other_labels_mapping = {
-                label: idx
-                for idx, label in zip(remaining_labels, unique_labels_without_1)
-            }
-            label_mapping.update(other_labels_mapping)
-            train_data[target_col] = train_data[target_col].map(label_mapping)
-            test_data[target_col] = test_data[target_col].map(label_mapping)
-    else:
-        for target_col in target_cols:
-            le = LabelEncoder().fit(train_data[target_col])
-            train_data[target_col] = le.transform(train_data[target_col])
-            test_data[target_col] = le.transform(test_data[target_col])
     return train_data, test_data
 
 
@@ -197,13 +164,9 @@ def tabular_setup(
     metadata["data_description"]["missing_data_count"] = missing_data_count
     metadata["data_description"]["unique_value_count"] = unique_value_count
 
-    test_data = create_dummy_targets(
-        train_data, test_data, target_cols, prediction_type)
-
-    if "classification" in prediction_type:
-        positive_target_values = metadata["data_description"]["positive_target_values"]
-        train_data, test_data = label_encoding(
-            train_data, test_data, target_cols, positive_target_values)
+    train_data, test_data = create_dummy_targets_and_encode_labels(
+        train_data, test_data, target_cols, prediction_type
+    )
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
