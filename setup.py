@@ -63,6 +63,7 @@ setup(
             'ramp-register-experiment = ramphy.cli.register_experiment:start',
             'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
             'ramp-foundation-models = ramphy.cli.foundation_models:start',
+            'ramp-save-results = ramphy.cli.save_results:start',
         ]
     }
 )

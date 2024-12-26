@@ -91,6 +91,15 @@ def ramp_action(action_function):
     return ramp_decorator
 
 
+def get_all_actions(ramp_kit_dir):
+    action_f_names = glob.glob(f'{ramp_kit_dir}/actions/*')
+    action_f_names.sort()
+    all_actions = []
+    for action_f_name in action_f_names:
+        f_name = Path(action_f_name).name
+        all_actions.append(load_ramp_action(action_f_name))
+    return all_actions
+
 def _bagged_score(score_type, bagged_f_name):
     bagged_scores_df = pd.read_csv(bagged_f_name)
     valid_scores_df = bagged_scores_df[bagged_scores_df["step"] == "valid"]
