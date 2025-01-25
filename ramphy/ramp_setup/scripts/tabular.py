@@ -32,17 +32,17 @@ def create_dummy_targets_and_encode_labels(
                 )
     elif "classification" in prediction_type:
         for target_col in target_cols:
-                target_values = list(train_data[target_col].unique())
-                new_target_values = list(range(len(target_values)))
-                binary_transf = dict(zip(target_values, new_target_values))
-                train_data = train_data.replace({target_col: binary_transf})
-                test_data = test_data.replace({target_col: binary_transf})
-                if target_col not in test_data.columns:
-                    counts = train_data[target_col].value_counts()
-                    p = [counts[t] / len(train_data) for t in new_target_values]
-                    test_data[target_col] = np.random.choice(
-                        new_target_values, len(test_data), p=p
-                    )
+            target_values = list(train_data[target_col].unique())
+            new_target_values = list(range(len(target_values)))
+            binary_transf = dict(zip(target_values, new_target_values))
+            train_data = train_data.replace({target_col: binary_transf})
+            test_data = test_data.replace({target_col: binary_transf})
+            if target_col not in test_data.columns:
+                counts = train_data[target_col].value_counts()
+                p = [counts[t] / len(train_data) for t in new_target_values]
+                test_data[target_col] = np.random.choice(
+                    new_target_values, len(test_data), p=p
+                )
 
     return train_data, test_data
 
@@ -163,6 +163,8 @@ def tabular_setup(
     metadata["data_description"]["feature_values"] = feature_values
     metadata["data_description"]["missing_data_count"] = missing_data_count
     metadata["data_description"]["unique_value_count"] = unique_value_count
+    metadata["n_train"] = len(train_data)
+    metadata["n_test"] = len(test_data)
 
     train_data, test_data = create_dummy_targets_and_encode_labels(
         train_data, test_data, target_cols, prediction_type
