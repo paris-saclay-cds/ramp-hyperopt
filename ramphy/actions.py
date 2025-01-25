@@ -703,6 +703,7 @@ def get_hyperopt_score_summary(
         for ss in selected_submissions:
             score_f_names.append(glob.glob(f"{str(ramp_kit_dir)}/submissions/{ss}/training_output/fold*/scores.csv"))
     row_dicts = []
+    print("Updating hyperparameter summaries...")
     for score_f_name in score_f_names:
         row_dict = {}
         fold_idx = int(Path(score_f_name).parent.name.split("_")[1])
