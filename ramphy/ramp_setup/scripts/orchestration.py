@@ -62,6 +62,7 @@ def run_race(
     max_time: float,
     elapsed_time: float,  # in hours
     preprocessors_to_hyper: Optional[list[str]] = None,
+    n_cpu_per_run: int = None,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
     improvement_speed_df = pd.DataFrame(columns=["round"] + base_predictors)
@@ -133,6 +134,7 @@ def run_race(
             fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             resume=True,
             subtract_existing=False,
+            n_cpu_per_run=n_cpu_per_run
         )
         hyperopt_action = last_action(ramp_kit_dir, "hyperopt")
         elapsed_time += hyperopt_action.runtime.total_seconds() / 3600
@@ -591,6 +593,7 @@ def hyperopt_race(
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
     no_growing_folds: bool = True,
+    n_cpu_per_run: int = None,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -600,6 +603,9 @@ def hyperopt_race(
     is_lower_the_better = problem.score_types[0].is_lower_the_better
     with open(ramp_kit_dir / "data" / "metadata.json", "r") as f:
         metadata = json.load(f)
+
+    if n_cpu_per_run is not None:
+        n_cpu_per_run = int(n_cpu_per_run)
 
     # Dictionary of submissions: list of dictionary of run times and scores
     action_stats = {submission: [] for submission in base_predictors}
@@ -681,6 +687,7 @@ def hyperopt_race(
         max_time=max_time,
         elapsed_time=0.0,
         preprocessors_to_hyper=dp_hyperopt_full_name,
+        n_cpu_per_run=n_cpu_per_run,
     )
 
     # Run the growing folds algorithm: select best of each base submission within

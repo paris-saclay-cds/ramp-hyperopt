@@ -178,6 +178,7 @@ def hyperopt(
     resume: Optional[bool] = True,
     subtract_existing: Optional[bool] = False,
     ramp_data_dir: Optional[str] = None,
+    n_cpu_per_run: Optional[int] = None,
 ) -> Dict:
     """Hyperopting action.
 
@@ -275,7 +276,7 @@ def hyperopt(
                 label=False,
                 resume=resume,
                 max_concurrent_runs=1,
-                n_cpu_per_run=None,
+                n_cpu_per_run=n_cpu_per_run,
                 n_gpu_per_run=0,
                 verbose=3,
             )

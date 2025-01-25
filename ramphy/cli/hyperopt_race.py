@@ -101,6 +101,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     show_default=True,
     help="Optional total running time in hours.",
 )
+@click.option(
+    "--n-cpu-per-run",
+    default=None,
+    show_default=True,
+    help="Number of CPUs to use for each run.",
+)
 @click_config_file.configuration_option()
 def main(
     ramp_kit,
@@ -119,6 +125,7 @@ def main(
     data_preprocessors,
     preprocessors_to_hyperopt,
     max_time,
+    n_cpu_per_run,
 ):
     rs.orchestration.hyperopt_race(
         data_preprocessors=list(data_preprocessors),
@@ -137,6 +144,7 @@ def main(
         preprocessors_to_hyperopt=list(preprocessors_to_hyperopt),
         base_predictors=list(base_predictors),
         max_time=max_time,
+        n_cpu_per_run=n_cpu_per_run,
     )
 
 
