@@ -114,6 +114,16 @@ def main(
     results_df.to_csv(results_path / "results_bagged_then_blended.csv", index=False)
     print(f"saved bagged_then_blended round idxs: {list(results_df['round_idx'])}")
 
+    for ra in all_actions:
+        if ra.name == "blend":
+            if ra.kwargs["fold_idxs"] == range(0, 3):
+                ra.name = "blend_hyperopt"
+            else:
+                ra.name = "blend_then_bag"
+    all_actions_df = pd.DataFrame([{"name": ra.name, "runtime": ra.runtime} for ra in all_actions])
+    runtimes = all_actions_df.groupby('name')['runtime'].sum()
+    runtimes.to_csv(results_path / "runtimes.csv")
+
 def start():
     main()
 
