@@ -54,7 +54,8 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
 #            name: new_name
 #            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
 #        X_transformed_df = X_transformed_df.rename(columns=col_rename, errors='raise')
-        X_transformed_df = pd.DataFrame(X_transformed_df, columns=converted_columns, index=X.index)
+        X_transformed_df = pd.DataFrame(
+            X_transformed_df.to_numpy(), columns=converted_columns, index=X.index)
         X = pd.concat((X, X_transformed_df), axis=1)
 
         metadata["data_description"]["feature_types"].pop(self.col)
