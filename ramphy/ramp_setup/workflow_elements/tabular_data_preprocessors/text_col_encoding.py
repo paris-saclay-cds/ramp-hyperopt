@@ -46,10 +46,10 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             minmax_hash=MINMAX_HASH,
         )
         X[self.col] = X[self.col].astype(str)
-        transformer.fit(X[[self.col]])
+        transformer.fit(X[self.col])
         new_columns = transformer.get_feature_names_out()
         converted_columns = [re.sub(r'[^a-zA-Z0-9_]', '_', col) + f"_{{i}}" for i, col in enumerate(new_columns)]
-        X_transformed_df = transformer.transform(X[[self.col]])
+        X_transformed_df = transformer.transform(X[self.col])
 #        col_rename = {{
 #            name: new_name
 #            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
