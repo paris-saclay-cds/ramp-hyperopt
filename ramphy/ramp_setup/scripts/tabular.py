@@ -13,8 +13,7 @@ from ramphy import ramp_setup as rs
 from ramphy.actions import ramp_action
 
 
-def create_dummy_targets_and_encode_labels(
-    train_data, test_data, target_cols, prediction_type):
+def create_dummy_targets_and_encode_labels(train_data, test_data, target_cols, prediction_type):
     """Mock test labels if they do not exist and encode train and test labels.
 
     This is for compatibility between rampwf which expects targets for the test and
@@ -40,9 +39,7 @@ def create_dummy_targets_and_encode_labels(
             if target_col not in test_data.columns:
                 counts = train_data[target_col].value_counts()
                 p = [counts[t] / len(train_data) for t in new_target_values]
-                test_data[target_col] = np.random.choice(
-                    new_target_values, len(test_data), p=p
-                )
+                test_data[target_col] = np.random.choice(new_target_values, len(test_data), p=p)
 
     return train_data, test_data
 
@@ -117,8 +114,7 @@ def tabular_setup(
 
     sample_submission_path = download_dir / "sample_submission.csv"
     if sample_submission_path.exists():
-        shutil.copy(
-            sample_submission_path, ramp_data_dir / "data" / "sample_submission.csv")
+        shutil.copy(sample_submission_path, ramp_data_dir / "data" / "sample_submission.csv")
 
     feature_values = {}
     missing_data_count = {}
@@ -166,9 +162,7 @@ def tabular_setup(
     metadata["n_train"] = len(train_data)
     metadata["n_test"] = len(test_data)
 
-    train_data, test_data = create_dummy_targets_and_encode_labels(
-        train_data, test_data, target_cols, prediction_type
-    )
+    train_data, test_data = create_dummy_targets_and_encode_labels(train_data, test_data, target_cols, prediction_type)
 
     test_data.to_csv(ramp_data_dir / "data" / "test.csv", index=False)
     train_data.to_csv(ramp_data_dir / "data" / "train.csv", index=False)
@@ -462,13 +456,15 @@ def tabular_text_col_encoders_submit(
     metadata = json.load(open(ramp_data_dir / "data" / "metadata.json"))
 
     dp_idx = rs.utils.num_data_preprocessors(submission, ramp_kit_dir)
-    dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "text_col_encoding.py"
+    # dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "text_col_encoding.py"
+    dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "tokenizer_text2vec.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
     dp_names = []
     for col, col_type in metadata["data_description"]["feature_types"].items():
         if col_type == "text":
             dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            dp_name = f"data_preprocessor_{dp_idx}{col}_text_col_encoding"
+            # dp_name = f"data_preprocessor_{dp_idx}{col}_text_col_encoding"
+            dp_name = f"data_preprocessor_{dp_idx}{col}_tokenizer_text_encoding"
             dp_names.append(dp_name)
             with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
                 f_out.write(dp_code_formatted)
