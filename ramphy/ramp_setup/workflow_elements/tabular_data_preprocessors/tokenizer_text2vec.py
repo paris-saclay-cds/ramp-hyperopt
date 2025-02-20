@@ -33,7 +33,7 @@ pd.set_option("display.max_columns", None)
 # RAMP START HYPERPARAMETERS
 encoding_mode_tokenizer = Hyperparameter(
     dtype="str",
-    default="pca_5",
+    default="pca_max",
     values=["extremes", "pca_1", "pca_3", "pca_5", "pca_max"],
 )
 # RAMP END HYPERPARAMETERS
