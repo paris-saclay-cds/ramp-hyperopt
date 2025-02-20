@@ -34,7 +34,7 @@ CLASSIFIERS = ['Intended Audience :: Science/Research',
                'Operating System :: MacOS']
 INSTALL_REQUIRES = ['numpy', 'scipy', 'pandas', 'scikit-learn>=0.22', 'joblib',
                     'cloudpickle', 'click', 'ray[tune]', 'ramp-workflow',
-                    'xarray', 'category_encoders', 'xgboost', 'lightgbm', 'catboost', 'kaggle', 'skrub', 'click_config_file', 'holidays']
+                    'xarray', 'category_encoders', 'xgboost', 'lightgbm', 'catboost', 'kaggle', 'skrub>=0.2', 'click_config_file', 'holidays']
 EXTRAS_REQUIRE = {
     'tests': ['pytest', 'pytest-cov'],
     'docs': ['sphinx', 'sphinx_rtd_theme', 'numpydoc', 'sphinx-click']
@@ -63,6 +63,7 @@ setup(
             'ramp-register-experiment = ramphy.cli.register_experiment:start',
             'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
             'ramp-foundation-models = ramphy.cli.foundation_models:start',
+            'ramp-save-results = ramphy.cli.save_results:start',
         ]
     }
 )

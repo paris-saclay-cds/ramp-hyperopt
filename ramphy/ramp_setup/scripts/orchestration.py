@@ -62,6 +62,7 @@ def run_race(
     max_time: float,
     elapsed_time: float,  # in hours
     preprocessors_to_hyperopt: Optional[list[str]] = None,
+    n_cpu_per_run: Optional[int] = None,
     hyperopt_all_at_once: bool = False,
 ) -> set[str]:
     # can be deleted, once the algorithm settles
@@ -143,6 +144,7 @@ def run_race(
             fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             resume=True,
             subtract_existing=False,
+            n_cpu_per_run=n_cpu_per_run,
         )
         hyperopt_action = last_action(ramp_kit_dir, "hyperopt")
         elapsed_time += hyperopt_action.runtime.total_seconds() / 3600
@@ -158,13 +160,17 @@ def run_race(
             # The blended score improvement is wrt the previous blended score. If it doesn't exist
             # (in the first iteration, or if no submission was blended for a reason) use the mean
             # score.
-            previous_blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
+            previous_blend_action = last_action(
+                ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
+            )
             rh.actions.blend(
                 ramp_kit_dir=ramp_kit_dir,
                 submissions=list(blended_submissions),
                 fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt),
             )
-            blend_action = last_action(ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt))
+            blend_action = last_action(
+                ramp_kit_dir, "blend", fold_idxs=range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
+            )
             round_datetime = blend_action.start_time
             elapsed_time += blend_action.runtime.total_seconds() / 3600
             if hasattr(blend_action, "blended_score"):
@@ -195,13 +201,19 @@ def run_race(
             if max_time > 0:
                 estimated_runtime_for_final_blend = 0
                 for submission in blended_submissions:
-                    scores_df = pd.read_csv(f"{ramp_kit_dir}/submissions/{submission}/training_output/fold_{first_fold_idx}/scores.csv")
+                    scores_df = pd.read_csv(
+                        f"{ramp_kit_dir}/submissions/{submission}/training_output/fold_{first_fold_idx}/scores.csv"
+                    )
                     estimated_runtime_for_final_blend += scores_df["time"].sum()
                 estimated_runtime_for_final_blend *= (n_folds_final_blend - n_folds_hyperopt) / 3600
-                estimated_final_blending_time = 2 * blend_action.runtime.total_seconds() * n_folds_final_blend / n_folds_hyperopt / 3600
+                estimated_final_blending_time = (
+                    2 * blend_action.runtime.total_seconds() * n_folds_final_blend / n_folds_hyperopt / 3600
+                )
                 with open(f"{ramp_kit_dir}/timing.txt", "w") as file:
                     file.write(f"Elapsed time: {elapsed_time:.2f} hours")
-                    file.write(f"\nEstimated runtime (train + valid + test) for final blend: {estimated_runtime_for_final_blend:.2f} hours")
+                    file.write(
+                        f"\nEstimated runtime (train + valid + test) for final blend: {estimated_runtime_for_final_blend:.2f} hours"
+                    )
                     file.write(f"\nEstimated final blending time: {estimated_final_blending_time:.2f} hours")
                 if elapsed_time + estimated_runtime_for_final_blend + estimated_final_blending_time > max_time:
                     print("Stopping for time limit")
@@ -226,7 +238,9 @@ def resume_race(
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     blend_actions = [
-        ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
+        ra
+        for ra in ramp_program
+        if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
     ]
     stop_time = blend_actions[-1].stop_time
     print(f"Last blending action at {stop_time}, deleting all actions after...")
@@ -241,7 +255,11 @@ def resume_race(
         f_name = Path(action_f_name).name
         ramp_program.append(rh.actions.load_ramp_action(Path(action_f_name)))
     # we only need race blend actions
-    blend_actions = [ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)]
+    blend_actions = [
+        ra
+        for ra in ramp_program
+        if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
+    ]
     hyperopt_actions = [ra for ra in ramp_program if ra.name == "hyperopt"]
     start_round = len(hyperopt_actions)
     scores = []
@@ -371,14 +389,14 @@ def final_blend_then_bag(
     n_folds_final_blend: int,
     first_fold_idx: int,
     n_rounds: int = -1,
-    round_datetime = None,  # for recording in the action, not used in the function
+    round_datetime=None,  # for recording in the action, not used in the function
 ):
     """Blend then bag and submit after each fold.
 
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all in <ramp_kit_dir>/final_test_predictions.
     """
-#    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+    #    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
     for stop_fold_idx in range(first_fold_idx + n_folds_final_blend, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.blend(
             ramp_kit_dir=ramp_kit_dir,
@@ -435,14 +453,14 @@ def final_bag_then_blend(
     n_folds_final_blend: int,
     first_fold_idx: int,
     n_rounds: int = -1,
-    round_datetime = None,  # for recording in the action, not used in the function
+    round_datetime=None,  # for recording in the action, not used in the function
 ):
     """Bag then blend and submit after each fold.
 
     To potentially recover the learning curve. Typically we only submit the last one,
     but we save all.
     """
-#    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
+    #    for stop_fold_idx in range(first_fold_idx + 1, first_fold_idx + n_folds_final_blend + 1):
     for stop_fold_idx in range(first_fold_idx + n_folds_final_blend, first_fold_idx + n_folds_final_blend + 1):
         rh.actions.bag_then_blend(
             ramp_kit_dir=ramp_kit_dir,
@@ -599,6 +617,7 @@ def hyperopt_race(
     n_sigma: float = 1.0,
     contributivity_floor: int = 100,  # on 1000, added to contributivity to give a chance to every submission
     no_growing_folds: bool = True,
+    n_cpu_per_run: int = None,
 ):
     kit_suffix = f"v{version}_n{number}"
     ramp_kit_dir = Path(kit_root) / f"{ramp_kit}_{kit_suffix}"
@@ -608,6 +627,9 @@ def hyperopt_race(
     is_lower_the_better = problem.score_types[0].is_lower_the_better
     with open(ramp_kit_dir / "data" / "metadata.json", "r") as f:
         metadata = json.load(f)
+
+    if n_cpu_per_run is not None:
+        n_cpu_per_run = int(n_cpu_per_run)
 
     # Dictionary of submissions: list of dictionary of run times and scores
     action_stats = {submission: [] for submission in base_predictors}
@@ -693,7 +715,7 @@ def hyperopt_race(
         max_time=max_time,
         elapsed_time=0.0,
         preprocessors_to_hyperopt=dp_hyperopt_full_name,
-        hyperopt_all_at_once=True,
+        n_cpu_per_run=n_cpu_per_run,
     )
 
     # Run the growing folds algorithm: select best of each base submission within

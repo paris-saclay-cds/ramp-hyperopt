@@ -92,9 +92,11 @@ def save_submission(y_pred, data_path=".", output_path=".", suffix="test"):
                 else:
                     df[f"{{target_col}}_{{tv}}"] = y_pred_block[:, tv_i]
         elif score_name in ['gini', 'ngini', 'auc', 'nll']:
-            # label encoding in the setup has been done such that the positve label is
-            # encoded as one
-            df[target_col] = y_pred_block[:, 1]
+            # positive_target_value needed in metadata for auc-type scores
+            positive_value_index = target_values.index(
+                positive_target_values[target_col]
+            )
+            df[target_col] = y_pred_block[:, positive_value_index]
         else:
             y_pred_indices = np.argmax(y_pred_block, axis=1)
             df[target_col] = [target_values[i] for i in y_pred_indices]

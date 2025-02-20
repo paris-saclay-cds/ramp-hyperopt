@@ -29,6 +29,11 @@ HYPERPARAMS_REPL_REGEX = re.compile(
     "{}.*{}".format(HYPERPARAMS_SECTION_START, HYPERPARAMS_SECTION_END), re.S
 )
 
+def check_disk_space():
+    total, used, free = shutil.disk_usage("/")
+    usage_percent = (used / total) * 100
+    if usage_percent > 94:
+        raise Exception("Disk space is full, cannot continue.")
 
 class Hyperparameter(object):
     """Discrete grid hyperparameter.
@@ -962,6 +967,15 @@ def run_hyperopt(
     n_gpu_per_run,
     verbose,
 ):
+    try:
+        check_disk_space()
+        # Continue with your Ray Tune experiment...
+    except Exception as e:
+        print(e)
+        print("rm -rf /tmp/ray/*")
+        print("rm -rf ~/ray_results/*")
+        exit()
+        
     ray.init(log_to_driver=False, ignore_reinit_error=True)
     if n_cpu_per_run is None:
         n_cpu_per_run = os.cpu_count() - 1

@@ -95,6 +95,15 @@ def ramp_action(action_function):
     return ramp_decorator
 
 
+def get_all_actions(ramp_kit_dir):
+    action_f_names = glob.glob(f'{ramp_kit_dir}/actions/*')
+    action_f_names.sort()
+    all_actions = []
+    for action_f_name in action_f_names:
+        f_name = Path(action_f_name).name
+        all_actions.append(load_ramp_action(action_f_name))
+    return all_actions
+
 def _bagged_score(score_type, bagged_f_name):
     bagged_scores_df = pd.read_csv(bagged_f_name)
     valid_scores_df = bagged_scores_df[bagged_scores_df["step"] == "valid"]
@@ -170,6 +179,7 @@ def hyperopt(
     resume: Optional[bool] = True,
     subtract_existing: Optional[bool] = False,
     ramp_data_dir: Optional[str] = None,
+    n_cpu_per_run: Optional[int] = None,
 ) -> Dict:
     """Hyperopting action.
 
@@ -267,9 +277,9 @@ def hyperopt(
                 label=False,
                 resume=resume,
                 max_concurrent_runs=1,
-                n_cpu_per_run=None,
-                n_gpu_per_run=torch.cuda.device_count(),
-                verbose=0,
+                n_cpu_per_run=n_cpu_per_run,
+                n_gpu_per_run=0,
+                verbose=3,
             )
             n_trained_submissions = len(created_submissions)
             existing_submissions = existing_submissions + created_submissions
@@ -717,6 +727,7 @@ def get_hyperopt_score_summary(
         for ss in selected_submissions:
             score_f_names.append(glob.glob(f"{str(ramp_kit_dir)}/submissions/{ss}/training_output/fold*/scores.csv"))
     row_dicts = []
+    print("Updating hyperparameter summaries...")
     for score_f_name in score_f_names:
         row_dict = {}
         fold_idx = int(Path(score_f_name).parent.name.split("_")[1])
