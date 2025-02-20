@@ -459,17 +459,13 @@ def tabular_text_col_encoders_submit(
     # dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "text_col_encoding.py"
     dp_template_path = Path("workflow_elements") / "tabular_data_preprocessors" / "tokenizer_text2vec.py"
     dp_code = rs.utils.load_template(package=rs, template_path=dp_template_path)
-    dp_names = []
-    for col, col_type in metadata["data_description"]["feature_types"].items():
-        if col_type == "text":
-            dp_code_formatted = dp_code.format_map(metadata | {"col": f"{col}", "str_col": f'"{col}"'})
-            # dp_name = f"data_preprocessor_{dp_idx}{col}_text_col_encoding"
-            dp_name = f"data_preprocessor_{dp_idx}{col}_tokenizer_text_encoding"
-            dp_names.append(dp_name)
-            with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
-                f_out.write(dp_code_formatted)
-            dp_idx += 1
-    return dp_names
+
+    if "text" in metadata["data_description"]["feature_types"].items():
+        dp_name = f"data_preprocessor_{dp_idx}_tokenizer_text_encoding"
+        with open(ramp_kit_dir / "submissions" / submission / f"{dp_name}.py", "w") as f_out:
+            f_out.write(dp_code)
+        dp_idx += 1
+    return [dp_name]
 
 
 @ramp_action
