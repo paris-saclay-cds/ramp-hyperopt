@@ -29,7 +29,7 @@ ramp-setup --ramp-kit kaggle_abalone --version 1_1 --number 1
 ```
 `version` and `number` can be any string. Conventionally we use `version` to mark either a version of `ramp-autods` or a config file specifying command-line parameters, and `number` to mark an execution, like a seed.
 
-If your setup folder is not `./ramp-setup-kits`, you can specify it with `--setup-root`.
+If your setup folder is not `../ramp-setup-kits`, you can specify it with `--setup-root`.
 
 The result is a functional RAMP kit, with the starting kit submission (an LGBM) trained, tested, and scored.
 <details><summary>Explanation of the resulting folder structure</summary>
