@@ -31,7 +31,8 @@ ramp-setup --ramp-kit kaggle_abalone --version 1_1 --number 1
 
 If your setup folder is not `../ramp-setup-kits`, you can specify it with `--setup-root`.
 
-The result is a functional RAMP kit, with the starting kit submission (an LGBM) trained, tested, and scored.
+The result is a functional RAMP kit (also available [here](https://github.com/ramp-kits/kaggle_abalone), for reference), with the starting kit submission (an LGBM) trained, tested, and scored.
+
 <details><summary>Explanation of the resulting folder structure</summary>
 
 ```
