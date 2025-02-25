@@ -73,7 +73,9 @@ ramp-kits
 4. `submissions` is the folder with all the submissions (data preprocessors and a predictor, inserted into the [classification]() or [regression]() workflow.). After setup, a single `starting_kit` submission is submitted, containing an LGBM `regressor.py`, and a list of `data_preprocessor`s (some of them fixed, some of them depending on the data). The `feature_extractor.py` is currently blank; data preprocessors are executed once, before the folds are created, while the feature extractor is called for every fold.
 5. `submissions/<submission>/training_output` stores all the results, including a table `bagged_scores.csv` for all the foldwise scores and runtimes, and `submission_bagged_test.csv` that is a valid submission file that can be submitted to Kaggle. For each fold, we store `y_pred_train.npz` (training + validation predictions) and `y_pred_test.npz` (test predictions). These can be large files, but we need to keep them until the final blend.
 </details>
+
 <details><summary>Optional RAMP test</summary>
+
 The kit is a valid RAMP kit which means that all RAMP commands can be used on it. You can test
 ```
 ramp-test
