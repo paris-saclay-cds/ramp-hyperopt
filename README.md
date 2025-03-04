@@ -3,7 +3,17 @@ RAMP hyperopt
 
 Hyperopt package for ramp-workflow.
 
-# Command-line parameters
+# Installation
+
+# How to use
+
+You need a RAMP kit set up, for example, from [here](https://github.com/ramp-kits/kaggle_abalone), with a submission to be hyperopted. Each workflow element can have a section describing the hyperparameters and grids of values, see for example the [regressor](https://github.com/ramp-kits/kaggle_abalone/blob/master/submissions/starting_kit/regressor.py). You can hyperopt each workflow element separately, or at the same time. You can start by 
+```
+ramp-hyperopt --config config_hyperopt_1.ini
+```
+using the config file [here](https://github.com/ramp-kits/kaggle_abalone/blob/master/config_hyperopt_1.ini). It will run three trials on the first three folds from the CV object defined in [`problem.py`](https://github.com/ramp-kits/kaggle_abalone/blob/master/problem.py#L30), using the [HEBO](https://github.com/huawei-noah/HEBO/tree/master/HEBO) hyperopt engine. 
+
+## Command-line parameters
 
 `--engine`:
 - `ray_hebo` (suggested)
