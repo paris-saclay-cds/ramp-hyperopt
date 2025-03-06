@@ -1,4 +1,5 @@
 import click
+import click_config_file
 
 from ..hyperopt import run_hyperopt
 
@@ -62,15 +63,31 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     default=10,
     show_default=True,
     help="The number of hyperopt iterations, inputted to the "
-    "engine. The granularity is per cv fold, so if you want to "
-    "fully test 7 hyperparameter combinations for example with the "
-    "random engine and you have 8 CV folds, you should enter "
-    "--n-trials 56",
+    "engine.",
+)
+@click.option(
+    "--n-folds",
+    default=3,
+    show_default=True,
+    help="The number of folds used in the hyperopt.",
+)
+@click.option(
+    "--first-fold-idx",
+    default=0,
+    show_default=True,
+    help="The index of the first fold of problem.get_cv.",
+)
+@click.option(
+    "--workflow-elements-to-hyperopt",
+    multiple=True,
+    default=[],
+    help="A list of workflow elements, typically python files in this folder "
+    "(without the extension) which have a hyperparameter grid defined at the top.",
 )
 @click.option(
     "--save-output",
     is_flag=True,
-    default=False,
+    default=True,
     show_default=True,
     help="Specify this flag to create a "
     "<submission>_<data_label>_hyperopt_<timestamp> "
@@ -108,7 +125,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="[ray] Machine resources (cpu) to allocate per trial. default to 1",
 )
 @click.option(
-    "--n-gpu-per-run",
+    "--n-gpu-per-run",s
     default=0,
     show_default=True,
     help="[ray] Machine resources (gpu) to allocate per trial. default to 0",
@@ -121,7 +138,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
          "2 = status and brief trial results, 3 = status and detailed trial results. "
          "Defaults to 3.",
 )
-
+@click_config_file.configuration_option()
 def main(
     submission,
     ramp_kit_dir,
@@ -130,6 +147,9 @@ def main(
     ramp_submission_dir,
     engine,
     n_trials,
+    n_folds,
+    first_fold_idx,
+    workflow_elements_to_hyperopt,
     save_output,
     test,
     label,
@@ -137,7 +157,7 @@ def main(
     max_concurrent_runs,
     n_cpu_per_run,
     n_gpu_per_run,
-    verbose
+    verbose,
 ):
     """Hyperopt a submission."""
     run_hyperopt(
@@ -147,8 +167,9 @@ def main(
         data_label=data_label,
         submission=submission,
         engine_name=engine,
-        n_trials=n_trials,
-        fold_idxs=None,
+        n_trials=n_trials * n_folds,
+        workflow_element_names=workflow_elements_to_hyperopt,
+        fold_idxs=range(first_fold_idx, first_fold_idx + n_folds),
         save_output=save_output,
         test=test,
         label=label,

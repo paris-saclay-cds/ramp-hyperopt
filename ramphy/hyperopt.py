@@ -758,7 +758,7 @@ class RayEngine:
 
                 self.ray_engine = ZOOptSearch(  # gets stuck often
                     algo="Asracos",  # only support ASRacos currently
-                    budget=n_trials,
+                    budget=10,
                     points_to_evaluate=points_to_evaluate,
                     evaluated_rewards=evaluated_rewards,
                 )
@@ -770,30 +770,9 @@ class RayEngine:
 
                 self.ray_engine = AxSearch(
                     points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except("ax-platform sqlalchemy")
-        elif engine_name[4:] == "blend_search":
-            try:
-                from ray.tune.search.flaml import BlendSearch
-
-                self.ray_engine = BlendSearch(
-                    points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
-                )
-            except ModuleNotFoundError:
-                self.raise_except("flaml")
-        elif engine_name[4:] == "cfo":
-            try:
-                from ray.tune.search.flaml import CFO
-
-                self.ray_engine = CFO(
-                    points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
-                )
-            except ModuleNotFoundError:
-                self.raise_except("flaml")
         elif engine_name[4:] == "skopt":
             try:
                 from ray.tune.search.skopt import SkOptSearch
@@ -810,7 +789,6 @@ class RayEngine:
 
                 self.ray_engine = HyperOptSearch(
                     points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except("hyperopt")
@@ -820,7 +798,6 @@ class RayEngine:
 
                 self.ray_engine = BayesOptSearch(
                     points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except("bayesian-optimization")
@@ -830,7 +807,6 @@ class RayEngine:
 
                 self.ray_engine = TuneBOHB(
                     points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except("hpbandster")
@@ -842,7 +818,6 @@ class RayEngine:
                 self.ray_engine = NevergradSearch(
                     optimizer=ng.optimizers.OnePlusOne,
                     points_to_evaluate=points_to_evaluate,
-                    evaluated_rewards=evaluated_rewards,
                 )
             except ModuleNotFoundError:
                 self.raise_except("nevergrad")
