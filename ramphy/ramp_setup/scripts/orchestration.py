@@ -222,6 +222,14 @@ def resume_race(
     blend_actions = [
         ra for ra in ramp_program if ra.name == "blend" and ra.kwargs["fold_idxs"] == range(first_fold_idx, first_fold_idx + n_folds_hyperopt)
     ]
+    
+    if len(blend_actions) == 0:
+        # Crash occured early, before the first round
+        start_round = 0
+        blended_submissions = set()
+        scores = []
+        return start_round, blended_submissions, action_stats, scores
+
     stop_time = blend_actions[-1].stop_time
     print(f"Last blending action at {stop_time}, deleting all actions after...")
     actions_f_names_to_delete = [a for a in action_f_names if pd.to_datetime(Path(a).stem) > stop_time]
