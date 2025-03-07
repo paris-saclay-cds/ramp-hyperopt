@@ -195,28 +195,28 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
         cols_with_unique_value = X_transformed.nunique() == 1
         X_transformed = X_transformed.loc[:, ~cols_with_unique_value]
         X_transformed.drop(self.col, axis=1, inplace=True)
-
+    
         return X_transformed
 
     def preprocess(
         self, X_train: pd.DataFrame, y_train: np.ndarray, X_test: pd.DataFrame, metadata: dict
     ) -> Tuple[pd.DataFrame, np.ndarray, pd.DataFrame, dict]:
-
-        X_tf = self._transform(pd.concat([X_train, X_test], axis=0)[[self.col]])
-        X_train_tf = X_tf.iloc[:len(X_train)]
-        X_test_tf = X_tf.iloc[len(X_train):]
-        new_columns = X_tf.columns
-
-        X_train = X_train.drop(columns=[self.col])
-        X_train[new_columns] = X_train_tf
-        X_test = X_test.drop(columns=[self.col])
-        X_test[new_columns] = X_test_tf
-
-        metadata["data_description"]["feature_types"].pop(self.col)
-        for col in new_columns:
-            if col == 'is_weekend':
-                metadata["data_description"]["feature_types"][col] = "bin"
-            else:
-                metadata["data_description"]["feature_types"][col] = "num"
+        if self.col in X_train.columns:        
+            X_tf = self._transform(pd.concat([X_train, X_test], axis=0)[[self.col]])
+            X_train_tf = X_tf.iloc[:len(X_train)]
+            X_test_tf = X_tf.iloc[len(X_train):]
+            new_columns = X_tf.columns
+    
+            X_train = X_train.drop(columns=[self.col])
+            X_train[new_columns] = X_train_tf
+            X_test = X_test.drop(columns=[self.col])
+            X_test[new_columns] = X_test_tf
+    
+            metadata["data_description"]["feature_types"].pop(self.col)
+            for col in new_columns:
+                if col == 'is_weekend':
+                    metadata["data_description"]["feature_types"][col] = "bin"
+                else:
+                    metadata["data_description"]["feature_types"][col] = "num"
 
         return X_train, y_train, X_test, metadata
