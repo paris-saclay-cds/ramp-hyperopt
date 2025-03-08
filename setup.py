@@ -14,7 +14,7 @@ with open(ver_file) as f:
 
 DISTNAME = 'ramp-hyperopt'
 DESCRIPTION = ('Hyperopt package for the ramp-workflow library.')
-with codecs.open('README.rst', encoding='utf-8-sig') as f:
+with codecs.open('README.md', encoding='utf-8-sig') as f:
     LONG_DESCRIPTION = f.read()
 MAINTAINER = 'B. Kegl'
 MAINTAINER_EMAIL = 'balazs.kegl@gmail.com'
@@ -58,12 +58,6 @@ setup(
     entry_points={
         'console_scripts': [
             'ramp-hyperopt = ramphy.cli.hyperopt:start',
-            'ramp-setup = ramphy.cli.setup:start',
-            'ramp-hyperopt-race = ramphy.cli.hyperopt_race:start',
-            'ramp-register-experiment = ramphy.cli.register_experiment:start',
-            'ramp-blend-at-round = ramphy.cli.blend_at_round:start',
-            'ramp-foundation-models = ramphy.cli.foundation_models:start',
-            'ramp-save-results = ramphy.cli.save_results:start',
         ]
     }
 )

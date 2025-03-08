@@ -125,7 +125,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     help="[ray] Machine resources (cpu) to allocate per trial. default to 1",
 )
 @click.option(
-    "--n-gpu-per-run",s
+    "--n-gpu-per-run",
     default=0,
     show_default=True,
     help="[ray] Machine resources (gpu) to allocate per trial. default to 0",
