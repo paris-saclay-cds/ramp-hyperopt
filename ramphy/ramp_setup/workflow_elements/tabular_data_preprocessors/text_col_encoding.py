@@ -45,25 +45,26 @@ class DataPreprocessor(rs.BaseDataPreprocessor):
             hashing=HASHING,
             minmax_hash=MINMAX_HASH,
         )
-        X[self.col] = X[self.col].astype(str)
-        transformer.fit(X[self.col])
-        new_columns = transformer.get_feature_names_out()
-        converted_columns = [re.sub(r'[^a-zA-Z0-9_]', '_', col) + f"_{{i}}" for i, col in enumerate(new_columns)]
-        X_transformed_df = transformer.transform(X[self.col])
-#        col_rename = {{
-#            name: new_name
-#            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
-#        X_transformed_df = X_transformed_df.rename(columns=col_rename, errors='raise')
-        X_transformed_df = pd.DataFrame(
-            X_transformed_df.to_numpy(), columns=converted_columns, index=X.index)
-        X = pd.concat((X, X_transformed_df), axis=1)
-
-        metadata["data_description"]["feature_types"].pop(self.col)
-        for col in converted_columns:
-            metadata["data_description"]["feature_types"][col] = "num"
-
-        X = X.drop(columns=[self.col])
-        X_train = X.iloc[:len(X_train)]
-        X_test = X.iloc[len(X_train):]
+        if self.col in X_train.columns:
+            X[self.col] = X[self.col].astype(str)
+            transformer.fit(X[self.col])
+            new_columns = transformer.get_feature_names_out()
+            converted_columns = [re.sub(r'[^a-zA-Z0-9_]', '_', col) + f"_{{i}}" for i, col in enumerate(new_columns)]
+            X_transformed_df = transformer.transform(X[self.col])
+    #        col_rename = {{
+    #            name: new_name
+    #            for name, new_name in zip(X_transformed_df.columns, converted_columns)}}
+    #        X_transformed_df = X_transformed_df.rename(columns=col_rename, errors='raise')
+            X_transformed_df = pd.DataFrame(
+                X_transformed_df.to_numpy(), columns=converted_columns, index=X.index)
+            X = pd.concat((X, X_transformed_df), axis=1)
+    
+            metadata["data_description"]["feature_types"].pop(self.col)
+            for col in converted_columns:
+                metadata["data_description"]["feature_types"][col] = "num"
+    
+            X = X.drop(columns=[self.col])
+            X_train = X.iloc[:len(X_train)]
+            X_test = X.iloc[len(X_train):]
 
         return X_train, y_train, X_test, metadata
