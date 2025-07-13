@@ -167,7 +167,7 @@ def main(
         data_label=data_label,
         submission=submission,
         engine_name=engine,
-        n_trials=n_trials * n_folds,
+        n_trials=n_trials,
         workflow_element_names=workflow_elements_to_hyperopt,
         fold_idxs=range(first_fold_idx, first_fold_idx + n_folds),
         save_output=save_output,
