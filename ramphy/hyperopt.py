@@ -21,7 +21,7 @@ import warnings
 # flake8: noqa: E501
 
 
-from .engines import RandomEngine
+from .engines import RandomEngine, HeboEngine
 
 HYPERPARAMS_SECTION_START = "# RAMP START HYPERPARAMETERS"
 HYPERPARAMS_SECTION_END = "# RAMP END HYPERPARAMETERS"
@@ -58,13 +58,17 @@ class Hyperparameter(object):
             The index in values of the current value of the hyperparameter.
         values: numpy array of any dtype
             The list of hyperparameter values.
-        prior: numpy array of float
-            A list of reals that the hyperopt can use as a prior probability
-            over values. Positivity and summing to one are not checked,
-            hyperparameter optimizers should do that when using the list
+        priors: numpy array of float
+            A list of reals between 0 and 1 representing a multinomial whether
+            the value should be kept and proposed to the hyperopt algorithm.
+            It is used to pre-select values before asking the algorithm to sample.
+            Default is all 1s, meanint that the value is always selected.
+            If set to all 0s the single default value will be passed to the 
+            hyperopt algorithm, meaning that this hyperparameter is fixed to
+            the default.
     """
 
-    def __init__(self, dtype, default=None, values=None, prior=None, name=""):
+    def __init__(self, dtype, default=None, values=None, priors=None, name=""):
         self.name = name
         self.workflow_element_name = ""
         self.dtype = dtype
@@ -86,15 +90,14 @@ class Hyperparameter(object):
                 raise ValueError(message)
             else:
                 self.set_default(default)
-
-        if prior is None:
-            self.prior = np.array([1.0 / self.n_values] * self.n_values)
+        if priors is None:
+            self.priors = np.ones(self.n_values)
         else:
-            if len(prior) != len(values):
+            if len(priors) != len(values):
                 raise ValueError(
-                    f"len(values) == {len(values)} != {len(prior)} == len(prior)"
+                    f"len(values) == {len(values)} != {len(priors)} == len(priors)"
                 )
-            self.prior = prior
+            self.priors = priors
 
     @property
     def n_values(self):
@@ -155,6 +158,24 @@ class Hyperparameter(object):
         return s
 
     @property
+    def prior_repr(self):
+        """The string representation of the list of priors.
+
+        It can be used to output the list of priors into a python file. For
+        object types it adds '' around the values, otherwise it's the list of
+        string representations of the values in brackets.
+
+        Return:
+            prior_repr : list of str
+                The string representation of the list of values.
+        """
+        s = "["
+        for p in self.priors:
+            s += "{}, ".format(p)
+        s += "]"
+        return s
+
+    @property
     def python_repr(self):
         """The string representation of the hyperparameter.
 
@@ -170,7 +191,8 @@ class Hyperparameter(object):
         repr = "{} = Hyperparameter(\n".format(self.name)
         repr += "    dtype='{}'".format(str(self.dtype))
         repr += ", default={}".format(self.default_repr)
-        repr += ", values={})\n".format(self.values_repr)
+        repr += ", values={}".format(self.values_repr)
+        repr += ",\n    priors={})\n".format(self.prior_repr)
         return repr
 
     def set_names(self, name, workflow_element_name):
@@ -280,12 +302,17 @@ def parse_hyperparameters(submission_path, workflow_element_name, in_play=True):
         h = getattr(workflow_element, object_name)
         if type(h) == Hyperparameter:
             h.set_names(object_name, workflow_element_name)
+            # We introduce actual_priors here otherwise priors are overwritten
+            # and eventually lost in the ancestry tree of submissions.
             if in_play:
                 h.start_value_index = 0
                 h.stop_value_index = len(h.values)
+                h.actual_priors = h.priors
             else:
                 h.start_value_index = h.default_index
                 h.stop_value_index = h.default_index + 1
+                h.actual_priors = np.zeros(h.n_values)
+                h.actual_priors[h.default_index] = 1.0
             hyperparameters.append(h)
     return hyperparameters
 
@@ -583,59 +610,65 @@ class HyperparameterOptimization(object):
         )
 
 
+def generate_output_submission(hyperparameter_experiment, hyper_indices):
+    hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
+    output_submission_path = f"{hyperparameter_experiment.submission_path}_hyperopt_{hyper_hash}"
+    output_submission = Path(output_submission_path).name
+    return output_submission_path, output_submission
+
+
 def run(hyperparameter_experiment, n_trials, resume=False):
     start_iter = 0
     if resume:
         hyperparameter_experiment.load_summary(
             hyperparameter_experiment.hyperopt_output_path
         )
-        start_iter = len(hyperparameter_experiment.df_scores_)
+        n_existing_trials = len(hyperparameter_experiment.df_scores_.groupby("hyperopt_submission").count())
     start = pd.Timestamp.now()
-    for i_iter in range(start_iter, n_trials):
+#    print(f"Remaining trials = n_trials - n_existing_trials = {n_trials} - {n_existing_trials} = {n_trials - n_existing_trials}")
+    output_submissions = []
+    for i_trial in range(n_trials):
         # Getting new hyperparameter values from engine
-        (
-            fold_idx,
-            next_value_indices,
-        ) = hyperparameter_experiment.engine.next_hyperparameter_indices(
+        hyper_indices = hyperparameter_experiment.engine.next_hyperparameter_indices(
             hyperparameter_experiment.df_scores_,
-            len(hyperparameter_experiment.cv),
             hyperparameter_experiment.problem,
         )
         # Updating hyperparameters
-        for h, i in zip(hyperparameter_experiment.hyperparameters, next_value_indices):
+        for h, i in zip(hyperparameter_experiment.hyperparameters, hyper_indices):
             h.default_index = i
         # Writing submission files with new hyperparameter values
-        output_submission_path = mkdtemp()
+        output_submission_path, output_submission = generate_output_submission(
+            hyperparameter_experiment, hyper_indices)
         write_hyperparameters(
             hyperparameter_experiment.submission_path,
             output_submission_path,
             hyperparameter_experiment.hypers_per_workflow_element,
         )
         # Calling the training script.
-
         hyperparameter_experiment.preprocess_data(output_submission_path)
-        df_scores = hyperparameter_experiment.run_next_experiment(
-            output_submission_path, fold_idx
-        )
-        sn = hyperparameter_experiment.score_names[0]
+        valid_scores = np.zeros(len(hyperparameter_experiment.cv))
+        for fold_i in range(len(hyperparameter_experiment.cv)):
+            df_scores = hyperparameter_experiment.run_next_experiment(
+                output_submission_path, fold_i, save_output=True
+            )
+            sn = hyperparameter_experiment.score_names[0]
+            valid_scores[fold_i] = df_scores.loc["valid", sn]
+            hyperparameter_experiment.update_df_scores(output_submission, df_scores, fold_i)
+        hyperparameter_experiment.make_and_save_summary()
         hyperparameter_experiment.engine.pass_feedback(
-            fold_idx, len(hyperparameter_experiment.cv), df_scores, sn
+            hyperparameter_experiment.df_scores_,
+            hyperparameter_experiment.problem,
         )
-        hyperparameter_experiment.update_df_scores(df_scores, fold_idx)
-        shutil.rmtree(output_submission_path)
+        
         now = pd.Timestamp.now()
-        eta = start + (now - start) / (i_iter + 1 - start_iter) * (
+        eta = start + (now - start) / (i_trial + 1 - start_iter) * (
             n_trials - start_iter
         )
-        print(f"Done {i_iter + 1} / {n_trials} at {now}. ETA = {eta}.")
-        hyperparameter_experiment.make_and_save_summary()
-    scores_columns = ["valid_" + name for name in hyperparameter_experiment.score_names]
-    for score in scores_columns:
-        hyperparameter_experiment.df_scores_[score + "_max"] = (
-            hyperparameter_experiment.df_scores_[score]
-            .rolling(n_trials, min_periods=1)
-            .max()
-        )
+        print(f"Done {i_trial + 1} / {n_trials} at {now}. ETA = {eta}.")
+        output_submissions.append(output_submission)
+    now = pd.Timestamp.now()
+    print(f"Done {n_trials} trials in {now - start}.")
+    return output_submissions
 
 
 def objective(config, run_params=None):
@@ -643,9 +676,8 @@ def objective(config, run_params=None):
     for h in hyperparameter_experiment.hyperparameters:
         h.default_index = config[h.name]
     hyper_indices = [h.default_index for h in hyperparameter_experiment.hyperparameters]
-    hyper_hash = hashlib.sha256(np.ascontiguousarray(hyper_indices)).hexdigest()[:10]
-    output_submission_path = f"{hyperparameter_experiment.submission_path}_hyperopt_{hyper_hash}"
-    output_submission = Path(output_submission_path).name
+    output_submission_path, output_submission = generate_output_submission(
+        hyperparameter_experiment, hyper_indices)    
     os.chdir(run_params["current_dir"])
     write_hyperparameters(
         hyperparameter_experiment.submission_path,
@@ -689,20 +721,21 @@ def run_tune(
         0
     ].is_lower_the_better
     engine_mode = "min" if is_lower_the_better else "max"
+#    values_in_play = {}
+#    for h in hyperparameter_experiment.hyperparameters:
+#        values_in_play[h.name] = []
+#        vs = range(h.start_value_index, h.stop_value_index)
+#        while len(values_in_play[h.name]) == 0:  # reject empty set
+#            for v in vs:
+#                if np.random.rand() < h.priors[v]:
+#                    values_in_play[h.name].append(v)
 
-    if hyperparameter_experiment.engine.name == "ray_grid_search":
-        warnings.warn("A full grid search is being used with RAY's default engine !")
-        config = {
-            h.name: tune.grid_search(range(h.start_value_index, h.stop_value_index))
-            for h in hyperparameter_experiment.hyperparameters
-        }
-        num_samples = int(len(hyperparameter_experiment.cv))
-    else:
-        config = {
-            h.name: tune.randint(h.start_value_index, h.stop_value_index)
-            for h in hyperparameter_experiment.hyperparameters
-        }
-        num_samples = int(n_trials / len(hyperparameter_experiment.cv))
+    config = {
+#        h.name: tune.randint(h.start_value_index, h.stop_value_index) if h.dtype in ["int", "float"] else tune.choice(values_in_play[h.name])
+        h.name: tune.randint(h.start_value_index, h.stop_value_index)
+        for h in hyperparameter_experiment.hyperparameters
+    }
+    num_samples = n_trials
 
     run_params = {
         "current_dir": os.getcwd(),
@@ -871,6 +904,8 @@ def init_hyperopt(
         submission_path, problem.workflow, workflow_element_names)
     if engine_name == "random":
         engine = RandomEngine(hyperparameters)
+    elif engine_name == "hebo":
+        engine = HeboEngine(hyperparameters)
     elif engine_name.startswith("ray_"):
         evaluated_rewards = None
         points_to_evaluate = None
@@ -951,12 +986,6 @@ def run_hyperopt(
         print("rm -rf ~/ray_results/*")
         exit()
         
-    ray.init(log_to_driver=False, ignore_reinit_error=True)
-    if n_cpu_per_run is None:
-        n_cpu_per_run = os.cpu_count() - 1
-
-    if n_gpu_per_run is None:
-        n_gpu_per_run = len(ray.get_gpu_ids())  # Get the number of GPUs available
     hyperparameter_experiment = init_hyperopt(
         ramp_kit_dir,
         ramp_data_dir,
@@ -971,6 +1000,12 @@ def run_hyperopt(
         test,
     )
     if engine_name.startswith("ray_"):
+        ray.init(log_to_driver=False, ignore_reinit_error=True)
+        if n_cpu_per_run is None:
+            n_cpu_per_run = os.cpu_count() - 1
+    
+        if n_gpu_per_run is None:
+            n_gpu_per_run = len(ray.get_gpu_ids())  # Get the number of GPUs available
         output_submissions = run_tune(
             hyperparameter_experiment,
             n_trials,
@@ -980,6 +1015,6 @@ def run_hyperopt(
             save_output,
             verbose,
         )
-        return output_submissions
     else:
-        run(hyperparameter_experiment, n_trials, resume)
+        output_submissions = run(hyperparameter_experiment, n_trials, resume)
+    return output_submissions
