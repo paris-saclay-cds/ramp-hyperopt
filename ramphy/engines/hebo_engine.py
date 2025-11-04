@@ -73,17 +73,17 @@ class HeboEngine(GenericEngine):
         next_value_indices = [rec[h.name].iloc[0] for h in self.hyperparameters]
         print(next_value_indices)
         return next_value_indices
-#        exit(0)
-        next_value_indices = []
-        for h in self.hyperparameters:
-            # Normalized prior distribution
-            prior = np.clip(h.actual_priors, 0., None)
-            prior /= prior.sum()
-            selected_index = np.random.choice(range(len(prior)), p=prior)
-            next_value_indices.append(selected_index)
-        print(next_value_indices)
-        exit(0)
-        return next_value_indices
+
+#        # Allowing priors in HEBO engine
+#        next_value_indices = []
+#        for h in self.hyperparameters:
+#            # Normalized prior distribution
+#            prior = np.clip(h.actual_priors, 0., None)
+#            prior /= prior.sum()
+#            selected_index = np.random.choice(range(len(prior)), p=prior)
+#            next_value_indices.append(selected_index)
+#        print(next_value_indices)
+#        return next_value_indices
 
     def pass_feedback(self, df_scores, problem):
         pass
